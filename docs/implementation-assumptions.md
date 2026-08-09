@@ -121,3 +121,35 @@ V6 remains authoritative if an assumption ever conflicts with it.
   not treated as an administrator action. Audit rows begin when the documented
   facility, verification, and identity-correction actions exist in Phases 6
   and 8; no speculative login-audit behavior is added.
+
+## Phase 6
+
+- Alembic revision identifiers use the ordered abbreviations
+  `0012_facilities` and `0013_role_facility_fk` to remain within Alembic's
+  32-character version column. The foreign-key constraint also has a compact
+  PostgreSQL-safe internal name; the documented table, column, and migration
+  order are unchanged.
+- The four documented facility types are enforced by request validation and a
+  database check. Facility names and optional registration numbers are not made
+  unique because the authoritative schema specifies no uniqueness rule; the
+  documented name index supports matching without silently merging branches or
+  organizations that share a name.
+- `PUT /admin/facilities/{id}` is a full replacement of the editable facility
+  fields. There is no delete route in Phase 6; administrators can mark a record
+  inactive while preserving references and auditability.
+- Verification accepts an existing active `facility_id`. When the submitted
+  name has no match, the admin first uses the separately documented facility
+  creation route and then verifies the application. Inline facility creation is
+  not added to the review payload, keeping both documented operations explicit.
+- A review decision is terminal: only `PENDING` applications can become
+  `VERIFIED` or `REJECTED`. Repeated or competing decisions return a conflict;
+  the row lock and single transaction ensure one audited winner. The documents
+  define no appeal or re-review workflow through Phase 14.
+- Facility create/update actions are audited in addition to the explicitly
+  required verification/rejection actions because they are trusted admin
+  mutations. Action types are stable uppercase literals and target the affected
+  facility or professional role registration; rejection stores its exact
+  trimmed reason.
+- The list route accepts an optional `verification_status` filter and returns
+  all statuses when it is omitted. The interface opens on `PENDING` for the
+  operational queue and offers explicit All, Verified, and Rejected views.

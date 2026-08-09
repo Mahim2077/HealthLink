@@ -72,6 +72,9 @@ class ProfessionalRoleRegistration(Base):
         ForeignKey("professional_roles.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    facility_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("healthcare_facilities.id", ondelete="RESTRICT")
+    )
     facility_name_submitted: Mapped[str] = mapped_column(String(255), nullable=False)
     designation: Mapped[str] = mapped_column(String(150), nullable=False)
     additional_info: Mapped[str | None] = mapped_column(Text)
@@ -102,6 +105,7 @@ class ProfessionalRoleRegistration(Base):
 
     professional: Mapped[HealthcareProfessionalProfile] = relationship()
     role: Mapped[ProfessionalRole] = relationship()
+    facility = relationship("HealthcareFacility")
 
 
 class DoctorRegistrationDetail(Base):

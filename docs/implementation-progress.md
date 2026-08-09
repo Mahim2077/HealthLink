@@ -13,7 +13,7 @@ apply to that phase have passed.
 | 3 | Citizen Profile and one-time BCN to NID upgrade | Completed |
 | 4 | Professional Registration and Role Catalog | Completed |
 | 5 | Admin Login and Admin Portal | Completed |
-| 6 | Facility Registry and Professional Verification | Not started |
+| 6 | Facility Registry and Professional Verification | Completed |
 | 7 | Professional Login and Active Role Context | Not started |
 | 8 | Admin Citizen Identity Support | Not started |
 | 9 | Doctor Search and Practice Schedule | Not started |
@@ -197,3 +197,41 @@ Phase 15 and later are explicitly outside the current implementation boundary.
 - Responsive and runtime checks: admin login and dashboard were checked at 390,
   768, and 1280 px widths with measured `scrollWidth == clientWidth`. The final
   browser console contained no errors.
+
+## Phase 6 verification evidence
+
+- Database: sequential migrations `0012_facilities` and
+  `0013_role_facility_fk` created the healthcare-facility registry and added the
+  delayed nullable primary-facility link to professional role registrations.
+  Both PostgreSQL databases passed downgrade to the Phase 5 boundary,
+  re-upgrade, `current`, and `alembic check` with no ungenerated operations.
+- Backend: all seven documented admin routes are implemented through route,
+  service, and repository layers. Facility creation and full update require an
+  active ADMIN context. Professional queue/detail responses are role-specific;
+  doctor detail includes BM&DC evidence. Verification requires an active
+  facility and links it atomically; rejection requires a nonblank reason. Both
+  decisions lock the pending application and write the admin audit in the same
+  transaction.
+- Backend automated tests: 115 passed against PostgreSQL 17. Phase 6 coverage
+  includes exact schema types/defaults/checks/index/foreign key, active-admin
+  authorization, facility create/list/update and audit, queue filtering, doctor
+  evidence, terminal verify/reject behavior, missing/inactive facilities,
+  required rejection reason, and a real two-connection verify-versus-reject
+  race with exactly one audited winner.
+- Frontend quality gates: ESLint and TypeScript passed; 23 Vitest files / 98
+  tests passed; the production build generated `/admin/facilities`,
+  `/admin/professional-registrations`, and its role-specific detail route.
+  Tests cover every API contract, facility normalization/editing, BM&DC display,
+  rejection validation, status filtering, and prevention of private data loads
+  before ADMIN authorization. Dependencies and lockfile remained synchronized.
+- Real Browser and PostgreSQL flow: the trusted admin created and updated a
+  hospital, reviewed a fresh doctor and lab-technician application, saw BM&DC
+  only for the doctor, linked the doctor to the active facility as VERIFIED,
+  received an accessible error for a whitespace-only rejection reason, and
+  rejected the lab application with the exact stored reason. Queue filters
+  reflected both terminal decisions.
+- Database inspection confirmed the facility link, mutually appropriate
+  decision timestamps, exact rejection reason, and `FACILITY_CREATE`,
+  `FACILITY_UPDATE`, `PROFESSIONAL_VERIFY`, and `PROFESSIONAL_REJECT` audit rows.
+  Logout and direct-access guards hid the queue afterward. Admin pages showed no
+  horizontal overflow at 390, 768, or 1280 px, and the final console was clean.

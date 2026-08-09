@@ -1,16 +1,28 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response
+import uuid
+
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.admins.schemas import AdminLoginRequest, AdminMeResponse
 from app.admins.service import AdminService
+from app.admins.verification_schemas import (
+    ProfessionalRegistrationDetail,
+    ProfessionalRegistrationSummary,
+    RejectProfessionalRequest,
+    VerifyProfessionalRequest,
+)
+from app.admins.verification_service import ProfessionalVerificationService
 from app.auth.constants import Portal
 from app.auth.cookies import set_refresh_cookie
 from app.auth.dependencies import AuthContext, require_portal
 from app.auth.schemas import TokenResponse
 from app.core.config import Settings
 from app.db.session import get_db
+from app.facilities.schemas import FacilityResponse, FacilityWriteRequest
+from app.facilities.service import FacilityService
+from app.professionals.constants import VerificationStatus
 
 
 auth_router = APIRouter(prefix="/auth/admin", tags=["admin-auth"])
@@ -53,3 +65,121 @@ def get_admin_me(
         last_name=context.user.last_name,
         is_super_admin=admin.is_super_admin,
     )
+
+
+def _require_active_admin(
+    request: Request, db: Session, context: AuthContext
+) -> None:
+    AdminService(db, _settings(request)).require_active_admin(context.user.id)
+
+
+@admin_router.get(
+    "/professional-registrations",
+    response_model=list[ProfessionalRegistrationSummary],
+)
+def list_professional_registrations(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
+    verification_status: Annotated[VerificationStatus | None, Query()] = None,
+) -> list[ProfessionalRegistrationSummary]:
+    _require_active_admin(request, db, context)
+    return ProfessionalVerificationService(db).list_registrations(
+        verification_status
+    )
+
+
+@admin_router.get(
+    "/professional-registrations/{registration_id}",
+    response_model=ProfessionalRegistrationDetail,
+)
+def get_professional_registration(
+    registration_id: uuid.UUID,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
+) -> ProfessionalRegistrationDetail:
+    _require_active_admin(request, db, context)
+    return ProfessionalVerificationService(db).get_registration(registration_id)
+
+
+@admin_router.post(
+    "/professional-registrations/{registration_id}/verify",
+    response_model=ProfessionalRegistrationDetail,
+)
+def verify_professional_registration(
+    registration_id: uuid.UUID,
+    payload: VerifyProfessionalRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
+) -> ProfessionalRegistrationDetail:
+    _require_active_admin(request, db, context)
+    return ProfessionalVerificationService(db).verify(
+        registration_id,
+        payload.facility_id,
+        admin_user_id=context.user.id,
+    )
+
+
+@admin_router.post(
+    "/professional-registrations/{registration_id}/reject",
+    response_model=ProfessionalRegistrationDetail,
+)
+def reject_professional_registration(
+    registration_id: uuid.UUID,
+    payload: RejectProfessionalRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
+) -> ProfessionalRegistrationDetail:
+    _require_active_admin(request, db, context)
+    return ProfessionalVerificationService(db).reject(
+        registration_id,
+        payload.reason,
+        admin_user_id=context.user.id,
+    )
+
+
+@admin_router.get("/facilities", response_model=list[FacilityResponse])
+def list_facilities(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
+) -> list[FacilityResponse]:
+    _require_active_admin(request, db, context)
+    return [
+        FacilityResponse.model_validate(facility)
+        for facility in FacilityService(db).list_facilities()
+    ]
+
+
+@admin_router.post(
+    "/facilities",
+    response_model=FacilityResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_facility(
+    payload: FacilityWriteRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
+) -> FacilityResponse:
+    _require_active_admin(request, db, context)
+    facility = FacilityService(db).create(payload, admin_user_id=context.user.id)
+    return FacilityResponse.model_validate(facility)
+
+
+@admin_router.put("/facilities/{facility_id}", response_model=FacilityResponse)
+def update_facility(
+    facility_id: uuid.UUID,
+    payload: FacilityWriteRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
+) -> FacilityResponse:
+    _require_active_admin(request, db, context)
+    facility = FacilityService(db).update(
+        facility_id, payload, admin_user_id=context.user.id
+    )
+    return FacilityResponse.model_validate(facility)

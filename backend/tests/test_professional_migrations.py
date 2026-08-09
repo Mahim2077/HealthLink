@@ -9,7 +9,7 @@ from app.db.base import Base
 BACKEND_DIRECTORY = Path(__file__).resolve().parents[1]
 
 
-def test_phase_four_metadata_matches_scope_and_delays_later_foreign_keys() -> None:
+def test_professional_metadata_includes_phase_six_facility_but_delays_active_role() -> None:
     expected = {
         "healthcare_professional_profiles",
         "professional_roles",
@@ -18,7 +18,11 @@ def test_phase_four_metadata_matches_scope_and_delays_later_foreign_keys() -> No
     }
     assert expected.issubset(Base.metadata.tables)
     registrations = Base.metadata.tables["professional_role_registrations"]
-    assert "facility_id" not in registrations.columns
+    assert "facility_id" in registrations.columns
+    assert {
+        foreign_key.target_fullname
+        for foreign_key in registrations.c.facility_id.foreign_keys
+    } == {"healthcare_facilities.id"}
     assert "active_professional_role_registration_id" not in Base.metadata.tables[
         "auth_sessions"
     ].columns
