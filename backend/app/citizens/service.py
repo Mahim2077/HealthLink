@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -16,7 +17,12 @@ from app.citizens.models import (
     UserNationalIdentifier,
 )
 from app.citizens.repository import CitizenRepository
-from app.citizens.schemas import CitizenLoginRequest, CitizenRegistrationRequest
+from app.citizens.schemas import (
+    CitizenAddNidRequest,
+    CitizenLoginRequest,
+    CitizenProfileUpdateRequest,
+    CitizenRegistrationRequest,
+)
 from app.core.config import Settings
 from app.core.exceptions import HealthLinkError
 from app.core.security import hash_password, verify_password
@@ -44,6 +50,11 @@ class CitizenConflictError(HealthLinkError):
 class CitizenCapabilityError(HealthLinkError):
     def __init__(self) -> None:
         super().__init__("Citizen profile required.", status_code=403)
+
+
+class CitizenIdentityUpgradeError(HealthLinkError):
+    def __init__(self, detail: str, *, status_code: int = 409) -> None:
+        super().__init__(detail, status_code=status_code)
 
 
 @dataclass(frozen=True)
@@ -204,3 +215,99 @@ class CitizenService:
             identity=identity,
             national_identifier=national_identifier,
         )
+
+    def update_profile(
+        self,
+        user_id: uuid.UUID,
+        request: CitizenProfileUpdateRequest,
+    ) -> CitizenProfile:
+        user = self.repository.get_user_by_id(user_id, for_update=True)
+        profile = self.repository.get_profile_by_user_id(
+            user_id,
+            for_update=True,
+        )
+        if user is None or profile is None:
+            self.db.rollback()
+            raise CitizenCapabilityError()
+
+        user.first_name = request.first_name
+        user.last_name = request.last_name
+        profile.date_of_birth = request.date_of_birth
+        profile.gender = request.gender
+        profile.blood_group = request.blood_group
+        profile.address = request.address
+        try:
+            self.db.commit()
+            self.db.refresh(user)
+            self.db.refresh(profile)
+            return profile
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def add_national_identifier(
+        self,
+        user_id: uuid.UUID,
+        request: CitizenAddNidRequest,
+    ) -> CitizenIdentityDetails:
+        if request.confirmation != "CONFIRM":
+            raise CitizenIdentityUpgradeError(
+                "Type CONFIRM exactly to add this National ID.",
+                status_code=400,
+            )
+
+        nid_number = request.nid_number.strip()
+        if not nid_number:
+            raise CitizenIdentityUpgradeError(
+                "National ID is required.",
+                status_code=400,
+            )
+
+        identity = self.repository.get_identity_by_user_id(
+            user_id,
+            for_update=True,
+        )
+        if identity is None:
+            self.db.rollback()
+            raise CitizenCapabilityError()
+        if identity.birth_certificate_number is None:
+            self.db.rollback()
+            raise CitizenIdentityUpgradeError(
+                "Only citizens registered with a Birth Certificate Number can add an NID."
+            )
+        if (
+            identity.national_identifier_id is not None
+            or identity.nid_added_at is not None
+            or self.repository.get_national_identifier_by_user_id(user_id)
+            is not None
+        ):
+            self.db.rollback()
+            raise CitizenIdentityUpgradeError(
+                "A National ID has already been added and cannot be replaced here."
+            )
+        if self.repository.get_national_identifier_by_number(nid_number) is not None:
+            self.db.rollback()
+            raise CitizenConflictError("NID is already registered.")
+
+        national_identifier = UserNationalIdentifier(
+            user_id=user_id,
+            nid_number=nid_number,
+        )
+        self.repository.add(national_identifier)
+        try:
+            self.db.flush()
+            identity.national_identifier_id = national_identifier.id
+            identity.nid_added_at = datetime.now(UTC)
+            self.db.commit()
+            self.db.refresh(identity)
+            self.db.refresh(national_identifier)
+            return CitizenIdentityDetails(
+                identity=identity,
+                national_identifier=national_identifier,
+            )
+        except IntegrityError as error:
+            self.db.rollback()
+            raise CitizenConflictError("NID is already registered.") from error
+        except Exception:
+            self.db.rollback()
+            raise

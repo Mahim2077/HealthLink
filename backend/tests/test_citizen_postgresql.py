@@ -17,8 +17,12 @@ from app.citizens.models import (
     CitizenProfile,
     UserNationalIdentifier,
 )
-from app.citizens.schemas import CitizenRegistrationRequest
-from app.citizens.service import CitizenConflictError, CitizenService
+from app.citizens.schemas import CitizenAddNidRequest, CitizenRegistrationRequest
+from app.citizens.service import (
+    CitizenConflictError,
+    CitizenIdentityUpgradeError,
+    CitizenService,
+)
 from app.core.config import Settings
 from app.core.security import REFRESH_TOKEN_COOKIE_NAME, hash_password
 from app.db.session import create_database_engine, get_db
@@ -453,4 +457,79 @@ def test_citizen_register_login_and_self_reads_against_postgresql(
                 ) == session_count_before
     finally:
         _delete_users(engine, user_ids)
+        engine.dispose()
+
+
+@pytest.mark.skipif(
+    not POSTGRES_TEST_DATABASE_URL,
+    reason="HEALTHLINK_TEST_DATABASE_URL is required for citizen PostgreSQL coverage",
+)
+def test_concurrent_one_time_nid_addition_has_exactly_one_winner(
+    test_settings: Settings,
+) -> None:
+    assert POSTGRES_TEST_DATABASE_URL is not None
+    engine = create_database_engine(POSTGRES_TEST_DATABASE_URL, poolclass=NullPool)
+    suffix = uuid.uuid4().hex
+    user_id: uuid.UUID | None = None
+    barrier = Barrier(2)
+    candidate_nids = [f"A{suffix}"[:32], f"B{suffix}"[:32]]
+
+    with Session(engine, expire_on_commit=False) as session:
+        registered = CitizenService(session, test_settings).register(
+            CitizenRegistrationRequest(
+                email=f"phase3-race-{suffix}@example.com",
+                password="StrongPassword123!",
+                first_name="Concurrent",
+                last_name="Citizen",
+                date_of_birth=date(1990, 1, 1),
+                gender="OTHER",
+                nid_number=None,
+                birth_certificate_number=_bcn(uuid.uuid4(), "P3-BCN-"),
+            )
+        )
+        user_id = registered.user.id
+        retained_bcn = registered.identity.birth_certificate_number
+
+    def add_nid(nid_number: str) -> str:
+        assert user_id is not None
+        with Session(engine, expire_on_commit=False) as session:
+            barrier.wait(timeout=10)
+            try:
+                CitizenService(session, test_settings).add_national_identifier(
+                    user_id,
+                    CitizenAddNidRequest(
+                        nid_number=nid_number,
+                        confirmation="CONFIRM",
+                    ),
+                )
+                return "created"
+            except CitizenIdentityUpgradeError:
+                return "conflict"
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            outcomes = list(executor.map(add_nid, candidate_nids))
+
+        assert outcomes.count("created") == 1
+        assert outcomes.count("conflict") == 1
+        with Session(engine) as session:
+            identity = session.scalar(
+                select(CitizenIdentifier).where(
+                    CitizenIdentifier.user_id == user_id
+                )
+            )
+            identifiers = session.scalars(
+                select(UserNationalIdentifier).where(
+                    UserNationalIdentifier.user_id == user_id
+                )
+            ).all()
+            assert identity is not None
+            assert identity.birth_certificate_number == retained_bcn
+            assert identity.nid_added_at is not None
+            assert len(identifiers) == 1
+            assert identifiers[0].nid_number in candidate_nids
+            assert identity.national_identifier_id == identifiers[0].id
+    finally:
+        if user_id is not None:
+            _delete_users(engine, [user_id])
         engine.dispose()

@@ -261,8 +261,11 @@ function DashboardContent({
           <div>
             <h2 className="text-base font-bold text-slate-950">Your citizen account is connected</h2>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              Profile changes and additional healthcare services are not available from this page yet.
+              Keep your personal details current and, if you registered with a Birth Certificate, add your NID once.
             </p>
+            <Link className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-bold text-white hover:bg-teal-800" href="/citizen/profile">
+              Manage profile and identity
+            </Link>
           </div>
         </div>
       </section>

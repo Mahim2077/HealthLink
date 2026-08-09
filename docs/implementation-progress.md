@@ -10,7 +10,7 @@ apply to that phase have passed.
 | 0 | Project Foundation | Completed |
 | 1 | Shared JWT Authentication and Refresh Sessions | Completed |
 | 2 | Citizen Registration and Login | Completed |
-| 3 | Citizen Profile and one-time BCN to NID upgrade | Not started |
+| 3 | Citizen Profile and one-time BCN to NID upgrade | Completed |
 | 4 | Professional Registration and Role Catalog | Not started |
 | 5 | Admin Login and Admin Portal | Not started |
 | 6 | Facility Registry and Professional Verification | Not started |
@@ -102,3 +102,32 @@ Phase 15 and later are explicitly outside the current implementation boundary.
   mobile (390 px), tablet (768 px), and desktop (1280 px) widths. There was no
   horizontal overflow, required labels and skip targets were present, and the
   final browser console was clean throughout the successful flows.
+
+## Phase 3 verification evidence
+
+- Database and migrations: Phase 3 correctly required no schema revision. The
+  live PostgreSQL schema remained at `0005_citizen_identifiers`; `current`,
+  `heads`, and `alembic check` passed with no ungenerated operations.
+- Backend: authenticated citizen profile replacement and the one-time BCN to
+  NID transaction were implemented through route, service, and repository
+  layers. The upgrade locks the citizen identity row, retains the BCN, creates
+  the authoritative national-identifier row, records `nid_added_at`, and
+  rejects replacement, wrong confirmation, and globally duplicate NIDs.
+- Backend automated tests: 85 passed against PostgreSQL 17. Phase 3 coverage
+  includes profile field boundaries and self-isolation, exact `CONFIRM`, BCN
+  retention, initial-NID and second-add rejection, uniqueness, rollback, and a
+  real two-connection row-lock race with exactly one winning NID addition.
+- Frontend quality gates: ESLint and TypeScript passed; 15 Vitest files / 71
+  tests passed; the production build generated the new `/citizen/profile`
+  route alongside all earlier routes. The dependency manifests and lockfile
+  required no additions.
+- Real Browser and PostgreSQL flow: a fresh BCN citizen signed in, edited their
+  profile, received an accessible error for lowercase confirmation, then added
+  an NID with exact `CONFIRM`. Direct database verification showed
+  `registered_with=BCN`, the exact original BCN, the exact new NID, and a set
+  `nid_added_at`; a hard reload showed both masked identifiers and no second-add
+  form, and the dashboard reflected the updated name.
+- Responsive and runtime checks: the profile/identity route was visually
+  checked at 390 px, 768 px, and 1280 px widths, with accessible labelled
+  controls and no visible clipping. The final browser console contained no
+  errors.

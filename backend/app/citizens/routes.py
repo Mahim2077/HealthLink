@@ -9,8 +9,10 @@ from app.citizens.constants import CitizenRegistrationMethod
 from app.citizens.dependencies import CitizenContext, get_current_citizen
 from app.citizens.schemas import (
     CitizenIdentityResponse,
+    CitizenAddNidRequest,
     CitizenLoginRequest,
     CitizenProfileResponse,
+    CitizenProfileUpdateRequest,
     CitizenRegistrationRequest,
     CitizenRegistrationResponse,
 )
@@ -105,6 +107,60 @@ def get_my_citizen_identity(
 ) -> CitizenIdentityResponse:
     details = CitizenService(db, _settings(request)).get_identity(
         context.auth.user.id
+    )
+    return CitizenIdentityResponse(
+        registered_with=CitizenRegistrationMethod(
+            details.identity.registered_with
+        ),
+        nid_number=(
+            details.national_identifier.nid_number
+            if details.national_identifier is not None
+            else None
+        ),
+        birth_certificate_number=details.identity.birth_certificate_number,
+        nid_added_at=details.identity.nid_added_at,
+    )
+
+
+@citizen_router.put("/me/profile", response_model=CitizenProfileResponse)
+def update_my_citizen_profile(
+    payload: CitizenProfileUpdateRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[CitizenContext, Depends(get_current_citizen)],
+) -> CitizenProfileResponse:
+    profile = CitizenService(db, _settings(request)).update_profile(
+        context.auth.user.id,
+        payload,
+    )
+    return CitizenProfileResponse(
+        user_id=context.auth.user.id,
+        citizen_id=profile.id,
+        email=context.auth.user.email,
+        first_name=context.auth.user.first_name,
+        last_name=context.auth.user.last_name,
+        date_of_birth=profile.date_of_birth,
+        gender=profile.gender,
+        blood_group=profile.blood_group,
+        address=profile.address,
+        created_at=profile.created_at,
+        updated_at=profile.updated_at,
+    )
+
+
+@citizen_router.post(
+    "/me/identity/add-nid",
+    response_model=CitizenIdentityResponse,
+)
+def add_my_national_identifier(
+    payload: CitizenAddNidRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[CitizenContext, Depends(get_current_citizen)],
+) -> CitizenIdentityResponse:
+    details = CitizenService(db, _settings(request)).add_national_identifier(
+        context.auth.user.id,
+        payload,
     )
     return CitizenIdentityResponse(
         registered_with=CitizenRegistrationMethod(

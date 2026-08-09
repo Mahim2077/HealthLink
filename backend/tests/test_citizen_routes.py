@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from app.auth.constants import Portal
 from app.auth.models import AuthSession, User
 from app.auth.service import AuthService
+from app.citizens.models import CitizenIdentifier, UserNationalIdentifier
 from app.core.config import Settings
 from app.core.security import REFRESH_TOKEN_COOKIE_NAME, hash_password
 
@@ -358,3 +359,210 @@ def test_each_citizen_token_reads_only_its_own_profile(client: TestClient) -> No
     assert first_profile["user_id"] == first_registration["user_id"]
     assert second_profile["user_id"] == second_registration["user_id"]
     assert first_profile["user_id"] != second_profile["user_id"]
+
+
+def test_citizen_can_update_only_their_editable_profile_fields(
+    client: TestClient,
+    db_session,
+) -> None:
+    registration, access_token = register_and_login(client)
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    response = client.put(
+        "/api/v1/citizens/me/profile",
+        headers=headers,
+        json={
+            "first_name": "  Ayesha  ",
+            "last_name": "  Karim  ",
+            "date_of_birth": "1994-04-14",
+            "gender": "FEMALE",
+            "blood_group": "B+",
+            "address": "Chattogram",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["first_name"] == "Ayesha"
+    assert response.json()["last_name"] == "Karim"
+    assert response.json()["date_of_birth"] == "1994-04-14"
+    assert response.json()["address"] == "Chattogram"
+    user = db_session.get(User, uuid.UUID(registration["user_id"]))
+    assert user is not None
+    assert (user.first_name, user.last_name) == ("Ayesha", "Karim")
+
+    forbidden = client.put(
+        "/api/v1/citizens/me/profile",
+        headers=headers,
+        json={
+            "first_name": "Ayesha",
+            "last_name": "Karim",
+            "date_of_birth": "1994-04-14",
+            "gender": "FEMALE",
+            "blood_group": "B+",
+            "address": "Chattogram",
+            "nid_number": "MUST-NOT-BE-ACCEPTED",
+        },
+    )
+    assert forbidden.status_code == 422
+    identity = client.get("/api/v1/citizens/me/identity", headers=headers)
+    assert identity.json()["nid_number"] == "1234567890"
+
+
+def test_profile_update_requires_citizen_portal_and_never_updates_another_user(
+    client: TestClient,
+    db_session,
+    test_settings: Settings,
+) -> None:
+    first_registration, first_access = register_and_login(client)
+    second_registration = client.post(
+        "/api/v1/auth/citizen/register",
+        json=registration_payload(email="second-profile@example.com", nid_number="PROFILE-2"),
+    ).json()
+    second_user = db_session.get(User, uuid.UUID(second_registration["user_id"]))
+    assert second_user is not None
+
+    admin_access = AuthService(db_session, test_settings).create_session(
+        uuid.UUID(first_registration["user_id"]),
+        Portal.ADMIN,
+    ).access_token
+    payload = {
+        "first_name": "Only",
+        "last_name": "Mine",
+        "date_of_birth": "1990-01-01",
+        "gender": "OTHER",
+        "blood_group": None,
+        "address": None,
+    }
+    assert client.put("/api/v1/citizens/me/profile", json=payload).status_code == 401
+    assert client.put(
+        "/api/v1/citizens/me/profile",
+        headers={"Authorization": f"Bearer {admin_access}"},
+        json=payload,
+    ).status_code == 403
+    assert client.put(
+        "/api/v1/citizens/me/profile",
+        headers={"Authorization": f"Bearer {first_access}"},
+        json=payload,
+    ).status_code == 200
+    db_session.refresh(second_user)
+    assert (second_user.first_name, second_user.last_name) == ("Amina", "Rahman")
+
+
+def test_bcn_citizen_adds_nid_once_and_retains_birth_certificate(
+    client: TestClient,
+    db_session,
+) -> None:
+    registration = client.post(
+        "/api/v1/auth/citizen/register",
+        json=registration_payload(
+            email="upgrade@example.com",
+            nid_number=None,
+            birth_certificate_number="BCN-UPGRADE-001",
+        ),
+    ).json()
+    login = client.post(
+        "/api/v1/auth/citizen/login",
+        json={"email": "upgrade@example.com", "password": "StrongPassword123!"},
+    )
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    response = client.post(
+        "/api/v1/citizens/me/identity/add-nid",
+        headers=headers,
+        json={"nid_number": "  NID-UPGRADE-001  ", "confirmation": "CONFIRM"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["registered_with"] == "BCN"
+    assert response.json()["nid_number"] == "NID-UPGRADE-001"
+    assert response.json()["birth_certificate_number"] == "BCN-UPGRADE-001"
+    assert response.json()["nid_added_at"] is not None
+    identity = db_session.scalar(
+        select(CitizenIdentifier).where(
+            CitizenIdentifier.user_id == uuid.UUID(registration["user_id"])
+        )
+    )
+    assert identity is not None
+    assert identity.birth_certificate_number == "BCN-UPGRADE-001"
+    assert identity.national_identifier_id is not None
+    assert identity.nid_added_at is not None
+    national_identifier = db_session.get(
+        UserNationalIdentifier,
+        identity.national_identifier_id,
+    )
+    assert national_identifier is not None
+    assert national_identifier.nid_number == "NID-UPGRADE-001"
+
+    second = client.post(
+        "/api/v1/citizens/me/identity/add-nid",
+        headers=headers,
+        json={"nid_number": "REPLACEMENT-NID", "confirmation": "CONFIRM"},
+    )
+    assert second.status_code == 409
+    db_session.refresh(identity)
+    assert identity.national_identifier_id == national_identifier.id
+
+
+def test_add_nid_requires_exact_confirmation_and_global_unique_value(
+    client: TestClient,
+) -> None:
+    client.post(
+        "/api/v1/auth/citizen/register",
+        json=registration_payload(email="existing-nid@example.com"),
+    )
+    client.post(
+        "/api/v1/auth/citizen/register",
+        json=registration_payload(
+            email="new-bcn@example.com",
+            nid_number=None,
+            birth_certificate_number="BCN-NEW-001",
+        ),
+    )
+    login = client.post(
+        "/api/v1/auth/citizen/login",
+        json={"email": "new-bcn@example.com", "password": "StrongPassword123!"},
+    )
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    for confirmation in ["confirm", " CONFIRM", "CONFIRM "]:
+        response = client.post(
+            "/api/v1/citizens/me/identity/add-nid",
+            headers=headers,
+            json={"nid_number": "NEW-UNUSED-NID", "confirmation": confirmation},
+        )
+        assert response.status_code == 400
+
+    duplicate = client.post(
+        "/api/v1/citizens/me/identity/add-nid",
+        headers=headers,
+        json={"nid_number": "1234567890", "confirmation": "CONFIRM"},
+    )
+    assert duplicate.status_code == 409
+    identity = client.get("/api/v1/citizens/me/identity", headers=headers)
+    assert identity.json()["nid_number"] is None
+    assert identity.json()["birth_certificate_number"] == "BCN-NEW-001"
+
+
+def test_add_nid_rejects_initial_nid_citizen_and_wrong_portal(
+    client: TestClient,
+    db_session,
+    test_settings: Settings,
+) -> None:
+    registration, access_token = register_and_login(client)
+    payload = {"nid_number": "ANOTHER-NID", "confirmation": "CONFIRM"}
+    response = client.post(
+        "/api/v1/citizens/me/identity/add-nid",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=payload,
+    )
+    assert response.status_code == 409
+
+    admin_access = AuthService(db_session, test_settings).create_session(
+        uuid.UUID(registration["user_id"]),
+        Portal.ADMIN,
+    ).access_token
+    assert client.post(
+        "/api/v1/citizens/me/identity/add-nid",
+        headers={"Authorization": f"Bearer {admin_access}"},
+        json=payload,
+    ).status_code == 403

@@ -71,6 +71,53 @@ class CitizenLoginRequest(BaseModel):
     password: LoginPassword
 
 
+class CitizenProfileUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    first_name: Annotated[str, Field(min_length=1, max_length=100)]
+    last_name: Annotated[str, Field(min_length=1, max_length=100)]
+    date_of_birth: date
+    gender: Annotated[str, Field(min_length=1, max_length=32)]
+    blood_group: Annotated[str | None, Field(max_length=8)] = None
+    address: str | None = None
+
+    @field_validator(
+        "first_name",
+        "last_name",
+        "gender",
+        "blood_group",
+        "address",
+        mode="before",
+    )
+    @classmethod
+    def strip_profile_text(cls, value: object) -> object:
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return value
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def reject_future_date_of_birth(cls, value: date) -> date:
+        if value > date.today():
+            raise ValueError("Date of birth cannot be in the future.")
+        return value
+
+
+class CitizenAddNidRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nid_number: Annotated[str, Field(min_length=1, max_length=32)]
+    confirmation: Annotated[str, Field(min_length=1, max_length=32)]
+
+    @field_validator("nid_number", mode="before")
+    @classmethod
+    def strip_nid_number(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
+
 class CitizenRegistrationResponse(BaseModel):
     user_id: uuid.UUID
     citizen_id: uuid.UUID

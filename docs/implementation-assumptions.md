@@ -64,3 +64,21 @@ V6 remains authoritative if an assumption ever conflicts with it.
   NID/BCN value because no masking contract is specified. The frontend masks it
   by default (fully masking identifiers of four or fewer characters) and never
   persists raw identity or access-token data in browser storage.
+
+## Phase 3
+
+- `PUT /citizens/me/profile` is a full replacement of the documented editable
+  citizen fields: first and last name, date of birth, gender, blood group, and
+  address. Email, password, user identifiers, NID, and BCN are forbidden from
+  that payload. The same trim, length, and non-future-date rules used at
+  registration remain in force.
+- The BCN to NID confirmation is the exact, case-sensitive string `CONFIRM`;
+  surrounding whitespace is not normalized. This check is performed
+  independently by the frontend and backend.
+- A successful self-service NID addition does not change `registered_with`:
+  it remains `BCN` to preserve how the citizen originally registered. The BCN
+  remains stored and visible in the owner-only identity response, while both
+  values stay masked in the interface.
+- Phase 3 needs no Alembic revision because Phase 2 deliberately created the
+  nullable national-identifier link and `nid_added_at` column and its database
+  check already permits the post-upgrade BCN-plus-NID state.

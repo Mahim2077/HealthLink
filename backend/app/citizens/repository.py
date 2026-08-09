@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
@@ -24,17 +24,61 @@ class CitizenRepository:
     def get_user_by_email(self, email: str) -> User | None:
         return self.db.scalar(select(User).where(User.email == email))
 
-    def get_profile_by_user_id(self, user_id: uuid.UUID) -> CitizenProfile | None:
-        return self.db.scalar(
-            select(CitizenProfile).where(CitizenProfile.user_id == user_id)
+    def get_user_by_id(
+        self,
+        user_id: uuid.UUID,
+        *,
+        for_update: bool = False,
+    ) -> User | None:
+        if not for_update:
+            return self.db.get(User, user_id)
+
+        statement = (
+            select(User)
+            .where(User.id == user_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
+        return self.db.scalar(statement)
+
+    def get_profile_by_user_id(
+        self,
+        user_id: uuid.UUID,
+        *,
+        for_update: bool = False,
+    ) -> CitizenProfile | None:
+        statement: Select[tuple[CitizenProfile]] = select(CitizenProfile).where(
+            CitizenProfile.user_id == user_id
+        )
+        if for_update:
+            statement = statement.with_for_update().execution_options(
+                populate_existing=True
+            )
+        return self.db.scalar(statement)
 
     def get_identity_by_user_id(
         self,
         user_id: uuid.UUID,
+        *,
+        for_update: bool = False,
     ) -> CitizenIdentifier | None:
+        statement: Select[tuple[CitizenIdentifier]] = select(
+            CitizenIdentifier
+        ).where(CitizenIdentifier.user_id == user_id)
+        if for_update:
+            statement = statement.with_for_update().execution_options(
+                populate_existing=True
+            )
+        return self.db.scalar(statement)
+
+    def get_national_identifier_by_user_id(
+        self,
+        user_id: uuid.UUID,
+    ) -> UserNationalIdentifier | None:
         return self.db.scalar(
-            select(CitizenIdentifier).where(CitizenIdentifier.user_id == user_id)
+            select(UserNationalIdentifier).where(
+                UserNationalIdentifier.user_id == user_id
+            )
         )
 
     def get_national_identifier_by_number(

@@ -6,10 +6,12 @@ import { replaceSession } from "@/lib/auth/actions";
 
 import type {
   CitizenDashboardData,
+  CitizenAddNidRequest,
   CitizenIdentity,
   CitizenLoginRequest,
   CitizenLoginResponse,
   CitizenProfile,
+  CitizenProfileUpdateRequest,
   CitizenRegistrationRequest,
   CitizenRegistrationResponse,
 } from "./types";
@@ -65,4 +67,22 @@ export async function loadCitizenDashboard(): Promise<CitizenDashboardData> {
   ]);
 
   return { identity, profile };
+}
+
+export async function updateCitizenProfile(
+  request: CitizenProfileUpdateRequest,
+): Promise<CitizenProfile> {
+  return apiClient.put<CitizenProfile, CitizenProfileUpdateRequest>(
+    "citizens/me/profile",
+    request,
+  );
+}
+
+export async function addCitizenNid(
+  request: CitizenAddNidRequest,
+): Promise<CitizenIdentity> {
+  return apiClient.post<CitizenIdentity, CitizenAddNidRequest>(
+    "citizens/me/identity/add-nid",
+    request,
+  );
 }

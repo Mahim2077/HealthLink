@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const apiMocks = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
+  put: vi.fn(),
   replaceSession: vi.fn(),
 }));
 
@@ -10,6 +11,7 @@ vi.mock("@/lib/api/client", () => ({
   apiClient: {
     get: apiMocks.get,
     post: apiMocks.post,
+    put: apiMocks.put,
   },
 }));
 
@@ -17,12 +19,19 @@ vi.mock("@/lib/auth/actions", () => ({
   replaceSession: apiMocks.replaceSession,
 }));
 
-import { loadCitizenDashboard, loginCitizen, registerCitizen } from "./api";
+import {
+  addCitizenNid,
+  loadCitizenDashboard,
+  loginCitizen,
+  registerCitizen,
+  updateCitizenProfile,
+} from "./api";
 
 describe("Citizen API", () => {
   beforeEach(() => {
     apiMocks.get.mockReset();
     apiMocks.post.mockReset();
+    apiMocks.put.mockReset();
     apiMocks.replaceSession.mockReset();
   });
 
@@ -110,6 +119,41 @@ describe("Citizen API", () => {
     expect(apiMocks.get).toHaveBeenNthCalledWith(
       2,
       "citizens/me/identity",
+    );
+  });
+
+  it("updates only the documented editable profile fields", async () => {
+    const request = {
+      address: "Chattogram",
+      blood_group: "B+",
+      date_of_birth: "1990-01-02",
+      first_name: "Ayesha",
+      gender: "FEMALE",
+      last_name: "Karim",
+    };
+    apiMocks.put.mockResolvedValue({ ...request, email: "citizen@example.com" });
+
+    await updateCitizenProfile(request);
+
+    expect(apiMocks.put).toHaveBeenCalledWith("citizens/me/profile", request);
+    expect(request).not.toHaveProperty("nid_number");
+    expect(request).not.toHaveProperty("birth_certificate_number");
+  });
+
+  it("uses the dedicated one-time NID endpoint with explicit confirmation", async () => {
+    const request = { confirmation: "CONFIRM", nid_number: "NID-001" };
+    apiMocks.post.mockResolvedValue({
+      birth_certificate_number: "BCN-001",
+      nid_added_at: "2026-08-10T00:00:00Z",
+      nid_number: "NID-001",
+      registered_with: "BCN",
+    });
+
+    await addCitizenNid(request);
+
+    expect(apiMocks.post).toHaveBeenCalledWith(
+      "citizens/me/identity/add-nid",
+      request,
     );
   });
 });

@@ -69,3 +69,18 @@ export type CitizenDashboardData = {
   profile: CitizenProfile;
   identity: CitizenIdentity;
 };
+
+export type CitizenProfileUpdateRequest = Pick<
+  CitizenProfile,
+  | "first_name"
+  | "last_name"
+  | "date_of_birth"
+  | "gender"
+  | "blood_group"
+  | "address"
+>;
+
+export type CitizenAddNidRequest = {
+  nid_number: string;
+  confirmation: string;
+};
