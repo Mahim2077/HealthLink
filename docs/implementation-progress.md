@@ -12,7 +12,7 @@ apply to that phase have passed.
 | 2 | Citizen Registration and Login | Completed |
 | 3 | Citizen Profile and one-time BCN to NID upgrade | Completed |
 | 4 | Professional Registration and Role Catalog | Completed |
-| 5 | Admin Login and Admin Portal | Not started |
+| 5 | Admin Login and Admin Portal | Completed |
 | 6 | Facility Registry and Professional Verification | Not started |
 | 7 | Professional Login and Active Role Context | Not started |
 | 8 | Admin Citizen Identity Support | Not started |
@@ -166,3 +166,34 @@ Phase 15 and later are explicitly outside the current implementation boundary.
 - Responsive and runtime checks: the professional form was exercised at 390,
   768, and 1280 px widths with measured `scrollWidth == clientWidth`, labelled
   controls, all six selectable roles, and clean browser consoles.
+
+## Phase 5 verification evidence
+
+- Database: sequential migrations `0010_admin_accounts` and
+  `0011_admin_action_logs` created the two Phase 5 tables. PostgreSQL downgrade
+  to Phase 4, re-upgrade, `current`, and `alembic check` passed on development
+  and test databases with no ungenerated operations.
+- Backend: the trusted provisioning utility creates an Argon2-protected admin
+  without exposing the password as a command argument. Admin login uses the
+  shared ADMIN refresh-session infrastructure, constant-work generic failures,
+  and an active base-user plus active-admin check; `/admin/me` enforces the
+  signed ADMIN portal on the server. No public admin registration exists.
+- Backend automated tests: 108 passed against PostgreSQL 17. Coverage includes
+  exact table constraints, foreign keys, defaults and timezone-aware values;
+  trusted provisioning; generic denial of normal and inactive accounts; ADMIN
+  JWT/session/cookie issuance; wrong-portal denial; self-isolated `/admin/me`;
+  and the absence of a registration route.
+- Frontend quality gates: ESLint and TypeScript passed; 21 Vitest files / 90
+  tests passed; the production build generated `/admin/login` and
+  `/admin/dashboard` alongside all prior routes. Tests cover serialized login,
+  ADMIN portal validation, refresh hydration, logout, direct-access guards, and
+  the logout-versus-rehydration race. Dependency manifests remained sufficient
+  and synchronized.
+- Real Browser and PostgreSQL flow: a normal citizen received the same generic
+  invalid-credentials result, while a trusted active administrator signed in
+  and loaded their real admin record. A hard reload restored the HttpOnly-cookie
+  session; logout removed the private view; and a direct dashboard visit showed
+  only the sign-in guard. No Phase 6 facility or verification controls appeared.
+- Responsive and runtime checks: admin login and dashboard were checked at 390,
+  768, and 1280 px widths with measured `scrollWidth == clientWidth`. The final
+  browser console contained no errors.

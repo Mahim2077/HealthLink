@@ -327,14 +327,14 @@ export default function Home() {
                           ? "bg-emerald-50 text-emerald-700"
                           : portal.kind === "professional"
                             ? "bg-sky-50 text-sky-700"
-                          : "bg-slate-100 text-slate-500")
+                          : "bg-indigo-50 text-indigo-700")
                       }
                     >
                       {portal.kind === "citizen"
                         ? "Available now"
                         : portal.kind === "professional"
                           ? "Registration open"
-                          : "Planned experience"}
+                          : "Available now"}
                     </span>
                   </div>
                   <p className="mt-7 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{portal.eyebrow}</p>
@@ -371,8 +371,9 @@ export default function Home() {
                       </Link>
                     </div>
                   ) : (
-                    <div className="mt-6 border-t border-slate-100 pt-5 text-xs font-semibold text-slate-500">
-                      {portal.detail}
+                    <div className="mt-6 flex flex-wrap gap-2 border-t border-slate-100 pt-5">
+                      <Link className="inline-flex min-h-10 items-center justify-center rounded-xl bg-indigo-700 px-4 text-xs font-bold text-white transition hover:bg-indigo-800" href="/admin/login">Admin sign in</Link>
+                      <span className="inline-flex min-h-10 items-center text-xs font-semibold text-slate-500">Trusted accounts only</span>
                     </div>
                   )}
                 </article>

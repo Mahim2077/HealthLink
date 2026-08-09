@@ -12,6 +12,7 @@ from app.db.session import create_database_engine
 from app.auth import models as auth_models  # noqa: F401
 from app.citizens import models as citizen_models  # noqa: F401
 from app.professionals import models as professional_models  # noqa: F401
+from app.admins import models as admin_models  # noqa: F401
 
 
 config = context.config

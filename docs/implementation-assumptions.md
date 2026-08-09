@@ -103,3 +103,21 @@ V6 remains authoritative if an assumption ever conflicts with it.
   Facility name, designation, and additional information are trimmed and
   required for every initial application, with additional information stored as
   unbounded database text.
+
+## Phase 5
+
+- There is no public or authenticated admin-registration API. The initial
+  administrator is created only through the trusted local provisioning command,
+  which prompts for the password twice instead of accepting it in command-line
+  arguments or writing it to logs.
+- Initial trusted provisioning refuses an email already owned by any user. The
+  documents do not define a workflow for promoting an existing citizen or
+  professional account, so that materially different identity-linking operation
+  is not invented in Phase 5.
+- Admin login issues the existing shared ADMIN session and token response; it
+  does not create or alter an account. The same HttpOnly, fixed-expiry refresh
+  cookie and in-memory access-token rules apply to the admin portal.
+- `admin_action_logs` is created in Phase 5 as documented, but login itself is
+  not treated as an administrator action. Audit rows begin when the documented
+  facility, verification, and identity-correction actions exist in Phases 6
+  and 8; no speculative login-audit behavior is added.

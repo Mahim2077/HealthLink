@@ -24,7 +24,7 @@ describe("HealthLink home page", () => {
     ).toBeInTheDocument();
   });
 
-  it("links only the available Citizen Portal routes", () => {
+  it("links each currently available portal entry point", () => {
     render(<Home />);
 
     expect(screen.getByRole("link", { name: "Citizen sign in" })).toHaveAttribute(
@@ -41,6 +41,9 @@ describe("HealthLink home page", () => {
     expect(
       screen.getByRole("link", { name: "Existing citizen" }),
     ).toHaveAttribute("href", "/professional/onboard");
-    expect(screen.queryByRole("link", { name: /admin/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Admin sign in" })).toHaveAttribute(
+      "href",
+      "/admin/login",
+    );
   });
 });

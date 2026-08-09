@@ -34,4 +34,4 @@ def test_phase_four_migrations_are_four_sequential_revisions() -> None:
     ]
     for revision, parent in expected:
         assert scripts.get_revision(revision).down_revision == parent
-    assert scripts.get_heads() == ["0009_doctor_reg_details"]
+    assert scripts.get_revision("0009_doctor_reg_details") is not None
