@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: "Aptos", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Aptos Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+}
+
+:root {
+  --background: #f7faf9;
+  --foreground: #0f172a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: #99f6e4;
+  color: #134e4a;
+}
+
+.page-grid {
+  background-image:
+    linear-gradient(to right, rgb(15 118 110 / 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(15 118 110 / 0.045) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(to bottom, black, transparent 88%);
+}
+
+.hero-glow {
+  background:
+    radial-gradient(circle at 18% 20%, rgb(45 212 191 / 0.2), transparent 31%),
+    radial-gradient(circle at 86% 16%, rgb(56 189 248 / 0.13), transparent 27%),
+    radial-gradient(circle at 76% 84%, rgb(20 184 166 / 0.13), transparent 31%);
+}
+
+.soft-shadow {
+  box-shadow:
+    0 40px 100px -52px rgb(15 23 42 / 0.38),
+    0 12px 36px -24px rgb(13 148 136 / 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

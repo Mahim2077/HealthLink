@@ -1,0 +1,13 @@
+# Dependencies and generated Next.js output
+/node_modules/
+/.next/
+/out/
+/coverage/
+
+# Local environment values; keep the documented example
+.env*
+!.env.example
+
+# Tooling output
+*.tsbuildinfo
+*.log
