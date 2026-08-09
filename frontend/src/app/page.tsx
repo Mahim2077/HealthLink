@@ -325,10 +325,16 @@ export default function Home() {
                         "rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] " +
                         (portal.kind === "citizen"
                           ? "bg-emerald-50 text-emerald-700"
+                          : portal.kind === "professional"
+                            ? "bg-sky-50 text-sky-700"
                           : "bg-slate-100 text-slate-500")
                       }
                     >
-                      {portal.kind === "citizen" ? "Available now" : "Planned experience"}
+                      {portal.kind === "citizen"
+                        ? "Available now"
+                        : portal.kind === "professional"
+                          ? "Registration open"
+                          : "Planned experience"}
                     </span>
                   </div>
                   <p className="mt-7 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{portal.eyebrow}</p>
@@ -347,6 +353,21 @@ export default function Home() {
                         href="/citizen/register"
                       >
                         Create account
+                      </Link>
+                    </div>
+                  ) : portal.kind === "professional" ? (
+                    <div className="mt-6 flex flex-wrap gap-2 border-t border-slate-100 pt-5">
+                      <Link
+                        className="inline-flex min-h-10 items-center justify-center rounded-xl bg-sky-700 px-4 text-xs font-bold text-white transition hover:bg-sky-800"
+                        href="/professional/register"
+                      >
+                        Apply with NID
+                      </Link>
+                      <Link
+                        className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 px-4 text-xs font-bold text-slate-700 transition hover:border-slate-400"
+                        href="/professional/onboard"
+                      >
+                        Existing citizen
                       </Link>
                     </div>
                   ) : (

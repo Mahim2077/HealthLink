@@ -11,7 +11,7 @@ apply to that phase have passed.
 | 1 | Shared JWT Authentication and Refresh Sessions | Completed |
 | 2 | Citizen Registration and Login | Completed |
 | 3 | Citizen Profile and one-time BCN to NID upgrade | Completed |
-| 4 | Professional Registration and Role Catalog | Not started |
+| 4 | Professional Registration and Role Catalog | Completed |
 | 5 | Admin Login and Admin Portal | Not started |
 | 6 | Facility Registry and Professional Verification | Not started |
 | 7 | Professional Login and Active Role Context | Not started |
@@ -131,3 +131,38 @@ Phase 15 and later are explicitly outside the current implementation boundary.
   checked at 390 px, 768 px, and 1280 px widths, with accessible labelled
   controls and no visible clipping. The final browser console contained no
   errors.
+
+## Phase 4 verification evidence
+
+- Database: sequential migrations `0006_prof_profiles`, `0007_prof_roles`,
+  `0008_prof_role_regs`, and `0009_doctor_reg_details` created the four Phase 4
+  tables and seeded the exact six-role catalog. PostgreSQL downgrade to Phase 3,
+  re-upgrade, `current`, and `alembic check` passed on both development and test
+  databases. Facility and active-session role foreign keys remain correctly
+  deferred to Phases 6 and 7.
+- Backend: public NID-only professional registration and authenticated
+  existing-account onboarding are transactional. Doctor applications require a
+  globally unique BM&DC number; other roles reject BM&DC input; all applications
+  begin PENDING, create no professional session, and expose no identity value in
+  the response. Existing NIDs are directed to onboarding instead of producing a
+  second user.
+- Backend automated tests: 98 passed against PostgreSQL 17. Coverage includes
+  exact schema/default/check/foreign-key/unique behavior, six-role seeding,
+  doctor and lab-technician registration, role-specific BM&DC validation,
+  BCN-only onboarding rejection, same-person reuse, multiple distinct roles,
+  duplicate-role rollback, and concurrent duplicate BM&DC registration with
+  exactly one winner and no orphan losing account.
+- Frontend quality gates: ESLint and TypeScript passed; 18 Vitest files / 81
+  tests passed; the production build generated `/professional/register` and
+  `/professional/onboard` in addition to all previous routes. The dynamic role
+  form clears and removes BM&DC for non-doctors; protected onboarding never
+  submits duplicate identity or account fields.
+- Real Browser and PostgreSQL flow: a new doctor submitted NID, BM&DC, facility,
+  designation, and large-text information and reached the PENDING confirmation.
+  A public attempt with an existing citizen NID showed the onboarding conflict
+  and created no user. The authenticated citizen then onboarded as a lab
+  technician; database inspection confirmed the same original user/NID, one
+  professional profile, and a PENDING role registration.
+- Responsive and runtime checks: the professional form was exercised at 390,
+  768, and 1280 px widths with measured `scrollWidth == clientWidth`, labelled
+  controls, all six selectable roles, and clean browser consoles.

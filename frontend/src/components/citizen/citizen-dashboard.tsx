@@ -266,6 +266,9 @@ function DashboardContent({
             <Link className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-bold text-white hover:bg-teal-800" href="/citizen/profile">
               Manage profile and identity
             </Link>
+            <Link className="ml-0 mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-bold text-slate-700 hover:border-slate-400 sm:ml-3" href="/professional/onboard">
+              Add a professional role
+            </Link>
           </div>
         </div>
       </section>

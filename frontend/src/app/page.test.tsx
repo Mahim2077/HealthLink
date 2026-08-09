@@ -36,8 +36,11 @@ describe("HealthLink home page", () => {
       "/citizen/register",
     );
     expect(
-      screen.queryByRole("link", { name: /professional/i }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("link", { name: "Apply with NID" }),
+    ).toHaveAttribute("href", "/professional/register");
+    expect(
+      screen.getByRole("link", { name: "Existing citizen" }),
+    ).toHaveAttribute("href", "/professional/onboard");
     expect(screen.queryByRole("link", { name: /admin/i })).not.toBeInTheDocument();
   });
 });

@@ -82,3 +82,24 @@ V6 remains authoritative if an assumption ever conflicts with it.
 - Phase 3 needs no Alembic revision because Phase 2 deliberately created the
   nullable national-identifier link and `nid_added_at` column and its database
   check already permits the post-upgrade BCN-plus-NID state.
+
+## Phase 4
+
+- Alembic's standard `version_num VARCHAR(32)` cannot store the plan's full
+  descriptive logical migration names. Internal revision identifiers use the
+  ordered, unambiguous abbreviations `0006_prof_profiles`, `0007_prof_roles`,
+  `0008_prof_role_regs`, and `0009_doctor_reg_details`; table names and phase
+  ordering remain exactly as documented.
+- New professional registration returns a `201` PENDING application without a
+  session. Professional login is intentionally unavailable until Phase 7.
+  Existing-account onboarding derives the user and NID exclusively from the
+  authenticated session and central identity row; it never accepts client-owned
+  user or NID fields.
+- Facility input remains the submitted free-text name until Phase 6 performs
+  administrator matching or creation. No facility table or foreign key is
+  introduced early.
+- The frontend role selector mirrors the six authoritative roles seeded by the
+  database. Doctor input requires BM&DC; all non-doctor payloads omit it.
+  Facility name, designation, and additional information are trimmed and
+  required for every initial application, with additional information stored as
+  unbounded database text.

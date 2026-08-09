@@ -3,6 +3,8 @@ from fastapi import APIRouter
 from app.auth.routes import router as auth_router
 from app.citizens.routes import auth_router as citizen_auth_router
 from app.citizens.routes import citizen_router
+from app.professionals.routes import auth_router as professional_auth_router
+from app.professionals.routes import professional_router
 
 
 api_router = APIRouter()
@@ -10,3 +12,5 @@ api_router = APIRouter()
 api_router.include_router(auth_router)
 api_router.include_router(citizen_auth_router)
 api_router.include_router(citizen_router)
+api_router.include_router(professional_auth_router)
+api_router.include_router(professional_router)

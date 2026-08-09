@@ -18,6 +18,8 @@ from app.core.config import Settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
+from app.professionals.constants import ROLE_SEED_DATA
+from app.professionals.models import ProfessionalRole
 
 
 @pytest.fixture
@@ -51,6 +53,15 @@ def db_engine() -> Iterator[Engine]:
 @pytest.fixture
 def db_session(db_engine: Engine) -> Iterator[Session]:
     with Session(db_engine, expire_on_commit=False) as session:
+        session.add_all(
+            ProfessionalRole(
+                code=code.value,
+                name=name,
+                description=description,
+            )
+            for code, name, description in ROLE_SEED_DATA
+        )
+        session.commit()
         yield session
 
 
