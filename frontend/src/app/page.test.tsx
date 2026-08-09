@@ -24,12 +24,20 @@ describe("HealthLink home page", () => {
     ).toBeInTheDocument();
   });
 
-  it("does not expose future portal routes", () => {
+  it("links only the available Citizen Portal routes", () => {
     render(<Home />);
 
-    const links = screen.getAllByRole("link");
-    expect(links.every((link) => !link.getAttribute("href")?.includes("/login"))).toBe(
-      true,
+    expect(screen.getByRole("link", { name: "Citizen sign in" })).toHaveAttribute(
+      "href",
+      "/citizen/login",
     );
+    expect(screen.getByRole("link", { name: "Create account" })).toHaveAttribute(
+      "href",
+      "/citizen/register",
+    );
+    expect(
+      screen.queryByRole("link", { name: /professional/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /admin/i })).not.toBeInTheDocument();
   });
 });

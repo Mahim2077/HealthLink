@@ -14,6 +14,25 @@ function detailFromPayload(payload: unknown): string | null {
     if (typeof detail === "string" && detail.trim().length > 0) {
       return detail;
     }
+
+    if (Array.isArray(detail)) {
+      const firstMessage = detail.find(
+        (item) =>
+          typeof item === "object" &&
+          item !== null &&
+          "msg" in item &&
+          typeof item.msg === "string",
+      );
+
+      if (
+        typeof firstMessage === "object" &&
+        firstMessage !== null &&
+        "msg" in firstMessage &&
+        typeof firstMessage.msg === "string"
+      ) {
+        return firstMessage.msg;
+      }
+    }
   }
 
   return null;

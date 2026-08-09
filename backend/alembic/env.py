@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.db.base import Base
 from app.db.session import create_database_engine
 from app.auth import models as auth_models  # noqa: F401
+from app.citizens import models as citizen_models  # noqa: F401
 
 
 config = context.config

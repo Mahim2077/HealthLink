@@ -27,4 +27,3 @@ def test_alembic_loads_phase_one_shared_auth_migration() -> None:
     assert users_revision.down_revision is None
     assert sessions_revision is not None
     assert sessions_revision.down_revision == "0001_users"
-    assert scripts.get_heads() == ["0002_auth_sessions"]

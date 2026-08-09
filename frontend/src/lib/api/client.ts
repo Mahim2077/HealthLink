@@ -54,7 +54,8 @@ export class ApiClient {
 
   constructor(options: ApiClientOptions = {}) {
     this.baseUrl = options.baseUrl ?? API_BASE_URL;
-    this.fetchImplementation = options.fetchImplementation ?? fetch;
+    this.fetchImplementation =
+      options.fetchImplementation ?? globalThis.fetch.bind(globalThis);
     this.tokenStore = options.tokenStore ?? accessTokenStore;
     this.refreshAccessTokenHandler =
       options.refreshAccessToken ??

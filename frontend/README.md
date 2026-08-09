@@ -1,6 +1,6 @@
 # HealthLink frontend
 
-Phases 0 and 1 establish the shared Next.js frontend and authentication foundation. It intentionally contains no citizen, professional, or admin login pages from later phases.
+The shared Next.js frontend includes the authentication foundation and the Phase 2 Citizen Portal account flow. Professional and admin portal workflows are intentionally not implemented yet.
 
 ## Local setup
 
@@ -26,8 +26,15 @@ The default frontend address is http://localhost:3000. The default API base URL 
 - Session replacement is serialized through the same barrier for later login flows, preventing login, logout, and refresh cookie responses from racing each other.
 - JWT payload decoding supports portal-aware presentation only; backend checks remain authoritative.
 
+## Citizen Portal
+
+- `/citizen/register` creates a citizen account using exactly one NID or Birth Certificate Number, then sends the citizen to sign in. Registration does not create a browser session.
+- `/citizen/login` replaces any existing session through the serialized auth barrier and opens the citizen dashboard.
+- `/citizen/dashboard` restores a session through the backend refresh cookie after reload, requires a Citizen portal token for presentation, and loads the authorized citizen profile and self-identity endpoints.
+- Identity values are masked in the dashboard. Raw identity data is used only in the authorized response and never persisted in browser storage.
+
 ## Foundation assumptions
 
 - System fonts are used so builds remain deterministic without downloading font files.
 - Vitest and Testing Library provide lightweight component and configuration tests.
-- Login forms and portal workflows begin in their documented later phases.
+- NID and Birth Certificate Numbers are treated as opaque strings. The UI enforces only the documented nonblank and maximum-length rules; government-specific formats remain outside this phase.

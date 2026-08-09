@@ -35,3 +35,32 @@ V6 remains authoritative if an assumption ever conflicts with it.
   mandatory, and the operation can only revoke the token's own matching
   session. This keeps logout reliable after access-token expiry and across
   browser tabs without granting application access.
+
+## Phase 2
+
+- Citizen registration returns a `201` account-created response without issuing
+  a session. The documented Register → Login workflow is explicit: only a
+  successful citizen login creates the CITIZEN refresh session.
+- Registration passwords are 8–128 characters. Login accepts 1–128 characters
+  so every syntactically bounded wrong password reaches the same generic `401`.
+  Login performs one Argon2 verification for every attempt, using a valid
+  precomputed dummy hash when no account exists, to avoid an email timing oracle.
+- Emails are trimmed and lowercased. Names, identity strings, and optional text
+  are trimmed; NID and Birth Certificate Numbers remain opaque strings so
+  leading zeroes and non-government-specific characters are preserved. No
+  external government-format validation is invented.
+- Date of birth may be any non-future local calendar date; no minimum age is
+  imposed because BCN registration must support younger citizens. Gender and
+  blood group remain bounded strings in the API/database; the frontend selects
+  common presentation values without introducing authoritative database enums.
+- Initial registration enforces exactly one NID or BCN in both request and
+  service validation. The database intentionally requires at least one rather
+  than exactly one so Phase 3 can retain the original BCN after adding an NID.
+  `registered_with` is derived by the server and constrained to `NID` or `BCN`.
+- Foreign keys use `RESTRICT`, consistent with the no-hard-delete model. Unique
+  constraints are the authoritative NID/BCN indexes; no redundant indexes are
+  added.
+- The owner-authorized identity endpoint returns the citizen's exact nullable
+  NID/BCN value because no masking contract is specified. The frontend masks it
+  by default (fully masking identifiers of four or fewer characters) and never
+  persists raw identity or access-token data in browser storage.

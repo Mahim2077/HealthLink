@@ -9,7 +9,7 @@ apply to that phase have passed.
 | --- | --- | --- |
 | 0 | Project Foundation | Completed |
 | 1 | Shared JWT Authentication and Refresh Sessions | Completed |
-| 2 | Citizen Registration and Login | Not started |
+| 2 | Citizen Registration and Login | Completed |
 | 3 | Citizen Profile and one-time BCN to NID upgrade | Not started |
 | 4 | Professional Registration and Role Catalog | Not started |
 | 5 | Admin Login and Admin Portal | Not started |
@@ -70,3 +70,35 @@ Phase 15 and later are explicitly outside the current implementation boundary.
   overflow or application errors, navigated to `#portals`, and produced no
   browser console messages. The non-visual refresh/logout flow is verified by
   the backend, PostgreSQL, and frontend concurrency suites above.
+
+## Phase 2 verification evidence
+
+- Database: sequential, reversible `0003_user_national_identifiers`,
+  `0004_citizen_profiles`, and `0005_citizen_identifiers` migrations passed a
+  live PostgreSQL downgrade to Phase 1, re-upgrade to head, current-head check,
+  and `alembic check` with no ungenerated operations.
+- Backend automated tests: 79 passed against PostgreSQL 17. Coverage includes
+  exact constraints and foreign keys, initial identity XOR and later-compatible
+  database OR behavior, concurrent duplicate registration with complete losing
+  transaction rollback, generic constant-work login failures, CITIZEN portal
+  authorization, self-isolation, cookie attributes, and sensitive validation
+  redaction.
+- Backend dependency validation: the single requirements manifest remained
+  sufficient and `pip check` reported no broken requirements.
+- Frontend quality gates: dependency tree/lockfile remained synchronized;
+  ESLint and TypeScript passed; 14 Vitest files / 65 tests passed; the final
+  production build generated `/`, `/citizen/register`, `/citizen/login`, and
+  `/citizen/dashboard` successfully.
+- Real Browser and PostgreSQL flow: fresh NID and BCN citizens registered,
+  signed in, and loaded the exact profile/identity records from the live API.
+  The dashboard masked both identity types, a hard reload restored the session
+  through the HttpOnly refresh cookie, logout returned to login, and a direct
+  dashboard visit after logout exposed no private data.
+- Browser error and validation paths: blank required fields produced accessible
+  field/summary errors; changing NID to BCN cleared the inactive identity value;
+  duplicate BCN produced the expected conflict message. Browser testing also
+  exposed and drove a regression fix for an unbound native `fetch` invocation.
+- Responsive and visual checks: registration/login/dashboard were checked at
+  mobile (390 px), tablet (768 px), and desktop (1280 px) widths. There was no
+  horizontal overflow, required labels and skip targets were present, and the
+  final browser console was clean throughout the successful flows.

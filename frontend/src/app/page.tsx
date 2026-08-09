@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { HealthLinkMark } from "@/components/brand/healthlink-mark";
 
 type PortalKind = "citizen" | "professional" | "admin";
@@ -162,7 +164,7 @@ export default function Home() {
 
         <div className="inline-flex items-center gap-2 rounded-full border border-teal-200/80 bg-white/80 px-3 py-2 text-xs font-semibold text-teal-800 shadow-sm backdrop-blur">
           <span className="size-2 rounded-full bg-teal-500 shadow-[0_0_0_4px_rgba(20,184,166,0.12)]" />
-          Foundation ready
+          Citizen care connected
         </div>
       </header>
 
@@ -180,7 +182,7 @@ export default function Home() {
               One health story, connected with care.
             </h1>
             <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl sm:leading-9">
-              HealthLink is being built to keep a citizen&apos;s healthcare journey coherent—while giving every portal the clarity and boundaries it needs.
+              HealthLink keeps a citizen&apos;s healthcare journey coherent—while giving every portal the clarity and boundaries it needs.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -188,7 +190,7 @@ export default function Home() {
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-teal-700 px-6 text-sm font-semibold text-white shadow-lg shadow-teal-900/15 transition hover:-translate-y-0.5 hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
                 href="#foundation"
               >
-                Explore the foundation
+                Explore connected care
                 <ArrowIcon />
               </a>
               <a
@@ -318,16 +320,40 @@ export default function Home() {
                     <span className={"flex size-12 items-center justify-center rounded-2xl ring-1 ring-inset " + portal.accent}>
                       <PortalIcon kind={portal.kind} />
                     </span>
-                    <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      Planned experience
+                    <span
+                      className={
+                        "rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] " +
+                        (portal.kind === "citizen"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-slate-100 text-slate-500")
+                      }
+                    >
+                      {portal.kind === "citizen" ? "Available now" : "Planned experience"}
                     </span>
                   </div>
                   <p className="mt-7 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{portal.eyebrow}</p>
                   <h3 className="mt-2 text-xl font-bold tracking-tight text-slate-950">{portal.title}</h3>
                   <p className="mt-3 text-sm leading-6 text-slate-600">{portal.description}</p>
-                  <div className="mt-6 border-t border-slate-100 pt-5 text-xs font-semibold text-slate-500">
-                    {portal.detail}
-                  </div>
+                  {portal.kind === "citizen" ? (
+                    <div className="mt-6 flex flex-wrap gap-2 border-t border-slate-100 pt-5">
+                      <Link
+                        className="inline-flex min-h-10 items-center justify-center rounded-xl bg-teal-700 px-4 text-xs font-bold text-white transition hover:bg-teal-800"
+                        href="/citizen/login"
+                      >
+                        Citizen sign in
+                      </Link>
+                      <Link
+                        className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 px-4 text-xs font-bold text-slate-700 transition hover:border-slate-400"
+                        href="/citizen/register"
+                      >
+                        Create account
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="mt-6 border-t border-slate-100 pt-5 text-xs font-semibold text-slate-500">
+                      {portal.detail}
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
@@ -342,7 +368,7 @@ export default function Home() {
                 Trust should feel visible.
               </h2>
               <p className="mt-5 text-base leading-7 text-slate-600">
-                HealthLink begins with a frontend foundation built for clarity, consistency, and responsible growth.
+                HealthLink brings clarity, consistency, and thoughtful safeguards to every care experience.
               </p>
             </div>
 
@@ -364,16 +390,16 @@ export default function Home() {
           <div className="overflow-hidden rounded-[2rem] bg-teal-800 px-6 py-10 text-white shadow-2xl shadow-teal-950/15 sm:px-10 sm:py-12 lg:px-14">
             <div className="grid items-end gap-10 lg:grid-cols-[1fr_auto]">
               <div className="max-w-2xl">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-200">Phase 0 foundation</p>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-200">Connected care foundation</p>
                 <h2 className="mt-4 font-display text-3xl font-bold tracking-[-0.04em] sm:text-4xl">
-                  Ready for deliberate, vertical growth.
+                  Built for dependable care journeys.
                 </h2>
                 <p className="mt-4 text-base leading-7 text-teal-50/80">
-                  The frontend baseline is typed, responsive, testable, and configured to connect to HealthLink&apos;s versioned API as each approved phase arrives.
+                  A calm, responsive experience connects trusted identity with the right portal and the right level of access.
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2">
-                {["App Router", "TypeScript", "Tailwind CSS", "Test ready"].map((item) => (
+                {["Trusted identity", "Clear portals", "Private by context", "Accessible states"].map((item) => (
                   <span
                     className="flex min-h-11 items-center gap-2 rounded-xl bg-white/10 px-3.5 text-xs font-semibold ring-1 ring-inset ring-white/10"
                     key={item}
@@ -394,7 +420,7 @@ export default function Home() {
             <HealthLinkMark className="size-8 text-teal-700" />
             <span className="text-sm font-bold text-slate-950">HealthLink</span>
           </div>
-          <p className="text-xs leading-5 text-slate-500">Connected care, built carefully—one verified phase at a time.</p>
+          <p className="text-xs leading-5 text-slate-500">Connected care, centered on people and protected by context.</p>
         </div>
       </footer>
     </div>

@@ -41,6 +41,34 @@ describe("ApiClient", () => {
     tokenStore = new AccessTokenStore();
   });
 
+  it("binds the default fetch implementation to its global receiver", async () => {
+    const receiverRequiredFetch = vi.fn(function (
+      this: unknown,
+    ): Promise<Response> {
+      if (this !== globalThis) {
+        throw new TypeError("fetch requires its global receiver");
+      }
+
+      return Promise.resolve(jsonResponse({ healthy: true }));
+    }) as unknown as typeof fetch;
+    vi.stubGlobal("fetch", receiverRequiredFetch);
+
+    try {
+      const client = new ApiClient({
+        baseUrl: "https://api.healthlink.test/api/v1",
+        refreshAccessToken: vi.fn(),
+        tokenStore,
+      });
+
+      await expect(client.get<{ healthy: boolean }>("health")).resolves.toEqual(
+        { healthy: true },
+      );
+      expect(receiverRequiredFetch).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("sends credentials, bearer auth, and parses a typed response", async () => {
     tokenStore.set("access-token");
     const fetchMock = vi
