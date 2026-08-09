@@ -1,6 +1,6 @@
 # HealthLink frontend
 
-Phase 0 establishes the shared Next.js frontend foundation. It intentionally contains no authentication or portal workflows from later phases.
+Phases 0 and 1 establish the shared Next.js frontend and authentication foundation. It intentionally contains no citizen, professional, or admin login pages from later phases.
 
 ## Local setup
 
@@ -17,8 +17,17 @@ The default frontend address is http://localhost:3000. The default API base URL 
     npm test
     npm run build
 
-## Phase 0 assumptions
+## Authentication foundation
+
+- Access tokens exist only in the in-memory access-token store.
+- Refresh tokens are expected in backend-issued HttpOnly cookies and every refresh request includes credentials.
+- The API client retries one unauthorized request after a single-flight refresh, preventing concurrent requests from rotating the same refresh session more than once.
+- Logout and logout-all close the refresh gate, await any in-flight refresh response, use the latest bearer for termination, and clear memory before releasing the gate.
+- Session replacement is serialized through the same barrier for later login flows, preventing login, logout, and refresh cookie responses from racing each other.
+- JWT payload decoding supports portal-aware presentation only; backend checks remain authoritative.
+
+## Foundation assumptions
 
 - System fonts are used so builds remain deterministic without downloading font files.
 - Vitest and Testing Library provide lightweight component and configuration tests.
-- Access tokens, refresh behavior, route guards, and portal pages begin in their documented later phases.
+- Login forms and portal workflows begin in their documented later phases.

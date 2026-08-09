@@ -26,7 +26,7 @@ documents and are preserved under their attached filenames.
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
 Copy-Item backend\.env.example backend\.env
-# Set DATABASE_URL in backend/.env.
+# Set DATABASE_URL and a 32+ character JWT_SECRET_KEY in backend/.env.
 Set-Location backend
 ..\.venv\Scripts\python.exe -m alembic upgrade head
 ..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload

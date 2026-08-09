@@ -48,3 +48,19 @@ def test_neon_style_postgresql_url_uses_psycopg_driver() -> None:
 def test_database_url_is_required_only_when_database_is_used() -> None:
     with pytest.raises(RuntimeError, match="DATABASE_URL"):
         normalize_database_url("")
+
+
+def test_settings_repr_does_not_expose_credentials() -> None:
+    database_url = "postgresql://private-user:private-password@example.invalid/private"
+    jwt_secret = "private-jwt-secret-with-at-least-thirty-two-characters"
+    settings = Settings(
+        _env_file=None,
+        database_url=database_url,
+        jwt_secret_key=jwt_secret,
+    )
+
+    rendered_settings = repr(settings)
+
+    assert database_url not in rendered_settings
+    assert "private-password" not in rendered_settings
+    assert jwt_secret not in rendered_settings

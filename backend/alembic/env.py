@@ -9,6 +9,7 @@ from sqlalchemy.engine import Connection, Engine
 from app.core.config import get_settings
 from app.db.base import Base
 from app.db.session import create_database_engine
+from app.auth import models as auth_models  # noqa: F401
 
 
 config = context.config
@@ -16,8 +17,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Import model modules above this line as they are introduced in later phases.
-# Phase 0 deliberately has empty metadata.
+# Import model modules above this line as they are introduced by each phase.
 target_metadata = Base.metadata
 
 

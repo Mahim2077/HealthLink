@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, PositiveInt, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,10 +28,31 @@ class Settings(BaseSettings):
         validation_alias="APP_ENV",
     )
     debug: bool = Field(default=False, validation_alias="DEBUG")
-    database_url: str = Field(default="", validation_alias="DATABASE_URL")
+    database_url: str = Field(
+        default="",
+        validation_alias="DATABASE_URL",
+        repr=False,
+    )
     frontend_url: str = Field(
         default="http://localhost:3000",
         validation_alias="FRONTEND_URL",
+    )
+    jwt_secret_key: str = Field(
+        default="",
+        validation_alias="JWT_SECRET_KEY",
+        repr=False,
+    )
+    jwt_algorithm: Literal["HS256"] = Field(
+        default="HS256",
+        validation_alias="JWT_ALGORITHM",
+    )
+    access_token_expire_minutes: PositiveInt = Field(
+        default=30,
+        validation_alias="ACCESS_TOKEN_EXPIRE_MINUTES",
+    )
+    refresh_token_expire_days: PositiveInt = Field(
+        default=7,
+        validation_alias="REFRESH_TOKEN_EXPIRE_DAYS",
     )
 
     @field_validator("debug", mode="before")
@@ -47,7 +68,7 @@ class Settings(BaseSettings):
             return False
         return value
 
-    @field_validator("database_url", "frontend_url")
+    @field_validator("database_url", "frontend_url", "jwt_secret_key")
     @classmethod
     def strip_surrounding_whitespace(cls, value: str) -> str:
         return value.strip()

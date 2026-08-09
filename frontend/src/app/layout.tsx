@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
+import { AuthProvider } from "@/components/auth/auth-provider";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -30,7 +32,7 @@ export default function RootLayout({
         >
           Skip to content
         </a>
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

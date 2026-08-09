@@ -8,7 +8,7 @@ apply to that phase have passed.
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 0 | Project Foundation | Completed |
-| 1 | Shared JWT Authentication and Refresh Sessions | Not started |
+| 1 | Shared JWT Authentication and Refresh Sessions | Completed |
 | 2 | Citizen Registration and Login | Not started |
 | 3 | Citizen Profile and one-time BCN to NID upgrade | Not started |
 | 4 | Professional Registration and Role Catalog | Not started |
@@ -44,3 +44,29 @@ Phase 15 and later are explicitly outside the current implementation boundary.
   horizontal overflow, switched desktop navigation off at the mobile
   breakpoint, navigated successfully to `#portals`, and produced no browser
   console warnings or errors.
+
+## Phase 1 verification evidence
+
+- Database: sequential, reversible `0001_users` and `0002_auth_sessions`
+  migrations passed PostgreSQL upgrade, downgrade-to-base, re-upgrade, current,
+  and `alembic check`; the final schema is at `0002_auth_sessions` with no
+  ungenerated operations.
+- Backend dependencies: the single requirements manifest installs cleanly in
+  the workspace virtual environment and `pip check` reports no conflicts.
+- Backend automated tests: 54 passed against PostgreSQL 17, including Argon2,
+  strict JWT validation, portal/session authorization, fixed-expiry refresh
+  rotation, cookie attributes, logout/logout-all, database constraints,
+  two-connection refresh contention, and the cross-tab refresh/logout race.
+- Frontend dependency tree and lockfile: unchanged and synchronized;
+  `npm ls --depth=0` passed.
+- Frontend ESLint and TypeScript checks: passed with no warnings or errors.
+- Frontend automated tests: 9 files / 41 tests passed, covering memory-only
+  access tokens, single-flight refresh, stale-response generations, idle token
+  expiry, logout/session-replacement serialization, and cookie-ordering guards.
+- Next.js production build: passed; Phase 1 intentionally adds no login page,
+  and static routes remain `/` and `/_not-found` until Phase 2.
+- Live HTTP and Browser smoke: production `/` and FastAPI `/health` returned
+  200. The final production build rendered in the built-in Browser without
+  overflow or application errors, navigated to `#portals`, and produced no
+  browser console messages. The non-visual refresh/logout flow is verified by
+  the backend, PostgreSQL, and frontend concurrency suites above.
