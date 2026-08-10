@@ -15,6 +15,7 @@ from app.doctors.schemas import (
     PracticeScheduleEntry,
     PracticeScheduleWriteRequest,
 )
+from app.doctors.facility_choice_schemas import DoctorFacilityChoice
 from app.doctors.service import DoctorService
 from app.professionals.constants import ProfessionalRoleCode, VerificationStatus
 from app.professionals.schemas import (
@@ -142,6 +143,23 @@ def get_professional_me(
 # ---------------------------------------------------------------------------
 # Doctor practice schedule (verified DOCTOR only)
 # ---------------------------------------------------------------------------
+
+
+@professional_router.get(
+    "/me/eligible-facilities",
+    response_model=list[DoctorFacilityChoice],
+)
+def list_eligible_facilities(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[
+        ProfessionalAuthContext,
+        Depends(require_verified_professional_role(ProfessionalRoleCode.DOCTOR)),
+    ],
+) -> list[DoctorFacilityChoice]:
+    return DoctorService(
+        db, _settings(request)
+    ).list_eligible_facilities(context.auth.user.id)
 
 
 @professional_router.get(

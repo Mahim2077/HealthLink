@@ -269,6 +269,9 @@ function DashboardContent({
             <Link className="ml-0 mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-bold text-slate-700 hover:border-slate-400 sm:ml-3" href="/professional/onboard">
               Add a professional role
             </Link>
+            <Link className="ml-0 mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-5 text-sm font-bold text-teal-800 hover:border-teal-300 sm:ml-3" href="/citizen/doctors/search">
+              Find a verified doctor
+            </Link>
           </div>
         </div>
       </section>

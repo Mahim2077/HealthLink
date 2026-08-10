@@ -232,6 +232,55 @@ class DoctorRepository:
     def get_schedule(self, schedule_id: uuid.UUID) -> DoctorPracticeSchedule | None:
         return self.db.get(DoctorPracticeSchedule, schedule_id)
 
+    def list_active_facilities(self) -> list[HealthcareFacility]:
+        statement = (
+            select(HealthcareFacility)
+            .where(HealthcareFacility.is_active.is_(True))
+            .order_by(HealthcareFacility.name)
+        )
+        return list(self.db.scalars(statement).unique())
+
+    def get_verified_facility_assignment(
+        self, doctor_user_id: uuid.UUID
+    ) -> uuid.UUID | None:
+        doctor_role_id = self._doctor_role_id()
+        facility_id = self.db.scalar(
+            select(ProfessionalRoleRegistration.facility_id)
+            .join(
+                HealthcareProfessionalProfile,
+                HealthcareProfessionalProfile.id
+                == ProfessionalRoleRegistration.professional_id,
+            )
+            .where(HealthcareProfessionalProfile.user_id == doctor_user_id)
+            .where(ProfessionalRoleRegistration.role_id == doctor_role_id)
+            .where(
+                ProfessionalRoleRegistration.verification_status
+                == VerificationStatus.VERIFIED.value
+            )
+            .where(ProfessionalRoleRegistration.facility_id.is_not(None))
+            .limit(1)
+        )
+        return facility_id
+
+    def list_verified_facility_ids(self, doctor_user_id: uuid.UUID) -> set[uuid.UUID]:
+        doctor_role_id = self._doctor_role_id()
+        rows = self.db.scalars(
+            select(ProfessionalRoleRegistration.facility_id)
+            .join(
+                HealthcareProfessionalProfile,
+                HealthcareProfessionalProfile.id
+                == ProfessionalRoleRegistration.professional_id,
+            )
+            .where(HealthcareProfessionalProfile.user_id == doctor_user_id)
+            .where(ProfessionalRoleRegistration.role_id == doctor_role_id)
+            .where(
+                ProfessionalRoleRegistration.verification_status
+                == VerificationStatus.VERIFIED.value
+            )
+            .where(ProfessionalRoleRegistration.facility_id.is_not(None))
+        ).all()
+        return {fid for fid in rows if fid is not None}
+
     def add(self, instance: object) -> object:
         self.db.add(instance)
         return instance

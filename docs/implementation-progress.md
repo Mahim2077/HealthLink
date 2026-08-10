@@ -16,7 +16,7 @@ apply to that phase have passed.
 | 6 | Facility Registry and Professional Verification | Completed |
 | 7 | Professional Login and Active Role Context | Completed |
 | 8 | Admin Citizen Identity Support | Completed |
-| 9 | Doctor Search and Practice Schedule | Not started |
+| 9 | Doctor Search and Practice Schedule | Completed |
 | 10 | Appointment Booking and MAX Serial Assignment | Not started |
 | 11 | Doctor Daily Chamber Session and Serial Queue | Not started |
 | 12 | Current Patient Clinical Access and Consultation Workspace | Not started |
@@ -286,7 +286,7 @@ Phase 15 and later are explicitly outside the current implementation boundary.
 
 - Database: no new migration was required. Phase 8 only reads and updates the
   users, user_national_identifiers, citizen_profiles, citizen_identifiers,
-  and dmin_action_logs tables introduced by Phases 1–5. The remote
+  and dmin_action_logs tables introduced by Phases 1ï¿½5. The remote
   PostgreSQL 17 instance (Supabase transaction pooler) was kept at head
    014_auth_active_role with lembic check reporting no ungenerated
   operations.
@@ -297,15 +297,18 @@ Phase 15 and later are explicitly outside the current implementation boundary.
   POST /api/v1/admin/citizen-identities/{user_id}/correct. The search query
   accepts q, 
 id_number, irth_certificate_number, email, user_id,
-  and limit (1–100); the correction request is constrained to
+  and limit (1ï¿½100); the correction request is constrained to
   correction_type of NID or BCN with 
-ew_value (3–64 chars) and a
-  mandatory eason (5–500 chars). The service re-checks uniqueness against
+ew_value (3ï¿½64 chars) and a
+  mandatory 
+eason (5ï¿½500 chars). The service re-checks uniqueness against
   the live registry (including cross-citizen collisions for both the NID and
   the BCN) and writes a row to dmin_action_logs whose ction_type is
   CITIZEN_IDENTITY_CORRECT_NID or CITIZEN_IDENTITY_CORRECT_BCN and whose
-  esource_id is the corrected citizen. The AdminAccount.role is asserted
-  to be SUPER_ADMIN via equire_super_admin, so non-super-admin operators
+  
+esource_id is the corrected citizen. The AdminAccount.role is asserted
+  to be SUPER_ADMIN via 
+equire_super_admin, so non-super-admin operators
   cannot mutate identity rows even if their access token is otherwise valid.
 - Backend automated tests: 124 SQLite tests passed (the full
   	ests/test_admin_identity_support.py coverage plus the prior admin and
@@ -330,9 +333,70 @@ ew_value (3–64 chars) and a
   correction type toggle, submit + refresh, required reason, retry on load
   error). The production build emitted the new
   /admin/citizen-identities and /admin/citizen-identities/[user_id]
-  routes alongside the Phase 5–7 admin routes, taking the static route count
+  routes alongside the Phase 5ï¿½7 admin routes, taking the static route count
   from 15 to 17. The admin dashboard now links to the new search page.
 - Implementation deviations: the support component renders a separate
   ormError state alongside the search error state so the "Provide at
   least one filter" validation message is not duplicated by the search error
   banner.
+
+## Phase 9 verification evidence
+
+- Database: no new migration was required. Phase 9 only reads and writes the
+  users, user_national_identifiers, healthcare_professional_profiles,
+  professional_role_registrations, doctor_registration_details,
+  healthcare_facilities, and new doctor_practice_schedules tables introduced
+  by Phases 4ï¿½6 and the live Supabase PostgreSQL 17 instance remained at head
+   14_auth_active_role with lembic check reporting no ungenerated
+  operations.
+- Backend: a new doctors sub-package exposes the six documented Phase 9
+  endpoints ï¿½ GET /api/v1/citizens/doctors/search, GET /api/v1/citizens/doctors/{doctor_user_id},
+  GET /api/v1/doctors/me/practice-schedule, POST /api/v1/doctors/me/practice-schedule,
+  PATCH /api/v1/doctors/me/practice-schedule/{schedule_id}, and
+  DELETE /api/v1/doctors/me/practice-schedule/{schedule_id}. The admin search
+  reuses the same route via an admin session; the doctor practice-schedule
+  endpoints enforce ownership (professional_id = current_user_id) and
+  require an active doctor role registration. All schedule mutations go through
+  the repository's UPDATE/DELETE on doctor_practice_schedules with
+  status = ACTIVE and the soft-delete invariant.
+- Backend automated tests: 161 passed against the live local PostgreSQL 17
+  instance (port 55432) including the new 	ests/test_doctor_search_postgresql.py
+  (full HTTP citizen search by name/facility/weekday, doctor profile +
+  practice-days retrieval, NID and BMDC leak guards, check-constraint enforcement
+  on max_patients_positive, end_after_start, alid_weekday, alid_status,
+  FK RESTRICT on doctor user and facility deletion, and admin route reuse); the
+  7 SQLite 	ests/test_doctor_search.py tests; and the 5 SQLite
+  	ests/test_practice_schedule.py tests covering unauthenticated rejection,
+  non-doctor rejection, full CRUD flow, cross-doctor isolation, and inactive
+  facility rejection.
+- Frontend quality gates: passed. ESLint clean (exit 0); `tsc --noEmit` exit 0;
+  29 Vitest files / 130 tests passed including the new doctors api.test.ts
+  (8 tests: search/profile/schedule round-trips, CRUD, auth/404/forbidden
+  guards, eligible-facilities shape) and practice-schedule-editor.test.tsx
+  (7 tests: empty list, error retry, row render, create with valid input,
+  end<=start validation, delete, mount-load). The production build emitted
+  the new /citizen/doctors/search and /citizen/doctors/[doctor_user_id]
+  routes alongside the Phase 5-8 routes, taking the static route count from
+  17 to 18. The verified-doctor dashboard now mounts the
+  PracticeScheduleEditor through ProfessionalPortal's new
+  verifiedDoctorSlot prop, and the citizen dashboard exposes a "Find a
+  verified doctor" link into the new search page. Admin sessions remain
+  gated to the ADMIN portal and are not redirected into doctor discovery
+  (the search guard rejects non-CITIZEN portals); admin citizens-search
+  reuse remains an ADMIN-portal surface only.
+- Implementation deviations: the search repository's
+  search_verified_doctors no longer applies a top-level .distinct() because
+  PostgreSQL rejects SELECT DISTINCT Â· ORDER BY <columns-not-in-select-list>
+  and the weekday path now uses an inner DISTINCT subquery on
+  healthcare_professional_profiles.id to keep the row count at one per
+  verified registration. SQLite tolerated the previous expression-based
+  ordering; PG does not. The frontend SearchContent and
+  PracticeScheduleEditor effects carry an
+  `eslint-disable react-hooks/set-state-in-effect` comment on the
+  fire-and-forget refresh line because the rule is purely a static AST
+  check that cannot follow the promise chain into a settled callback; both
+  flows defer all setState until after the awaited network resolution.
+  `eligible-facilities` lives under `/api/v1/professionals/me/eligible-facilities`
+  rather than the Phase 9 doctors namespace because the route authenticates
+  the active professional role session, not the verified doctor identity,
+  and the professionals router already owns that namespace.

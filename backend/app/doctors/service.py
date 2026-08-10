@@ -17,6 +17,7 @@ from app.doctors.schemas import (
     PracticeScheduleEntry,
     PracticeScheduleWriteRequest,
 )
+from app.doctors.facility_choice_schemas import DoctorFacilityChoice
 
 
 class DoctorNotFoundError(HealthLinkError):
@@ -87,6 +88,32 @@ class DoctorService:
             raise DoctorNotFoundError()
         schedules = self.repository.list_active_schedules_for_doctor(doctor_user_id)
         return [_to_practice_day(schedule) for schedule in schedules]
+
+    def list_eligible_facilities(
+        self, doctor_user_id: uuid.UUID
+    ) -> list[DoctorFacilityChoice]:
+        """List active facilities a verified doctor may attach to a schedule.
+
+        Returns all currently active facilities so the doctor can pick a
+        destination. ``is_verified_assignment`` flags facilities where the
+        doctor already holds an approved DOCTOR registration; those are
+        surfaced first in the UI as a hint.
+        """
+        registration = self.repository.get_verified_doctor_registration(doctor_user_id)
+        if registration is None:
+            raise DoctorNotFoundError()
+        facilities = self.repository.list_active_facilities()
+        verified_ids = self.repository.list_verified_facility_ids(doctor_user_id)
+        return [
+            DoctorFacilityChoice(
+                id=facility.id,
+                name=facility.name,
+                facility_type=facility.facility_type,
+                is_active=facility.is_active,
+                is_verified_assignment=facility.id in verified_ids,
+            )
+            for facility in facilities
+        ]
 
     # ------------------------------------------------------------------
     # Schedule self-management (verified DOCTOR)
