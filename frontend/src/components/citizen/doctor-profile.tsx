@@ -214,6 +214,17 @@ function ProfileContent({
             Specialization: {profile.specialization}
           </p>
         ) : null}
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Link
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-bold text-white transition hover:bg-teal-800"
+            data-testid="book-appointment-cta"
+            href={`/citizen/appointments/book?doctor_user_id=${encodeURIComponent(
+              profile.id,
+            )}&facility_id=${encodeURIComponent(profile.facility_id)}`}
+          >
+            Book appointment
+          </Link>
+        </div>
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
