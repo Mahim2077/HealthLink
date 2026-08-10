@@ -11,7 +11,7 @@ BACKEND_DIRECTORY = Path(__file__).resolve().parents[1]
 
 def test_phase_one_metadata_contains_only_shared_auth_tables() -> None:
     assert {"users", "auth_sessions"}.issubset(Base.metadata.tables)
-    assert "active_professional_role_registration_id" not in (
+    assert "active_professional_role_registration_id" in (
         Base.metadata.tables["auth_sessions"].columns
     )
 

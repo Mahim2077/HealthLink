@@ -6,6 +6,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator, model_validator
 
+from app.auth.schemas import TokenResponse
+from app.facilities.schemas import FacilityResponse
 from app.professionals.constants import ProfessionalRoleCode, VerificationStatus
 
 
@@ -77,3 +79,43 @@ class ProfessionalApplicationResponse(BaseModel):
     role_code: ProfessionalRoleCode
     verification_status: VerificationStatus
     submitted_at: datetime
+
+
+class ProfessionalLoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nid_number: Annotated[str, Field(min_length=1, max_length=32)]
+    password: Annotated[SecretStr, Field(min_length=1, max_length=128)]
+    role_code: ProfessionalRoleCode
+
+    @field_validator("nid_number", mode="before")
+    @classmethod
+    def strip_nid(cls, value: object) -> object:
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return value
+
+
+class ProfessionalLoginResponse(TokenResponse):
+    role_registration_id: uuid.UUID
+    role_code: ProfessionalRoleCode
+    verification_status: VerificationStatus
+
+
+class ProfessionalMeResponse(BaseModel):
+    user_id: uuid.UUID
+    professional_id: uuid.UUID
+    role_registration_id: uuid.UUID
+    first_name: str
+    last_name: str
+    email: str
+    role_code: ProfessionalRoleCode
+    role_name: str
+    verification_status: VerificationStatus
+    designation: str
+    facility: FacilityResponse | None
+    submitted_at: datetime
+    verified_at: datetime | None
+    rejected_at: datetime | None
+    rejection_reason: str | None

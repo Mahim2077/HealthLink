@@ -14,7 +14,7 @@ apply to that phase have passed.
 | 4 | Professional Registration and Role Catalog | Completed |
 | 5 | Admin Login and Admin Portal | Completed |
 | 6 | Facility Registry and Professional Verification | Completed |
-| 7 | Professional Login and Active Role Context | Not started |
+| 7 | Professional Login and Active Role Context | Completed |
 | 8 | Admin Citizen Identity Support | Not started |
 | 9 | Doctor Search and Practice Schedule | Not started |
 | 10 | Appointment Booking and MAX Serial Assignment | Not started |
@@ -235,3 +235,49 @@ Phase 15 and later are explicitly outside the current implementation boundary.
   `FACILITY_UPDATE`, `PROFESSIONAL_VERIFY`, and `PROFESSIONAL_REJECT` audit rows.
   Logout and direct-access guards hid the queue afterward. Admin pages showed no
   horizontal overflow at 390, 768, or 1280 px, and the final console was clean.
+
+## Phase 7 verification evidence
+
+- Database: migration `0014_auth_active_role` adds the nullable
+  `auth_sessions.active_professional_role_registration_id` column with a
+  RESTRICT foreign key to `professional_role_registrations.id`. The remote
+  PostgreSQL 17 instance (Supabase transaction pooler) was upgraded from an
+  empty schema through all 14 migrations to head `0014_auth_active_role`,
+  downgraded to `0013_role_facility_fk`, re-upgraded to head, and reported
+  `alembic check` with no ungenerated operations.
+- Backend: the professional module now exposes `POST /api/v1/auth/professional/login`
+  and `GET /api/v1/professionals/me`. `AuthService.create_session` requires the
+  active role registration id for `PORTAL.PROFESSIONAL` and forbids it for
+  CITIZEN and ADMIN; `AccessTokenClaims` carries an optional `prrid` claim that
+  the new `get_current_professional_context` dependency validates against the
+  live session row and the user-owned registration.
+  `require_verified_professional_role(role_code)` rejects PENDING and REJECTED
+  registrations and any role other than `role_code`, even when the same user
+  owns a VERIFIED registration of a different kind. The login route uses a
+  constant-work Argon2 dummy hash to keep timing observable when the NID does
+  not resolve.
+- Backend automated tests: 4 professional PostgreSQL tests, 4 citizen, 2 admin,
+  2 facility, 4 auth-concurrency and constraint tests (excluding the two
+  cross-tab backend-pid assertions that the Supabase transaction pooler pools
+  into a single backend connection), and 105 SQLite tests including the focused
+  Phase 7 coverage of verified multi-role login, JWT `prrid` matching,
+  PENDING/REJECTED login-but-restricted, wrong-NID/wrong-password/wrong-role
+  generic 401 with no session row, and selected-role unable to satisfy another
+  role's `require_verified_professional_role`. `backend/tests/test_professional_login_migration.py`
+  asserts the migration metadata (revision chain, nullable column, FK target).
+- Frontend quality gates: ESLint and TypeScript passed; 25 Vitest files / 105
+  tests passed including `professional-portal.test.tsx` (CITIZEN token cannot
+  load private data; PENDING/REJECTED routes to restricted view; VERIFIED view
+  shows role + facility; rejection reason is surfaced in status), the
+  `professional-login-form.test.tsx` verification-status routing, the
+  `lib/professional/api.test.ts` shared replacement barrier and `loadProfessionalMe`,
+  and the home-page test that confirms the new "Professional sign in" link.
+  The production build emitted the new `/professional/login`,
+  `/professional/dashboard`, and `/professional/status` routes alongside the
+  Phase 4–6 routes.
+- Implementation deviations: the test
+  `backend/tests/test_professional_login_postgresql.py` previously used a string
+  literal for `AuthSession.expires_at`; this was changed to a
+  timezone-aware `datetime(2099, 1, 1, tzinfo=timezone.utc)` to match the
+  `Mapped[datetime]` column without relying on driver coercion. The targeted
+  PostgreSQL test ran against the live Supabase instance and passed.

@@ -91,7 +91,12 @@ V6 remains authoritative if an assumption ever conflicts with it.
   `0008_prof_role_regs`, and `0009_doctor_reg_details`; table names and phase
   ordering remain exactly as documented.
 - New professional registration returns a `201` PENDING application without a
-  session. Professional login is intentionally unavailable until Phase 7.
+  session. From Phase 7 onward, professional login is exposed at
+  `POST /api/v1/auth/professional/login` and the selected role becomes the
+  active role context for the session; the JWT carries an optional `prrid`
+  claim that the professional dependency validates against the live session
+  row. PENDING and REJECTED role registrations can complete login but cannot
+  satisfy `require_verified_professional_role(role_code)`.
   Existing-account onboarding derives the user and NID exclusively from the
   authenticated session and central identity row; it never accepts client-owned
   user or NID fields.

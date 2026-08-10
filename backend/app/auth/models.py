@@ -55,6 +55,9 @@ class AuthSession(Base):
         nullable=False,
     )
     portal: Mapped[str] = mapped_column(String(32), nullable=False)
+    active_professional_role_registration_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("professional_role_registrations.id", ondelete="RESTRICT")
+    )
     refresh_token_hash: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
@@ -70,3 +73,6 @@ class AuthSession(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="auth_sessions")
+    active_professional_role_registration = relationship(
+        "ProfessionalRoleRegistration"
+    )

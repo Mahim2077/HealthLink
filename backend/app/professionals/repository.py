@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.auth.models import User
 from app.citizens.models import UserNationalIdentifier
@@ -80,5 +80,20 @@ class ProfessionalRepository:
         return self.db.scalar(
             select(DoctorRegistrationDetail).where(
                 DoctorRegistrationDetail.bmdc_registration_number == number
+            )
+        )
+
+    def get_role_registration_by_id(
+        self, registration_id: uuid.UUID
+    ) -> ProfessionalRoleRegistration | None:
+        return self.db.scalar(
+            select(ProfessionalRoleRegistration)
+            .where(ProfessionalRoleRegistration.id == registration_id)
+            .options(
+                selectinload(ProfessionalRoleRegistration.professional).selectinload(
+                    HealthcareProfessionalProfile.user
+                ),
+                selectinload(ProfessionalRoleRegistration.role),
+                selectinload(ProfessionalRoleRegistration.facility),
             )
         )

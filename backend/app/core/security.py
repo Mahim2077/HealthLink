@@ -37,6 +37,9 @@ class AccessTokenClaims(BaseModel):
     issued_at: datetime = Field(alias="iat")
     expires_at: datetime = Field(alias="exp")
     token_type: Literal["access"] = Field(alias="type")
+    active_professional_role_registration_id: uuid.UUID | None = Field(
+        default=None, alias="prrid"
+    )
 
 
 class TokenValidationError(ValueError):
@@ -76,6 +79,7 @@ def create_access_token(
     portal: Portal,
     session_id: uuid.UUID,
     settings: Settings,
+    active_professional_role_registration_id: uuid.UUID | None = None,
     now: datetime | None = None,
 ) -> str:
     issued_at = now or datetime.now(timezone.utc)
@@ -89,6 +93,8 @@ def create_access_token(
         "exp": expires_at,
         "type": "access",
     }
+    if active_professional_role_registration_id is not None:
+        payload["prrid"] = str(active_professional_role_registration_id)
     return jwt.encode(
         payload,
         _jwt_secret(settings),

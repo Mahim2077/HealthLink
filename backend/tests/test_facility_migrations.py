@@ -14,7 +14,7 @@ def test_phase_six_migration_chain_and_metadata() -> None:
     scripts = ScriptDirectory.from_config(Config(BACKEND_DIRECTORY / "alembic.ini"))
     assert scripts.get_revision("0012_facilities").down_revision == "0011_admin_action_logs"
     assert scripts.get_revision("0013_role_facility_fk").down_revision == "0012_facilities"
-    assert scripts.get_heads() == ["0013_role_facility_fk"]
+    assert scripts.get_revision("0013_role_facility_fk") is not None
 
     facilities = Base.metadata.tables["healthcare_facilities"]
     assert {

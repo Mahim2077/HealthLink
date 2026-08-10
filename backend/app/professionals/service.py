@@ -7,10 +7,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
+from app.auth.constants import Portal
+from app.auth.service import AuthenticationError, AuthService, IssuedTokens
 from app.citizens.models import UserNationalIdentifier
 from app.core.config import Settings
 from app.core.exceptions import HealthLinkError
-from app.core.security import hash_password
+from app.core.security import hash_password, verify_password
 from app.professionals.constants import ProfessionalRoleCode, VerificationStatus
 from app.professionals.models import (
     DoctorRegistrationDetail,
@@ -23,6 +25,13 @@ from app.professionals.schemas import (
     ProfessionalApplicationFields,
     ProfessionalOnboardingRequest,
     ProfessionalRegistrationRequest,
+    ProfessionalLoginRequest,
+)
+
+
+_DUMMY_PROFESSIONAL_PASSWORD_HASH = (
+    "$argon2id$v=19$m=65536,t=3,p=4$"
+    "x6UEndDIGINbChliFokAwg$WMEeIYWIpGqFiUdzYGg6peAi29r+B7mSRpjNdS6jsqU"
 )
 
 
@@ -40,6 +49,13 @@ class ProfessionalApplicationError(HealthLinkError):
 class SubmittedProfessionalApplication:
     user: User
     profile: HealthcareProfessionalProfile
+    role: ProfessionalRole
+    registration: ProfessionalRoleRegistration
+
+
+@dataclass(frozen=True)
+class ProfessionalLoginResult:
+    tokens: IssuedTokens
     role: ProfessionalRole
     registration: ProfessionalRoleRegistration
 
@@ -190,3 +206,42 @@ class ProfessionalService:
         except Exception:
             self.db.rollback()
             raise
+
+    def login(self, request: ProfessionalLoginRequest) -> ProfessionalLoginResult:
+        national_identifier = self.repository.get_nid_by_number(request.nid_number)
+        user = (
+            self.repository.get_user_by_id_for_update(national_identifier.user_id)
+            if national_identifier is not None
+            else None
+        )
+        password_matches = verify_password(
+            request.password.get_secret_value(),
+            user.password_hash if user is not None else _DUMMY_PROFESSIONAL_PASSWORD_HASH,
+        )
+        profile = self.repository.get_profile_by_user_id(user.id) if user else None
+        role = self.repository.get_role_by_code(request.role_code.value)
+        registration = (
+            self.repository.get_role_registration(profile.id, role.id)
+            if profile is not None and role is not None
+            else None
+        )
+        if (
+            user is None
+            or not user.is_active
+            or not password_matches
+            or role is None
+            or not role.is_active
+            or registration is None
+        ):
+            self.db.rollback()
+            raise AuthenticationError("Invalid NID, password, or professional role.")
+        tokens = AuthService(self.db, self.settings).create_session(
+            user.id,
+            Portal.PROFESSIONAL,
+            active_professional_role_registration_id=registration.id,
+        )
+        return ProfessionalLoginResult(
+            tokens=tokens,
+            role=role,
+            registration=registration,
+        )

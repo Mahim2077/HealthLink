@@ -333,7 +333,7 @@ export default function Home() {
                       {portal.kind === "citizen"
                         ? "Available now"
                         : portal.kind === "professional"
-                          ? "Registration open"
+                            ? "Available now"
                           : "Available now"}
                     </span>
                   </div>
@@ -355,20 +355,26 @@ export default function Home() {
                         Create account
                       </Link>
                     </div>
-                  ) : portal.kind === "professional" ? (
-                    <div className="mt-6 flex flex-wrap gap-2 border-t border-slate-100 pt-5">
-                      <Link
-                        className="inline-flex min-h-10 items-center justify-center rounded-xl bg-sky-700 px-4 text-xs font-bold text-white transition hover:bg-sky-800"
-                        href="/professional/register"
-                      >
-                        Apply with NID
-                      </Link>
-                      <Link
-                        className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 px-4 text-xs font-bold text-slate-700 transition hover:border-slate-400"
-                        href="/professional/onboard"
-                      >
-                        Existing citizen
-                      </Link>
+                    ) : portal.kind === "professional" ? (
+                      <div className="mt-6 flex flex-wrap gap-2 border-t border-slate-100 pt-5">
+                        <Link
+                          className="inline-flex min-h-10 items-center justify-center rounded-xl bg-sky-700 px-4 text-xs font-bold text-white transition hover:bg-sky-800"
+                          href="/professional/login"
+                        >
+                          Professional sign in
+                        </Link>
+                        <Link
+                          className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 px-4 text-xs font-bold text-slate-700 transition hover:border-slate-400"
+                          href="/professional/register"
+                        >
+                          Apply with NID
+                        </Link>
+                        <Link
+                          className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 px-4 text-xs font-bold text-slate-700 transition hover:border-slate-400"
+                          href="/professional/onboard"
+                        >
+                          Existing citizen
+                        </Link>
                     </div>
                   ) : (
                     <div className="mt-6 flex flex-wrap gap-2 border-t border-slate-100 pt-5">

@@ -9,7 +9,7 @@ from app.db.base import Base
 BACKEND_DIRECTORY = Path(__file__).resolve().parents[1]
 
 
-def test_professional_metadata_includes_phase_six_facility_but_delays_active_role() -> None:
+def test_professional_metadata_includes_facility_and_phase_seven_active_role() -> None:
     expected = {
         "healthcare_professional_profiles",
         "professional_roles",
@@ -23,7 +23,7 @@ def test_professional_metadata_includes_phase_six_facility_but_delays_active_rol
         foreign_key.target_fullname
         for foreign_key in registrations.c.facility_id.foreign_keys
     } == {"healthcare_facilities.id"}
-    assert "active_professional_role_registration_id" not in Base.metadata.tables[
+    assert "active_professional_role_registration_id" in Base.metadata.tables[
         "auth_sessions"
     ].columns
 

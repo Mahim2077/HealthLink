@@ -68,6 +68,9 @@ class AuthService:
             session_id=auth_session.id,
             settings=self.settings,
             now=now,
+            active_professional_role_registration_id=(
+                auth_session.active_professional_role_registration_id
+            ),
         )
         return IssuedTokens(
             access_token=access_token,
@@ -83,17 +86,31 @@ class AuthService:
         user_id: uuid.UUID,
         portal: Portal,
         *,
+        active_professional_role_registration_id: uuid.UUID | None = None,
         now: datetime | None = None,
     ) -> IssuedTokens:
         issued_at = now or utc_now()
         user = self.repository.get_user_by_id(user_id)
         if user is None or not user.is_active:
             raise AuthenticationError("Active user account required.")
+        if (
+            portal is Portal.PROFESSIONAL
+            and active_professional_role_registration_id is None
+        ) or (
+            portal is not Portal.PROFESSIONAL
+            and active_professional_role_registration_id is not None
+        ):
+            raise ValueError(
+                "Active professional role is required only for PROFESSIONAL sessions."
+            )
 
         raw_refresh_token = generate_refresh_token()
         auth_session = AuthSession(
             user_id=user_id,
             portal=portal.value,
+            active_professional_role_registration_id=(
+                active_professional_role_registration_id
+            ),
             refresh_token_hash=hash_refresh_token(raw_refresh_token),
             expires_at=issued_at
             + timedelta(days=self.settings.refresh_token_expire_days),

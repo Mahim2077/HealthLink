@@ -35,9 +35,12 @@ describe("HealthLink home page", () => {
       "href",
       "/citizen/register",
     );
-    expect(
-      screen.getByRole("link", { name: "Apply with NID" }),
-    ).toHaveAttribute("href", "/professional/register");
+      expect(
+        screen.getByRole("link", { name: "Apply with NID" }),
+      ).toHaveAttribute("href", "/professional/register");
+      expect(
+        screen.getByRole("link", { name: "Professional sign in" }),
+      ).toHaveAttribute("href", "/professional/login");
     expect(
       screen.getByRole("link", { name: "Existing citizen" }),
     ).toHaveAttribute("href", "/professional/onboard");

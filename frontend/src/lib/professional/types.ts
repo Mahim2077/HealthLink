@@ -47,3 +47,39 @@ export type ProfessionalApplicationResponse = {
   verification_status: "PENDING";
   submitted_at: string;
 };
+
+export type ProfessionalVerificationStatus = "PENDING" | "VERIFIED" | "REJECTED";
+
+export type ProfessionalLoginRequest = {
+  nid_number: string;
+  password: string;
+  role_code: ProfessionalRoleCode;
+};
+
+export type ProfessionalLoginResponse = {
+  access_token: string;
+  token_type: "bearer";
+  expires_in: number;
+  portal: "PROFESSIONAL";
+  role_registration_id: string;
+  role_code: ProfessionalRoleCode;
+  verification_status: ProfessionalVerificationStatus;
+};
+
+export type ProfessionalMe = {
+  user_id: string;
+  professional_id: string;
+  role_registration_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role_code: ProfessionalRoleCode;
+  role_name: string;
+  verification_status: ProfessionalVerificationStatus;
+  designation: string;
+  facility: { id: string; name: string; facility_type: string; address: string } | null;
+  submitted_at: string;
+  verified_at: string | null;
+  rejected_at: string | null;
+  rejection_reason: string | null;
+};

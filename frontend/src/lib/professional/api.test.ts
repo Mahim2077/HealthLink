@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ post: vi.fn() }));
+const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), replaceSession: vi.fn() }));
 
-vi.mock("@/lib/api/client", () => ({ apiClient: { post: mocks.post } }));
+vi.mock("@/lib/api/client", () => ({ apiClient: { get: mocks.get, post: mocks.post } }));
+vi.mock("@/lib/auth/actions", () => ({ replaceSession: mocks.replaceSession }));
 
-import { onboardProfessional, registerProfessional } from "./api";
+import { loadProfessionalMe, loginProfessional, onboardProfessional, registerProfessional } from "./api";
 
 describe("Professional API", () => {
-  beforeEach(() => mocks.post.mockReset());
+  beforeEach(() => { mocks.get.mockReset(); mocks.post.mockReset(); mocks.replaceSession.mockReset(); });
 
   it("registers a new professional without attaching or refreshing auth", async () => {
     const request = {
@@ -47,5 +48,16 @@ describe("Professional API", () => {
     expect(mocks.post).toHaveBeenCalledWith("professionals/me/onboard", request);
     expect(request).not.toHaveProperty("nid_number");
     expect(request).not.toHaveProperty("user_id");
+  });
+
+  it("logs in through the shared replacement barrier and loads active context", async () => {
+    const response = { access_token: "professional-token", expires_in: 1800, portal: "PROFESSIONAL", role_code: "DOCTOR", role_registration_id: "r1", token_type: "bearer", verification_status: "VERIFIED" } as const;
+    mocks.post.mockResolvedValue(response); mocks.replaceSession.mockImplementation(async (issue: () => Promise<string>) => issue());
+    const request = { nid_number: "NID-1", password: "secret", role_code: "DOCTOR" as const };
+    await expect(loginProfessional(request)).resolves.toEqual(response);
+    expect(mocks.post).toHaveBeenCalledWith("auth/professional/login", request, { auth: false, retryOnUnauthorized: false });
+    expect(mocks.replaceSession).toHaveBeenCalledOnce();
+    mocks.get.mockResolvedValue({ role_code: "DOCTOR" }); await loadProfessionalMe();
+    expect(mocks.get).toHaveBeenCalledWith("professionals/me");
   });
 });
