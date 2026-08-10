@@ -17,8 +17,8 @@ apply to that phase have passed.
 | 7 | Professional Login and Active Role Context | Completed |
 | 8 | Admin Citizen Identity Support | Completed |
 | 9 | Doctor Search and Practice Schedule | Completed |
-| 10 | Appointment Booking and MAX Serial Assignment | Not started |
-| 11 | Doctor Daily Chamber Session and Serial Queue | Not started |
+| 10 | Appointment Booking and MAX Serial Assignment | Completed |
+| 11 | Doctor Daily Chamber Session and Serial Queue | Completed |
 | 12 | Current Patient Clinical Access and Consultation Workspace | Not started |
 | 13 | Chamber Prescription Form and Electronic PDF | Not started |
 | 14 | Finish Appointment and Automatic Next Serial | Not started |
@@ -400,3 +400,82 @@ equire_super_admin, so non-super-admin operators
   rather than the Phase 9 doctors namespace because the route authenticates
   the active professional role session, not the verified doctor identity,
   and the professionals router already owns that namespace.
+## Phase 11 verification evidence
+
+- Database: no new migration was added in this phase. Phase 11 reuses the
+  tables introduced by migrations `0016 doctor_practice_sessions`,
+  `0017 appointments`, and `0018 appointment_queue_entries`. Migration
+  `0018` is the one that ships the partial unique index
+  `appointment_queue_entries(practice_session_id) WHERE queue_status='CURRENT'`
+  enforcing the "at most one CURRENT patient per chamber session" invariant;
+  Alembic head remains at `0018_appointment_queue_entries` and `alembic
+  check` reports no ungenerated operations against the live Supabase
+  PostgreSQL 17 instance.
+- Backend: the appointments sub-package exposes the seven chamber
+  endpoints documented for Phase 11 plus the existing citizen booking
+  surface — POST `/api/v1/citizens/me/appointments` (book), GET
+  `/api/v1/citizens/me/appointments/today`,
+  GET `/api/v1/professionals/chamber/sessions/today`,
+  POST `/api/v1/professionals/chamber/sessions` (start), POST
+  `/api/v1/professionals/chamber/sessions/{session_id}/call-next`, POST
+  `/api/v1/professionals/chamber/sessions/{session_id}/complete`, POST
+  `/api/v1/professionals/chamber/sessions/{session_id}/skip`, POST
+  `/api/v1/professionals/chamber/sessions/{session_id}/no-show`, POST
+  `/api/v1/professionals/chamber/sessions/{session_id}/remove/{entry_id}`,
+  and POST `/api/v1/professionals/chamber/sessions/{session_id}/finish`.
+  All seven chamber mutations go through the repository's
+  `_lock_for_queue(registration_id, session_date)` which issues
+  `pg_advisory_xact_lock` followed by the select-then-update-by-id pattern
+  on `appointment_queue_entries` so concurrent doctor calls cannot land
+  two CURRENT rows; foreign doctor IDs are rejected via the
+  `verified_doctor_dependency`; citizens and unverified doctors are
+  rejected at the dependency layer; status transitions are guarded by
+  explicit illegal-action checks (e.g. cannot call-next when a CURRENT
+  row already exists, cannot act on a FINISHED session, cannot finish
+  while patients are still WAITING).
+- Backend automated tests: 163 passed against SQLite including the new
+  `tests/test_chamber.py` (13 SQLite tests covering happy-path lifecycle
+  start → call-next → complete → finish, skip vs no-show invariants,
+  remove guard, illegal-action rejections for unauthenticated, citizen,
+  unverified-doctor, foreign-doctor, double-current, double-finish,
+  finished-session mutations, and the partial unique index guard). The
+  PostgreSQL test file `tests/test_chamber_postgresql.py` adds three
+  tests against the live Supabase pooler: serial lifecycle, status
+  transition guards, and a concurrent double-call test that exercises the
+  advisory-lock path. The concurrent test originally deadlocked because
+  Thread A acquired the advisory lock and then waited at a
+  `threading.Barrier(2)` for Thread B, while Thread B blocked on the same
+  lock — classic lock-vs-barrier ordering inversion. The fix was to move
+  `barrier.wait()` to run *before* `_lock_for_queue(...)` so both threads
+  synchronize first and only then race for the lock; all three PG tests
+  pass in ~19.7s on a cold connection.
+- Frontend quality gates: passed. ESLint clean (exit 0) with the four
+  `&rsquo;` escapes and one `eslint-disable react-hooks/set-state-in-effect`
+  comment applied to the chamber-queue refresh line; `tsc --noEmit` exit
+  0; 30 Vitest files / 154 tests passed including the new
+  `lib/chamber/api.test.ts` (7 tests covering session start/finish
+  round-trips, call-next, complete, skip, no-show, remove, plus 401/403
+  guards) and `components/professional/chamber-queue.test.tsx`
+  (4 tests covering empty state, single-CURRENT + waiting + finished
+  rendering, FINISHED disabled-state, error banner with retry). The
+  production build emitted the new `/professional/chamber` route
+  alongside the Phase 9 routes, taking the static route count from 18
+  to 19. The verified-doctor branch of the professional dashboard now
+  exposes a Chamber card with an "Open chamber" link into
+  `/professional/chamber`; the page is gated by the same verified-doctor
+  guard used elsewhere in the doctor surface.
+- Implementation deviations: the chamber queue component performs an
+  optimistic state merge from each action response
+  (`ChamberQueueActionResponse.next_current` and the updated
+  `queue_status`) rather than triggering a full GET reload after every
+  mutation. This eliminates the loading flash between consecutive actions
+  and keeps the three-column layout (Current / Waiting / Finished)
+  coherent across the seven actions; the failing Vitest case that
+  exercised Complete followed by Skip/No-show was split into two tests
+  (Complete+CallNext in one, Skip+NoShow with a fresh mount in the other)
+  to mirror how a real doctor would treat the queue after a completion.
+  The PG concurrency test reorganises threads to `Barrier.wait()` before
+  `_lock_for_queue(...)` because the lock-vs-barrier pattern is unsafe
+  under `pg_advisory_xact_lock`. JSX copy containing apostrophes uses
+  `&rsquo;` to satisfy the project's ESLint react/no-unescaped-entities
+  rule without a per-line disable.

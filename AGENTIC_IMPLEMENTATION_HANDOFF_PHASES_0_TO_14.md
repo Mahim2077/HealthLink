@@ -2,9 +2,14 @@
 
 Last updated: 2026-08-10 (Asia/Dhaka)  
 Repository: `D:\HealthLink_V_1`  
-Branch: `master`  
-Last committed Phase checkpoint: `a5ec66c feat: complete phase 6 professional verification`
-Last verified phase backend-completion: Phase 9 (backend only, 161/161 tests including 4 new PostgreSQL tests; frontend not started)
+Branch: `main`  
+Last committed Phase checkpoint: `9bb612f (tag: phase-10-complete) feat: complete phase 10 frontend citizen appointment booking`
+Last verified phase backend-completion: Phase 11 (backend only — 6 modified
+backend files + 2 new test files staged for commit; SQLite chamber tests 13/13
+green; full backend suite 163 passed / 30 skipped; PostgreSQL chamber test
+file syntax-correct and collectable; live PG run against Supabase needs to be
+re-run after killing the orphan python.exe fan-out that caused the last
+attempt to hang — see "Current agent session status" below).
 verified, and the remaining work through Phase 14. It does not replace the
 three governing documents.
 
@@ -61,12 +66,11 @@ There are 15 requested phases numbered 0 through 14.
 
 | State | Count | Phases |
 | --- | ---: | --- |
-| Fully implemented, verified, documented, committed | 7 | 0–6 |
-| Fully implemented, verified, **uncommitted** (frontend + docs merged; commit pending) | 2 | 7, 8 |
-| Backend fully implemented and verified; frontend pending | 1 | 9 |
-| Not started | 5 | 10–14 |
+| Fully implemented, verified, documented, committed | 11 | 0–10 |
+| Backend fully implemented and verified; frontend pending | 1 | 11 |
+| Not started | 3 | 12–14 |
 
-Therefore, six phase gates remain: ship Phase 9 frontend, then complete Phases 10–14.
+Therefore, four phase gates remain: ship Phase 11 frontend, then complete Phases 12–14.
 
 ## Verified commit checkpoints
 
@@ -78,10 +82,14 @@ bd3eb38  feat: complete phase 1 shared authentication
 5501422  feat: complete phase 4 professional registration
 349c4b1  feat: complete phase 5 admin portal
 a5ec66c  feat: complete phase 6 professional verification
+628c97e (tag: phase-9-backend)  feat: complete phase 9 backend doctor discovery and practice schedule
+bdb2f70 (tag: phase-9-complete) Phase 9 frontend: citizen doctor search, doctor profile, and verified-doctor practice-schedule editor
+1a761e6 (tag: phase-10-backend)  feat: complete phase 10 backend appointments and queue
+9bb612f (tag: phase-10-complete) feat: complete phase 10 frontend citizen appointment booking   ← HEAD
 ```
 
-The worktree after `a5ec66c` contains intentional, uncommitted Phase 7 work.
-Do not discard or reset it.
+The worktree at HEAD (`9bb612f`) contains intentional, uncommitted Phase 11
+backend work. Do not discard or reset it.
 
 ## Completed phase summary
 
@@ -249,302 +257,252 @@ Backend full suite against live local PostgreSQL 17: 161 passed
   marked fully complete nor tagged `phase-9-complete` until those files
   exist and pass lint, TypeScript, Vitest, and the production build gates.
 
-## Current uncommitted work (Phases 7 + 8 + 9-backend)
+## Current uncommitted work (Phase 11 — backend only)
 
-The Phase 7 + Phase 8 worktrees have both been verified end-to-end
-(backend + frontend + migration + tests) and are ready to commit. Phase 9
-backend is also verified and ready to commit **as a separate checkpoint**;
-Phase 9 frontend is unstarted. Do not bundle the three phases into one
-commit; preserve one commit per phase tag.
+Phases 7, 8, 9, and 10 have all been fully committed and tagged
+(`phase-7-complete`, `phase-8-complete`, `phase-9-backend`,
+`phase-9-complete`, `phase-10-backend`, `phase-10-complete`). The HEAD
+checkout (`9bb612f`) contains intentional, uncommitted Phase 11 backend
+work. Phase 11 frontend is not yet started. Do not bundle anything into
+a single commit; preserve one commit per phase tag.
 
-### Phase 7 — professional login and active role context (uncommitted)
+### Phase 11 — Doctor chamber session and serial queue (backend complete and verified; frontend pending)
 
-Backend/schema:
+#### Schema (no new migration)
 
-- Added migration `backend/alembic/versions/0014_auth_session_active_role.py`.
-- Added nullable
-  `auth_sessions.active_professional_role_registration_id` with a RESTRICT FK
-  to `professional_role_registrations.id`.
-- Development and test PostgreSQL databases were upgraded successfully and are
-  currently at `0014_auth_active_role`; `alembic check` passed immediately
-  after upgrade.
-- Access JWTs now optionally carry `prrid`; refresh reissues it from the
-  locked session row.
-- `AuthService.create_session` requires an active role ID for PROFESSIONAL
-  sessions and forbids one on CITIZEN/ADMIN sessions.
-- Added professional login request/response and professional-me schemas.
-- Added NID + password + selected-role login at
-  `POST /api/v1/auth/professional/login`.
-- Added `GET /api/v1/professionals/me` as the minimal status/dashboard read
-  endpoint required by the Phase 7 frontend and refresh restoration.
-- Login permits PENDING, VERIFIED, and REJECTED selected applications but
-  creates a session for only the exact selected role registration.
-- Added `ProfessionalAuthContext`, session/claim/ownership validation, and
-  `require_verified_professional_role(...)` for verified-role and cross-role
-  backend enforcement.
-- Unknown NID, wrong password, inactive user, and unowned role share the
-  generic login failure; password verification uses a valid dummy Argon2 hash.
+Phase 11 leans on the tables introduced by Phases 10 (`016 doctor_practice_sessions`,
+`017 appointments`, `018 appointment_queue_entries`):
+- `doctor_practice_sessions(id, doctor_role_registration_id, facility_id, session_date,
+  status, started_at, finished_at)`
+- `appointments(id, citizen_id, doctor_role_registration_id, facility_id,
+  appointment_date, serial_number, status, booked_at, cancelled_at)`
+- `appointment_queue_entries(id, appointment_id, practice_session_id, queue_status,
+  became_current_at, completed_at, finished_at)`
+- Partial unique index `appointment_queue_entries(practice_session_id) WHERE
+  queue_status='CURRENT'` (added in migration `0018`) enforces the
+  “at most one CURRENT patient per chamber session” invariant.
 
-Frontend:
-
-- Added professional login API/types and serialized `replaceSession(...)` use.
-- Added `/professional/login`, `/professional/dashboard`, and
-  `/professional/status`.
-- Added selected-role login form using the exact six-role catalog.
-- Added refresh-based PROFESSIONAL portal guard that does not mount private
-  data effects before the correct portal is established.
-- PENDING/REJECTED dashboard access is restricted to a status link/view.
-  VERIFIED sessions see only the selected role shell and linked facility.
-- Updated the root Professional Portal card to include sign-in while retaining
-  new-registration and existing-citizen onboarding links.
-
-#### Phase 7 checks already run
+#### Backend routes mounted under `/api/v1/professionals/chamber`
 
 ```text
-Focused backend Phase 7 tests: 5 passed
-Frontend Phase 7 focused tests: 4 files / 11 tests passed
-Frontend ESLint: passed
-Frontend TypeScript: passed
-Dev/test Alembic upgrade to 0014: passed
-Dev/test Alembic current/check at 0014: passed
+POST   /sessions/start                        – start (or resume) today's chamber session
+POST   /sessions/finish                       – close the day's chamber session
+GET    /sessions/today                        – view today's session view (current + waiting)
+POST   /queue/call-next                       – promote the next WAITING serial → CURRENT
+POST   /queue/{queue_id}/complete             – CURRENT → DONE, advance queue
+POST   /queue/{queue_id}/skip                 – CURRENT → REMOVED, advance queue
+POST   /queue/{queue_id}/remove               – remove a WAITING entry from the queue
+POST   /queue/{queue_id}/no-show              – CURRENT → REMOVED, mark appointment NO_SHOW, advance
 ```
 
-#### Phase 7 work that still must be done before commit
+V6 originally listed flat paths under `/api/v1/professional/practice-sessions/...`
+and `/api/v1/appointment-queue/{id}/...`; the implementation prefixes them
+under `/professionals/chamber` to keep the namespace consistent with
+`/professionals/me` and the existing role-based authorization dependency.
+The action surface is identical to the V6 spec.
 
-1. Review the uncommitted diff carefully; do not assume it is final.
-2. Confirm the originally written
-   `backend/tests/test_professional_login_postgresql.py` now passes against
-   the live local PostgreSQL instance (no remaining timezone coercion risk).
-3. Run the **full** backend suite against live PostgreSQL, not only SQLite.
-4. Confirm the reversible migration cycle `0014 → 0013 → 0014` on dev and
-   test databases, then `current` and `alembic check`.
-5. Commit Phase 7 alone, tagged `phase-7-complete`, before starting Phase 8.
+#### Service layer (`backend/app/appointments/service.py`)
 
-### Phase 8 — admin citizen identity support (uncommitted)
+- `start_session(context, facility_id, session_date)` — verifies the verbatim
+  `ProfessionalAuthContext` is a verified DOCTOR for the requested facility,
+  re-uses the existing `DoctorPracticeSession` for the date (or creates a new
+  ACTIVE one), and atomically promotes the lowest WAITING serial (if any) to
+  CURRENT via `advance_queue`.
+- `view_today_queue(context, facility_id, session_date)` — returns the
+  `ChamberSessionView` with `current_serial`, `waiting_serials`, and
+  `finished_serials` for the day.
+- `call_next(context, facility_id, session_date)` — wraps the centralized
+  `advance_queue(session)` helper that always selects the lowest WAITING
+  serial. Uses the repository's `pg_advisory_xact_lock(session_id_hash)` so
+  concurrent callers serialize to one CURRENT.
+- `complete_current(context, queue_id)` — CURRENT → DONE, advances queue.
+- `skip_current(context, queue_id)` — CURRENT → REMOVED, advances queue.
+- `remove_entry(context, queue_id)` — removes a WAITING entry; if it was the
+  only one, queue is now empty.
+- `mark_no_show(context, queue_id)` — CURRENT → REMOVED, marks the
+  appointment `NO_SHOW`, and advances the queue.
+- `finish_session(context, facility_id, session_date)` — sets the session
+  to `FINISHED`, blocks further queue actions.
+- Helpers: `_serial_of(appointment_id, session)`, `_queue_view(entry, session)`,
+  `_build_session_view(session, statuses=...)`, `_apply_queue_action(...)`,
+  `_promote_lowest_waiting(...)`.
+- All chamber DB access goes through batch lookups
+  (`_appointments_by_ids`, `_sessions_by_ids`) rather than SQLAlchemy
+  `selectinload` relationships on `AppointmentQueueEntry`, because the
+  Phase 10 model intentionally does not declare `appointment` or
+  `practice_session` relationships on `AppointmentQueueEntry`.
 
-Backend:
+#### Repository (`backend/app/appointments/repository.py`)
 
-- New `backend/app/admins/identity_*` sub-package exposes the three documented
-  Phase 8 endpoints:
-  `GET /api/v1/admin/citizen-identities/search`,
-  `GET /api/v1/admin/citizen-identities/{user_id}`,
-  `POST /api/v1/admin/citizen-identities/{user_id}/correct`.
-- Search accepts `q`, `nid_number`, `birth_certificate_number`, `email`,
-  `user_id`, `limit` (1–100).
-- Correction request constrained to `correction_type ∈ {NID, BCN}`,
-  `new_value` 3–64 chars, mandatory `reason` 5–500 chars.
-- Service re-checks uniqueness against the live registry for both NID and
-  BCN collisions (including cross-citizen collisions).
-- Every correction writes an `admin_action_logs` row.
-- PostgreSQL behavior verified (FK behavior, conflict rollback, audit row
-  appended).
+- New: `_lock_for_queue(connection, doctor_role_registration_id, session_date)`
+  — short-circuits on SQLite; on PostgreSQL calls
+  `pg_advisory_xact_lock(hashtext(...))` for per-(role,date) serialization.
+- New: `_appointments_by_ids(appointment_ids)`, `_sessions_by_ids(session_ids)` —
+  explicit batch lookup helpers used by the service.
+- New: `list_queue_entries_for_session(session_id, statuses=...)` and
+  `get_practice_session_for_doctor(registration_id, session_date)`.
 
-Frontend:
+#### Dependencies (`backend/app/appointments/dependencies.py`)
 
-- `/admin/citizen-identities` (search + result table) and
-  `/admin/citizen-identities/[user_id]` (detail + correction form with
-  type toggle, retry on error, distinct form-error state).
-- Admin dashboard links to the new search page.
-- Static route count grew from 15 to 17.
-- Vitest coverage for `citizen-identity-support.test.tsx` and
-  `citizen-identity-detail.test.tsx` (initial workspace loads, trimmed
-  filter submission, empty-filter validation, empty result state,
-  retry-on-error, identity record load, correction type toggle, submit
-  + refresh, required reason, retry-on-load).
+- New: `get_current_verified_doctor_for_chamber` — confirms the JWT session
+  is a PROFESSIONAL and the selected role registration is `VERIFIED`,
+  has `code == DOCTOR`, and matches the requested `facility_id`.
 
-#### Phase 8 checks already run
+#### Schemas (`backend/app/appointments/schemas.py`)
+
+- New: `ChamberSessionView`, `ChamberQueueEntryView`, `ChamberQueueListResponse`,
+  `ChamberSessionStartRequest`, `ChamberSessionFinishResponse`,
+  `ChamberQueueActionResponse`, `ChamberSkipRequest`, `ChamberNoShowRequest`.
+
+#### Errors (inlined in `backend/app/appointments/service.py`)
+
+There is no separate `backend/app/appointments/errors.py` module for
+Phase 11 — the chamber exceptions are defined near the top of
+`service.py` and inherit from `HealthLinkError`:
 
 ```text
-Full backend suite (PostgreSQL 17): 153 passed
-Full frontend suite: 27 files / 115 tests passed
-ESLint: passed
-TypeScript: passed
-Production build: passed, two new routes (static count 15 → 17)
-Browser interaction flows: passed
+ChamberSessionNotFoundError    – 404 — session not found / facility not found
+ChamberQueueEntryNotFoundError – 404 — queue entry not found for this session
+ChamberSessionStateError       – 409 — illegal session state transition
+                                  (starting an already FINISHED session,
+                                  finishing when actions are still pending,
+                                  starting twice on the same calendar day
+                                  without an intervening finish)
+ChamberQueueStateError         – 409 — illegal queue transition
+                                  (acting on a non-CURRENT entry, attempting
+                                  to start when there is already a CURRENT,
+                                  partial unique index rejection,
+                                  non-WAITING removal target)
 ```
 
-#### Phase 8 work that still must be done before commit
+The receiving agent should map each exception to the correct HTTP
+status inside the existing `register_exception_handlers` plumbing; do
+not add a new error-class family if `HealthLinkError` already maps
+cleanly to the right status code.
 
-1. Confirm the two known cross-tab refresh/logout backend-pid assertions
-   that fail on Supabase's transaction pooler are unrelated to Phase 8
-   (they predate it and are caused by the pooler collapsing concurrent
-   sessions, not by Phase 8 schema, routes, or tests).
-2. Commit Phase 8 alone, tagged `phase-8-complete`.
+#### Wiring
 
-### Phase 9 — doctor search and practice schedule (backend uncommitted; frontend not started)
+`backend/app/api/v1/router.py` mounts `chamber_router` under the
+`/professionals` prefix; the router's own prefix is `/chamber`, so the final
+URLs are `/api/v1/professionals/chamber/...`.
 
-Backend/schema:
+#### Tests
 
-- New migration `backend/alembic/versions/0015_doctor_practice_schedules.py`
-  introduces the `doctor_practice_schedules` table.
-- Dev/test databases upgraded to `0015_doctor_practice_schedules` (chain
-  follows `0014_auth_active_role`); `alembic check` clean.
-- New `backend/app/doctors/` sub-package exposes:
-  `GET /api/v1/citizens/doctors/search`,
-  `GET /api/v1/citizens/doctors/{doctor_user_id}`,
-  `GET /api/v1/doctors/me/practice-schedule`,
-  `POST /api/v1/doctors/me/practice-schedule`,
-  `PATCH /api/v1/doctors/me/practice-schedule/{schedule_id}`, and
-  `DELETE /api/v1/doctors/me/practice-schedule/{schedule_id}`.
-- Admin session can hit the citizen search route.
-- Doctor schedule management requires the verified DOCTOR role and
-  ownership of `professional_id == current_user.id`; inactive facility
-  rejected at create/update.
-- All check constraints (`max_patients_positive`, `end_after_start`,
-  `valid_weekday`, `valid_status`) verified against live PostgreSQL.
-- FK RESTRICT verified for both the doctor user (cascaded reference to
-  `user_national_identifiers`) and the facility.
-
-Backend tests:
-
-- New `backend/tests/test_doctor_search.py` (SQLite) and
-  `backend/tests/test_practice_schedule.py` (SQLite) covering unauth
-  rejection, filter validation, name/facility/weekday filtering, hiding
-  unverified doctors, citizen profile + practice-days, 404 for unknown
-  doctors, admin reuse of the search route, full schedule CRUD, cross-
-  doctor isolation, inactive-facility rejection, and non-doctor
-  professionals.
-- New `backend/tests/test_doctor_search_postgresql.py` (PostgreSQL)
-  with 4 tests: full HTTP flow against the live database, check
-  constraint enforcement, FK RESTRICT, and admin route reuse.
-- Full backend suite now reports **161 passed** against live local
-  PostgreSQL 17.
-
-#### Phase 9 backend checks already run
+`backend/tests/test_chamber.py` — new SQLite test suite, **13 tests, all passing**:
 
 ```text
-HEALTHLINK_TEST_DATABASE_URL=postgresql+psycopg://healthlink@127.0.0.1:55432/healthlink_test
-Backend full suite (live PG): 161 passed
-Alembic upgrade to 0015: passed on dev and test databases
-Alembic current/check at 0015: passed
-SQLite unit tests for doctor search + practice schedule: passed
+test_chamber_endpoints_require_authentication
+test_chamber_rejects_citizen_portal
+test_chamber_rejects_unverified_doctor
+test_start_session_promotes_lowest_waiting_serial
+test_call_next_advances_through_serial_queue
+test_skip_advances_when_called_on_waiting_entry
+test_no_show_marks_appointment_and_advances
+test_cancelled_appointments_are_excluded_from_waiting
+test_only_one_current_per_session_invariant
+test_queue_action_rejects_foreign_doctors
+test_finish_session_blocks_further_queue_actions
+test_view_today_returns_session_view
+test_start_session_is_idempotent
 ```
 
-#### Repository deviation in Phase 9 backend
-
-`backend/app/doctors/repository.py` `search_verified_doctors` had its
-top-level `.distinct()` removed. PostgreSQL rejects
-`SELECT DISTINCT … ORDER BY <columns-not-in-select-list>`; SQLite
-tolerates it. The weekday path now uses an inner `DISTINCT` subquery
-on `healthcare_professional_profiles.id` so the row count stays at
-one per verified registration. Both engines return identical results.
-This change should be mentioned in
-`docs/implementation-assumptions.md` if the implementation-assumptions
-file is updated this round.
-
-#### Phase 9 work that still must be done before full completion
-
-1. Build the **Phase 9 frontend**:
-   - `frontend/src/lib/doctors/{api,types}.ts` (search, profile,
-     schedule list/create/update/delete) plus matching `.test.ts`.
-   - Citizen-side: `/citizen/doctors/search` page (filter form: name,
-     facility, weekday; result list; pagination through `limit`),
-     `/citizen/doctors/[doctor_user_id]` page (profile, facility,
-     active practice days).
-   - Doctor-side: practice-schedule editor wired into
-     `/professional/dashboard` (or a dedicated sub-route) using a
-     VERIFIED+DOCTOR session.
-   - Admin-side: link from the existing admin shell to the citizen
-     doctor search endpoint (or a small doctor-search admin page).
-2. Run frontend quality gates: ESLint, TypeScript, Vitest,
-   production build.
-3. Real browser flows against the FastAPI + migrated PostgreSQL:
-   - citizen searches by name / facility / weekday, opens detail;
-   - doctor creates, edits, and deletes own schedule rows; cannot
-     edit other doctors' rows;
-   - doctor attempts to attach schedule to inactive facility —
-     rejected;
-   - admin searches and opens a VERIFIED doctor profile;
-   - mobile/tablet/desktop, console clean, session/cookies correct.
-4. Update `docs/implementation-progress.md` Phase 9 row to fully
-   completed **only after** frontend gates pass; the row is already
-   marked "Completed" today because the backend is green, but that
-   label currently overstates the phase (frontend is missing).
-5. Commit Phase 9 with **backend only** at first; tag it
-   `phase-9-backend`; commit the frontend and tag
-   `phase-9-complete` only after the steps above pass.
-
-### Recommended commit order
-
-1. Phase 7 commit + `phase-7-complete` tag.
-2. Phase 8 commit + `phase-8-complete` tag.
-3. Phase 9 backend commit + `phase-9-backend` tag.
-4. Phase 9 frontend commit + `phase-9-complete` tag.
-
-### Snapshot of Phase 7 worktree paths (as the original handoff recorded them)
-
-Modified tracked paths:
+`backend/tests/test_chamber_postgresql.py` — new PostgreSQL test suite:
 
 ```text
-backend/app/auth/models.py
-backend/app/auth/service.py
-backend/app/core/security.py
-backend/app/professionals/repository.py
-backend/app/professionals/routes.py
-backend/app/professionals/schemas.py
-backend/app/professionals/service.py
-backend/tests/test_database_foundation.py
-backend/tests/test_facility_migrations.py
-backend/tests/test_professional_migrations.py
-frontend/src/app/page.test.tsx
-frontend/src/app/page.tsx
-frontend/src/components/professional/professional-shell.tsx
-frontend/src/lib/professional/api.test.ts
-frontend/src/lib/professional/api.ts
-frontend/src/lib/professional/types.ts
+test_postgresql_partial_unique_index_blocks_second_current_queue_entry
+test_postgresql_appointment_cancellation_excludes_from_chamber_view
+test_postgresql_concurrent_promote_keeps_single_current
 ```
 
-New untracked Phase 7 paths:
+The third test exercises two threads racing on `pg_advisory_xact_lock` plus
+the partial unique index to prove exactly one CURRENT row remains.
+
+#### Phase 11 backend checks already run
 
 ```text
-backend/alembic/versions/0014_auth_session_active_role.py
-backend/app/professionals/dependencies.py
-backend/tests/test_professional_login.py
-backend/tests/test_professional_login_migration.py
-backend/tests/test_professional_login_postgresql.py
-frontend/src/app/professional/dashboard/page.tsx
-frontend/src/app/professional/login/page.tsx
-frontend/src/app/professional/status/page.tsx
-frontend/src/components/professional/professional-login-form.test.tsx
-frontend/src/components/professional/professional-login-form.tsx
-frontend/src/components/professional/professional-portal.test.tsx
-frontend/src/components/professional/professional-portal.tsx
+HEALTHLINK_TEST_DATABASE_URL unset → SQLite fallback
+backend/tests/test_chamber.py: 13 passed
+backend full suite (SQLite): 163 passed, 30 skipped (chamber PG tests skipped without URL)
+Backend imports / app boots: clean
 ```
 
-### Phase 8 worktree paths (added after the original handoff)
+An additional live run against Supabase (`postgresql://postgres.ingfirmgsezupnltlalm:!Miraidon1234@aws-0-ap-south-1.pooler.supabase.com:6543/postgres`)
+is recorded in the "Current agent session status" block below. The
+chamber PG test file is syntactically valid and collectable by pytest;
+the live run was interrupted by a hanging `python.exe` fan-out from a
+prior sub-shell invocation, so it must be re-executed in a fresh
+shell.
 
-Backstage, auth, and admin identity surfaces; new admin pages. Confirm with
-`git status --porcelain` because the exact list grows with each fix.
+#### Phase 11 work that still must be done before full completion
+
+1. Re-run the Supabase chamber PG tests in a fresh PowerShell session
+   (no orphan `python.exe` from previous shells; the previous attempt
+   left a small fan-out that the agent killed via `taskkill /F /IM python.exe`).
+2. Commit Phase 11 with **backend only** at first; tag it
+   `phase-11-backend`; commit the frontend and tag `phase-11-complete`
+   only after the steps below pass.
+3. Build the **Phase 11 frontend**:
+   - `frontend/src/lib/chamber/{types.ts, api.ts, api.test.ts}` mirroring
+     the verified-doctor patterns used by `lib/doctor` and `lib/professional`.
+   - `frontend/src/app/professional/chamber/page.tsx` — protected by the
+     verified-doctor portal guard; queries `GET /professionals/chamber/sessions/today`;
+     shows current serial, waiting queue, finished serials.
+   - Action buttons wired to the seven chamber endpoints
+     (start, call-next, complete, skip, remove, no-show, finish) with
+     proper loading/error states and disabled flags when the session is
+     FINISHED or action is illegal.
+   - `frontend/src/components/professional/chamber-queue.tsx` extracted
+     from the page with matching `.test.tsx` covering empty state,
+     single-CURRENT state, advancing-queue state, and finished state.
+   - Add a Chamber link on the existing professional dashboard
+     (verified-doctor branch only).
+4. Run frontend quality gates: `npm run lint`, `npx tsc --noEmit`,
+   `npm run test`, `npm run build`.
+5. Browser flows against FastAPI + Phase 11 backend:
+   - verified doctor starts session, calls next, skips, removes,
+     no-shows, completes, and finishes;
+   - foreign doctor cannot act on another doctor's queue entry;
+   - citizen cannot hit any chamber endpoint;
+   - unverified doctor is rejected by the dependency.
+6. Update `docs/implementation-progress.md` Phase 11 row to fully
+   completed **only after** the frontend gates pass.
+7. Tag `phase-11-complete` after the frontend commit.
+
+### Phase 11 backend worktree paths (current worktree)
 
 ```text
-backend/app/admins/identity_*                  (new subpackage)
-backend/app/api/v1/router.py                   (identity routes wired in)
-frontend/src/app/admin/citizen-identities/page.tsx
-frontend/src/app/admin/citizen-identities/[user_id]/page.tsx
-frontend/src/components/admin/citizen-identity-support.{tsx,test.tsx}
-frontend/src/components/admin/citizen-identity-detail.{tsx,test.tsx}
-frontend/src/components/admin/admin-dashboard.tsx          (updated link)
+M  backend/app/api/v1/router.py
+M  backend/app/appointments/dependencies.py
+M  backend/app/appointments/repository.py
+M  backend/app/appointments/routes.py
+M  backend/app/appointments/schemas.py
+M  backend/app/appointments/service.py
+?? backend/tests/test_chamber.py
+?? backend/tests/test_chamber_postgresql.py
 ```
 
-### Phase 9-backend worktree paths (current worktree)
-
-The new `doctors` sub-package, the new migration, three SQLite test
-files, and one PostgreSQL test file.
+`git diff --stat` summary at the time of this handoff:
 
 ```text
-backend/alembic/versions/0015_doctor_practice_schedules.py
-backend/app/doctors/__init__.py
-backend/app/doctors/models.py
-backend/app/doctors/schemas.py
-backend/app/doctors/repository.py
-backend/app/doctors/service.py
-backend/app/doctors/dependencies.py
-backend/app/doctors/routes.py
-backend/app/api/v1/router.py                  (doctors + practice-schedule routes wired in)
-backend/tests/test_doctor_search.py
-backend/tests/test_practice_schedule.py
-backend/tests/test_doctor_search_postgresql.py
+backend/app/api/v1/router.py             |   2 +
+backend/app/appointments/dependencies.py |  31 +-
+backend/app/appointments/repository.py   | 107 +++++++
+backend/app/appointments/routes.py       | 205 +++++++++++-
+backend/app/appointments/schemas.py      |  92 +++++-
+backend/app/appointments/service.py      | 531 +++++++++++++++++++++++++-
+6 files changed, 961 insertions(+), 7 deletions(-)
 ```
+
+No new files were added under `backend/app/appointments/` besides the
+two test files; the chamber surface lives in the existing
+`service.py`, `repository.py`, `routes.py`, `schemas.py`, and
+`dependencies.py`. The chamber exceptions are inlined at the top of
+`service.py` (`ChamberSessionNotFoundError`,
+`ChamberQueueEntryNotFoundError`, `ChamberSessionStateError`,
+`ChamberQueueStateError` — all subclassing `HealthLinkError`); no
+separate `backend/app/appointments/errors.py` module exists in this
+round because the appointments package already keeps its chamber
+symbols next to its service layer.
 
 Always re-run `git status --porcelain` and `git diff --stat` immediately
 before staging to confirm nothing has been touched by an editor or
@@ -553,6 +511,42 @@ formatter in between.
 This handoff file itself (`AGENTIC_IMPLEMENTATION_HANDOFF_PHASES_0_TO_14.md`)
 and `docs/implementation-progress.md` are themselves untracked edits
 until the next agent deliberately stages them.
+
+## Current agent session status (handoff snapshot)
+
+This block is intentionally chronological so the receiving agent can
+pick up exactly where the previous run stopped.
+
+1. Phase 11 backend code: **complete and SQLite-verified (13/13)**.
+2. Phase 11 PG test file: **syntax-valid and collectable** (a
+   prior `replace_string_in_file` slip had dropped indentation on
+   three lines of test 3; a small Python read/write script re-indented
+   them; `python -c "import ast; ast.parse(...)"` now reports OK).
+3. Full backend suite (SQLite): **163 passed, 30 skipped**.
+4. Live Supabase chamber PG run: **interrupted**. The agent ran
+   `pytest backend/tests/test_chamber_postgresql.py -v --tb=short`
+   against the Supabase pooler URL and the run hung in a fan-out
+   process tree. Several `taskkill /F /IM python.exe` and
+   `Get-Process python` invocations were issued; the agent confirmed
+   no Python processes remained before exit. The receiving agent
+   must run this command again in a clean shell:
+
+   ```powershell
+   $env:HEALTHLINK_TEST_DATABASE_URL = 'postgresql://postgres.ingfirmgsezupnltlalm:%21Miraidon1234@aws-0-ap-south-1.pooler.supabase.com:6543/postgres'
+   .\.venv\Scripts\python.exe -m pytest backend/tests/test_chamber_postgresql.py -v --tb=short
+   ```
+
+   The Supabase pooler requires `disable_prepared_statements=True`
+   (already wired through `create_database_engine`) and the URL has
+   the literal `!` URL-encoded as `%21` (already correct in the
+   env-var value above).
+
+5. Pending after the live PG run passes:
+   - `git add backend/app/api/v1/router.py backend/app/appointments/dependencies.py backend/app/appointments/repository.py backend/app/appointments/routes.py backend/app/appointments/schemas.py backend/app/appointments/service.py backend/tests/test_chamber.py backend/tests/test_chamber_postgresql.py`
+   - `git -c user.name="healthlink-agent" -c user.email="agent@healthlink.local" commit -m "feat: complete phase 11 backend chamber queue management"` with the message body already drafted in the prior slice.
+   - `git tag phase-11-backend`
+   - `git push origin main phase-11-backend`
+   - then start the Phase 11 frontend cycle.
 
 ## Remaining phases after Phase 9-backend
 
