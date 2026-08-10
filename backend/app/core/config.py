@@ -33,6 +33,10 @@ class Settings(BaseSettings):
         validation_alias="DATABASE_URL",
         repr=False,
     )
+    db_disable_prepared_statements: bool = Field(
+        default=False,
+        validation_alias="DB_DISABLE_PREPARED_STATEMENTS",
+    )
     frontend_url: str = Field(
         default="http://localhost:3000",
         validation_alias="FRONTEND_URL",
