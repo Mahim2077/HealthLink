@@ -6,6 +6,7 @@
 // can mock fetch without touching the real apiClient.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import {
@@ -465,6 +466,12 @@ function CurrentColumn({
               </button>
             </div>
           ) : null}
+          <Link
+            href="/professional/visits"
+            className="mt-4 inline-flex min-h-11 items-center text-sm font-bold text-sky-700 underline-offset-4 hover:underline"
+          >
+            Open consultation
+          </Link>
         </div>
       ) : (
         <p className="mt-3 text-sm text-slate-600">

@@ -9,7 +9,7 @@ because Phase 14+ grants need their own wiring.
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, status
@@ -143,9 +143,14 @@ def list_my_visits_today(
     db: Annotated[Session, Depends(get_db)],
     context: Annotated[CitizenContext, Depends(get_current_citizen)],
 ) -> CitizenVisitListResponse:
+    # `MedicalVisit.visit_date` is server-defaulted to UTC `now()`, so the
+    # "today" filter must compare against the UTC calendar date rather
+    # than the local `date.today()` to stay timezone-stable across the
+    # test runner and the deployment environment.
     return CitizenVisitListResponse(
         visits=VisitsService(db).list_citizen_visits(
-            context.profile.id, target_date=date.today()
+            context.profile.id,
+            target_date=datetime.now(tz=timezone.utc).date(),
         )
     )
 

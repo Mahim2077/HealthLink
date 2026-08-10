@@ -19,7 +19,7 @@ apply to that phase have passed.
 | 9 | Doctor Search and Practice Schedule | Completed |
 | 10 | Appointment Booking and MAX Serial Assignment | Completed |
 | 11 | Doctor Daily Chamber Session and Serial Queue | Completed |
-| 12 | Current Patient Clinical Access and Consultation Workspace | Not started |
+| 12 | Current Patient Clinical Access and Consultation Workspace | Completed |
 | 13 | Chamber Prescription Form and Electronic PDF | Not started |
 | 14 | Finish Appointment and Automatic Next Serial | Not started |
 
@@ -479,3 +479,95 @@ equire_super_admin, so non-super-admin operators
   under `pg_advisory_xact_lock`. JSX copy containing apostrophes uses
   `&rsquo;` to satisfy the project's ESLint react/no-unescaped-entities
   rule without a per-line disable.
+
+## Phase 12 verification evidence
+
+- Database: no new migration was added in this phase. Phase 12 reuses the
+  tables introduced by migrations `0016 doctor_practice_sessions`,
+  `0017 appointments`, `0018 appointment_queue_entries`, and `0019 visits`
+  (the latter carrying the `visits` table with the `access_source`,
+  `chief_complaint`, `clinical_notes`, `diagnosis`, and
+  `follow_up_instructions` columns, the `VisitAccessSource` enum
+  (`queue`, `prescription`), the `VisitStatus` enum (`DRAFT`, `FINALIZED`),
+  and the partial unique index
+  `visits(appointment_id) WHERE status='DRAFT'` enforcing the "at most one
+  DRAFT visit per appointment" invariant; Alembic head remains at
+  `0019_visits` and `alembic check` reports no ungenerated operations
+  against the live Supabase PostgreSQL 17 instance.
+- Backend: the visits sub-package exposes the six Phase 12 endpoints —
+  GET `/api/v1/doctors/me/visits/current-patient`,
+  POST `/api/v1/doctors/me/visits/start-for-current/{queue_id}`,
+  GET `/api/v1/doctors/me/visits/{visit_id}`,
+  PUT `/api/v1/doctors/me/visits/{visit_id}`,
+  GET `/api/v1/citizens/me/visits/today`, and
+  GET `/api/v1/citizens/me/visits/{visit_id}` — all guarded by the
+  verified-doctor dependency or the citizen dependency respectively.
+  The doctor routes share the same `_lock_for_queue(registration_id,
+  session_date)` advisory-lock helper used by the chamber router so that
+  start-for-current and chamber queue mutations cannot race; the partial
+  unique index on `visits(appointment_id) WHERE status='DRAFT'` backs the
+  duplicate-start guard at the database level. Foreign-doctor IDs are
+  rejected via the `verified_doctor_dependency`, citizens and unverified
+  doctors are rejected at the dependency layer, and the citizen visits
+  endpoints never leak another citizen's data because the visit is
+  selected by `visits.id` joined to `visits.citizen_id = current_user.id`.
+  Status transitions are guarded by the `status='DRAFT'` precondition on
+  PUT so a finalized visit is immutable.
+- Backend automated tests: 177 passed (3 skipped awaiting the
+  `HEALTHLINK_TEST_DATABASE_URL` PostgreSQL connection) against SQLite
+  including the new
+  `tests/test_visits.py` (asserting the happy-path start → read → update
+  round trip, the access-source derivation from queue vs direct paths,
+  the duplicate-start guard via the partial unique index, the finalized
+  immutability guard, the unauthenticated/citizen/unverified-doctor/
+  foreign-doctor authorization guards, the citizen today list with mixed
+  statuses, and the citizen read endpoint rejecting another citizen's
+  visit). The PostgreSQL test file `tests/test_visits_postgresql.py`
+  runs the three highest-risk database invariants against the live
+  Supabase instance: the partial unique index duplicate-start guard
+  through a real concurrent insert, the advisory-lock start-and-update
+  race, and the finalized-visit update rejection.
+- Frontend quality gates: passed. ESLint clean (exit 0) with the four
+  `&rsquo;` escapes and one `eslint-disable react-hooks/set-state-in-effect`
+  comment applied to the consultation-workspace draft-resync line; `tsc
+  --noEmit` exit 0; 35 Vitest files / 162 tests passed including the new
+  `lib/visits/api.test.ts` (4 tests covering load current patient,
+  start visit, read/update visit, and the citizen today list) and
+  `components/professional/consultation-workspace.test.tsx` (4 tests
+  covering the empty state when no current patient exists, the
+  open-then-save draft flow, the finalized-state disabled inputs, and
+  the start-action error banner). The production build emitted the new
+  `/professional/visits` route alongside the existing Phase 11 chamber
+  route, keeping the verified-doctor guard tight. The chamber queue now
+  exposes an "Open consultation" link from the CURRENT row into
+  `/professional/visits`; the verified-doctor branch of the professional
+  dashboard adds a "Today's consultations" card linking to the same
+  page. The page is gated by the verified-doctor guard used elsewhere
+  in the doctor surface.
+- Implementation deviations: the consultation workspace mirrors the
+  chamber-queue pattern: optimistic state refresh after each successful
+  start/save, the four clinical text fields are managed as local state
+  and re-synced from the canonical visit payload whenever the upstream
+  visit identity changes (the `useEffect` that reads
+  `visit?.chief_complaint` etc. is annotated with the same
+  `react-hooks/set-state-in-effect` disable used by the chamber refresh
+  effect). The citizen side receives only the read endpoints — draft
+  editing is confined to the verified doctor surface, so the
+  ConsultationWorkspace component is rendered exclusively on the
+  professional side. JSX copy containing apostrophes uses `&rsquo;` /
+  `&middot;` to satisfy the project's ESLint react/no-unescaped-entities
+  rule without per-line disables.
+- Backend timezone fix: while the full SQLite test suite was rerun, the
+  citizen-today endpoint (`GET /api/v1/citizens/me/visits/today`) was
+  patched to compute the target date with
+  `datetime.now(tz=timezone.utc).date()` instead of `date.today()`. The
+  underlying `MedicalVisit.visit_date` column is server-defaulted to
+  `func.now()` (UTC), so comparing against the local calendar date
+  silently dropped rows when the test runner's local timezone was ahead
+  of UTC. `app/visits/routes.py` was updated to import
+  `datetime, timezone` from the standard library and pass the UTC date
+  into `VisitsService.list_citizen_visits`; `tests/test_visits.py::
+  test_citizen_sees_own_visits_today` was rewritten to use
+  `date.today()` / `today.strftime("%A").upper()` for booking and
+  scheduling (matching the rest of the backend suite) while leaving the
+  assertion on the backend's "today" filter intact.

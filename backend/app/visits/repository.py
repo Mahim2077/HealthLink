@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Iterable
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.appointments.models import (
@@ -359,14 +359,13 @@ class VisitsRepository:
             .order_by(MedicalVisit.visit_date.desc())
         )
         if target_date is not None:
-            start = datetime.combine(target_date, datetime.min.time())
-            end = datetime.combine(target_date, datetime.max.time())
-            stmt = stmt.where(
-                and_(
-                    MedicalVisit.visit_date >= start,
-                    MedicalVisit.visit_date <= end,
-                )
-            )
+            # Compare the calendar-date portion of `visit_date` against the
+            # target date so the filter is timezone-stable across the
+            # test runner (where `date.today()` is local) and the database
+            # server (where `func.now()` is also local). Using
+            # `func.date(...)` works on both SQLite and PostgreSQL without
+            # requiring the column to be timezone-aware in the driver.
+            stmt = stmt.where(func.date(MedicalVisit.visit_date) == target_date)
         return self.db.execute(stmt).all()
 
 

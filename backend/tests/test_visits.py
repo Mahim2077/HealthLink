@@ -716,13 +716,18 @@ def test_citizen_sees_own_visits_today(
         facility=facility,
         nid_number="NID-VISITS-TODAY",
     )
+    # The /citizens/me/visits/today filter compares the visit row's
+    # `visit_date` (server-defaulted to UTC `now()`) against the test
+    # runner's `date.today()`. To stay timezone-stable we schedule the
+    # doctor for the test runner's own weekday and book today's date.
+    today = date.today()
+    today_weekday = today.strftime("%A").upper()
     _add_schedule(
         db_session,
         doctor_user_id=doctor_user_id,
         facility=facility,
-        weekday="MONDAY",
+        weekday=today_weekday,
     )
-    target = _next_matching_date("MONDAY")
 
     citizen_token, _ = _register_citizen(client)
     _book(
@@ -730,14 +735,14 @@ def test_citizen_sees_own_visits_today(
         citizen_token,
         doctor_user_id=doctor_user_id,
         facility_id=facility.id,
-        appointment_date=target,
+        appointment_date=today,
     )
 
     doctor_token = _login_professional(
         client, nid_number=nid, password=password
     )
     started = _start_session(
-        client, doctor_token, facility_id=facility.id, session_date=target
+        client, doctor_token, facility_id=facility.id, session_date=today
     )
     queue_id = started["current"]["queue_id"]
     opened = client.post(
