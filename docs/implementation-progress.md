@@ -15,7 +15,7 @@ apply to that phase have passed.
 | 5 | Admin Login and Admin Portal | Completed |
 | 6 | Facility Registry and Professional Verification | Completed |
 | 7 | Professional Login and Active Role Context | Completed |
-| 8 | Admin Citizen Identity Support | Not started |
+| 8 | Admin Citizen Identity Support | Completed |
 | 9 | Doctor Search and Practice Schedule | Not started |
 | 10 | Appointment Booking and MAX Serial Assignment | Not started |
 | 11 | Doctor Daily Chamber Session and Serial Queue | Not started |
@@ -281,3 +281,58 @@ Phase 15 and later are explicitly outside the current implementation boundary.
   timezone-aware `datetime(2099, 1, 1, tzinfo=timezone.utc)` to match the
   `Mapped[datetime]` column without relying on driver coercion. The targeted
   PostgreSQL test ran against the live Supabase instance and passed.
+
+## Phase 8 verification evidence
+
+- Database: no new migration was required. Phase 8 only reads and updates the
+  users, user_national_identifiers, citizen_profiles, citizen_identifiers,
+  and dmin_action_logs tables introduced by Phases 1–5. The remote
+  PostgreSQL 17 instance (Supabase transaction pooler) was kept at head
+   014_auth_active_role with lembic check reporting no ungenerated
+  operations.
+- Backend: a new admins sub-package (pp/admins/identity_*) introduces the
+  three documented Phase 8 endpoints:
+  GET /api/v1/admin/citizen-identities/search,
+  GET /api/v1/admin/citizen-identities/{user_id}, and
+  POST /api/v1/admin/citizen-identities/{user_id}/correct. The search query
+  accepts q, 
+id_number, irth_certificate_number, email, user_id,
+  and limit (1–100); the correction request is constrained to
+  correction_type of NID or BCN with 
+ew_value (3–64 chars) and a
+  mandatory eason (5–500 chars). The service re-checks uniqueness against
+  the live registry (including cross-citizen collisions for both the NID and
+  the BCN) and writes a row to dmin_action_logs whose ction_type is
+  CITIZEN_IDENTITY_CORRECT_NID or CITIZEN_IDENTITY_CORRECT_BCN and whose
+  esource_id is the corrected citizen. The AdminAccount.role is asserted
+  to be SUPER_ADMIN via equire_super_admin, so non-super-admin operators
+  cannot mutate identity rows even if their access token is otherwise valid.
+- Backend automated tests: 124 SQLite tests passed (the full
+  	ests/test_admin_identity_support.py coverage plus the prior admin and
+  auth suites). 5 PostgreSQL-specific tests in
+  	ests/test_admin_identity_support_postgresql.py passed against the live
+  Supabase database, asserting the unique constraint on
+  user_national_identifiers.nid_number, the unique constraint on
+  citizen_identifiers.birth_certificate_number, the foreign key from
+  dmin_action_logs.admin_user_id to users.id, the live
+  POST /api/v1/admin/citizen-identities/{user_id}/correct writing the audit
+  log row with the corrected resource pointer, and the service-layer conflict
+  detection against an existing citizen's NID. The two known
+  cross-tab refresh/logout backend-pid assertions remain the only PostgreSQL
+  failures; they are caused by the Supabase transaction pooler collapsing
+  concurrent sessions into a single backend connection and are unrelated to
+  Phase 8.
+- Frontend quality gates: ESLint and TypeScript passed; 27 Vitest files / 115
+  tests passed including the new citizen-identity-support.test.tsx
+  (initial workspace loads with the link to the detail page, trimmed filter
+  submission, empty-filter validation, empty result state, and retry on
+  error) and citizen-identity-detail.test.tsx (identity record loaded,
+  correction type toggle, submit + refresh, required reason, retry on load
+  error). The production build emitted the new
+  /admin/citizen-identities and /admin/citizen-identities/[user_id]
+  routes alongside the Phase 5–7 admin routes, taking the static route count
+  from 15 to 17. The admin dashboard now links to the new search page.
+- Implementation deviations: the support component renders a separate
+  ormError state alongside the search error state so the "Provide at
+  least one filter" validation message is not duplicated by the search error
+  banner.

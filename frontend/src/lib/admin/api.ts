@@ -8,6 +8,10 @@ import type {
   AdminLoginRequest,
   AdminLoginResponse,
   AdminMe,
+  CitizenIdentityCorrectionRequest,
+  CitizenIdentityCorrectionResponse,
+  CitizenIdentityDetail,
+  CitizenIdentitySummary,
   Facility,
   FacilityWriteRequest,
   ProfessionalRegistrationDetail,
@@ -84,5 +88,52 @@ export async function rejectProfessionalRegistration(
   return apiClient.post<ProfessionalRegistrationDetail, { reason: string }>(
     `admin/professional-registrations/${id}/reject`,
     { reason },
+  );
+}
+
+export type CitizenIdentitySearchFilters = {
+  nid_number?: string;
+  birth_certificate_number?: string;
+  email?: string;
+  user_id?: string;
+  limit?: number;
+};
+
+export async function searchCitizenIdentities(
+  filters: CitizenIdentitySearchFilters,
+): Promise<CitizenIdentitySummary[]> {
+  const params = new URLSearchParams();
+  if (filters.nid_number && filters.nid_number.trim()) {
+    params.set("nid_number", filters.nid_number.trim());
+  }
+  if (filters.birth_certificate_number && filters.birth_certificate_number.trim()) {
+    params.set("birth_certificate_number", filters.birth_certificate_number.trim());
+  }
+  if (filters.email && filters.email.trim()) {
+    params.set("email", filters.email.trim());
+  }
+  if (filters.user_id && filters.user_id.trim()) {
+    params.set("user_id", filters.user_id.trim());
+  }
+  if (filters.limit) {
+    params.set("limit", String(filters.limit));
+  }
+  const query = params.toString();
+  return apiClient.get<CitizenIdentitySummary[]>(
+    `admin/citizen-identities/search${query ? `?${query}` : ""}`,
+  );
+}
+
+export async function loadCitizenIdentity(userId: string): Promise<CitizenIdentityDetail> {
+  return apiClient.get<CitizenIdentityDetail>(`admin/citizen-identities/${userId}`);
+}
+
+export async function correctCitizenIdentity(
+  userId: string,
+  payload: CitizenIdentityCorrectionRequest,
+): Promise<CitizenIdentityCorrectionResponse> {
+  return apiClient.post<CitizenIdentityCorrectionResponse, CitizenIdentityCorrectionRequest>(
+    `admin/citizen-identities/${userId}/correct`,
+    payload,
   );
 }

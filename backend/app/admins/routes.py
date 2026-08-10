@@ -5,6 +5,14 @@ import uuid
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
+from app.admins.identity_schemas import (
+    CitizenIdentityCorrectionRequest,
+    CitizenIdentityCorrectionResponse,
+    CitizenIdentityDetail,
+    CitizenIdentitySearchQuery,
+    CitizenIdentitySummary,
+)
+from app.admins.identity_service import CitizenIdentitySupportService
 from app.admins.schemas import AdminLoginRequest, AdminMeResponse
 from app.admins.service import AdminService
 from app.admins.verification_schemas import (
@@ -183,3 +191,59 @@ def update_facility(
         facility_id, payload, admin_user_id=context.user.id
     )
     return FacilityResponse.model_validate(facility)
+
+
+@admin_router.get(
+    "/citizen-identities/search",
+    response_model=list[CitizenIdentitySummary],
+)
+def search_citizen_identities(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
+    query: Annotated[
+        CitizenIdentitySearchQuery,
+        Depends(CitizenIdentitySearchQuery.as_query),
+    ],
+) -> list[CitizenIdentitySummary]:
+    _require_active_admin(request, db, context)
+    return CitizenIdentitySupportService(db).search(
+        nid_number=query.nid_number,
+        birth_certificate_number=query.birth_certificate_number,
+        email=str(query.email) if query.email else None,
+        user_id=query.user_id,
+        limit=query.limit,
+    )
+
+
+@admin_router.get(
+    "/citizen-identities/{user_id}",
+    response_model=CitizenIdentityDetail,
+)
+def get_citizen_identity(
+    user_id: uuid.UUID,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
+) -> CitizenIdentityDetail:
+    _require_active_admin(request, db, context)
+    return CitizenIdentitySupportService(db).detail(user_id)
+
+
+@admin_router.post(
+    "/citizen-identities/{user_id}/correct",
+    response_model=CitizenIdentityCorrectionResponse,
+)
+def correct_citizen_identity(
+    user_id: uuid.UUID,
+    payload: CitizenIdentityCorrectionRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
+) -> CitizenIdentityCorrectionResponse:
+    _require_active_admin(request, db, context)
+    return CitizenIdentitySupportService(db).correct(
+        user_id,
+        payload,
+        admin_user_id=context.user.id,
+    )
