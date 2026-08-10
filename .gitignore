@@ -46,3 +46,7 @@ private_storage/
 # Workspace-local PostgreSQL used only for verification
 .postgres-data/
 .postgres-socket/
+
+# Puku editor scratchpad and ad-hoc probe scripts
+.puku/
+scripts_probe_*.py
