@@ -1,4 +1,6 @@
+from datetime import datetime, timezone
 from typing import Annotated
+import uuid
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
@@ -7,6 +9,13 @@ from app.auth.dependencies import AuthContext, get_current_auth_context
 from app.auth.cookies import set_refresh_cookie
 from app.core.config import Settings
 from app.db.session import get_db
+from app.doctors.schemas import (
+    PracticeScheduleCreateResponse,
+    PracticeScheduleDeleteResponse,
+    PracticeScheduleEntry,
+    PracticeScheduleWriteRequest,
+)
+from app.doctors.service import DoctorService
 from app.professionals.constants import ProfessionalRoleCode, VerificationStatus
 from app.professionals.schemas import (
     ProfessionalApplicationResponse,
@@ -19,6 +28,7 @@ from app.professionals.schemas import (
 from app.professionals.dependencies import (
     ProfessionalAuthContext,
     get_current_professional_context,
+    require_verified_professional_role,
 )
 from app.professionals.service import ProfessionalService, SubmittedProfessionalApplication
 
@@ -127,3 +137,92 @@ def get_professional_me(
         rejected_at=registration.rejected_at,
         rejection_reason=registration.rejection_reason,
     )
+
+
+# ---------------------------------------------------------------------------
+# Doctor practice schedule (verified DOCTOR only)
+# ---------------------------------------------------------------------------
+
+
+@professional_router.get(
+    "/me/practice-schedule",
+    response_model=list[PracticeScheduleEntry],
+)
+def list_practice_schedule(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[
+        ProfessionalAuthContext,
+        Depends(require_verified_professional_role(ProfessionalRoleCode.DOCTOR)),
+    ],
+) -> list[PracticeScheduleEntry]:
+    return DoctorService(
+        db, _settings(request)
+    ).list_schedule_entries(context.auth.user.id)
+
+
+@professional_router.post(
+    "/me/practice-schedule",
+    response_model=PracticeScheduleCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_practice_schedule(
+    payload: PracticeScheduleWriteRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[
+        ProfessionalAuthContext,
+        Depends(require_verified_professional_role(ProfessionalRoleCode.DOCTOR)),
+    ],
+) -> PracticeScheduleCreateResponse:
+    result = DoctorService(
+        db, _settings(request)
+    ).create_schedule_entry(context.auth.user.id, payload)
+    return PracticeScheduleCreateResponse(schedule=result.schedule)
+
+
+@professional_router.put(
+    "/me/practice-schedule/{schedule_id}",
+    response_model=PracticeScheduleEntry,
+)
+def update_practice_schedule(
+    payload: PracticeScheduleWriteRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[
+        ProfessionalAuthContext,
+        Depends(require_verified_professional_role(ProfessionalRoleCode.DOCTOR)),
+    ],
+    schedule_id: uuid.UUID,
+) -> PracticeScheduleEntry:
+    result = DoctorService(
+        db, _settings(request)
+    ).update_schedule_entry(context.auth.user.id, schedule_id, payload)
+    return result.schedule
+
+
+@professional_router.delete(
+    "/me/practice-schedule/{schedule_id}",
+    response_model=PracticeScheduleDeleteResponse,
+)
+def delete_practice_schedule(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[
+        ProfessionalAuthContext,
+        Depends(require_verified_professional_role(ProfessionalRoleCode.DOCTOR)),
+    ],
+    schedule_id: uuid.UUID,
+) -> PracticeScheduleDeleteResponse:
+    service = DoctorService(db, _settings(request))
+    service.delete_schedule_entry(context.auth.user.id, schedule_id)
+    schedule = service.repository.get_schedule(schedule_id)
+    deleted_at = schedule.deleted_at if schedule else None
+    return PracticeScheduleDeleteResponse(
+        id=schedule_id,
+        deleted_at=deleted_at or _utcnow(),
+    )
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
