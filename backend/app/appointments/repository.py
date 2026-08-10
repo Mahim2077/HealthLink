@@ -12,6 +12,7 @@ from app.appointments.models import (
     AppointmentQueueEntry,
     AppointmentStatus,
     DoctorPracticeSession,
+    QueueStatus,
     SessionStatus,
 )
 from app.auth.models import User
@@ -222,6 +223,24 @@ class AppointmentRepository:
     def add_queue_entry(self, entry: AppointmentQueueEntry) -> None:
         self.db.add(entry)
 
+    def get_appointments_by_ids(
+        self, appointment_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, Appointment]:
+        """Fetch appointments by ID in a single SELECT; returns a dict."""
+
+        if not appointment_ids:
+            return {}
+        statement = select(Appointment).where(Appointment.id.in_(appointment_ids))
+        return {appointment.id: appointment for appointment in self.db.scalars(statement)}
+
+    def get_appointment_by_id(self, appointment_id: uuid.UUID) -> Appointment | None:
+        return self.db.get(Appointment, appointment_id)
+
+    def get_practice_session_by_id(
+        self, session_id: uuid.UUID
+    ) -> DoctorPracticeSession | None:
+        return self.db.get(DoctorPracticeSession, session_id)
+
     # ------------------------------------------------------------------
     # History
     # ------------------------------------------------------------------
@@ -262,6 +281,94 @@ class AppointmentRepository:
             select(User).where(User.id.in_(list(user_ids)))
         ).unique()
         return {row.id: row for row in rows}
+
+    # ------------------------------------------------------------------
+    # Phase 11 — chamber session + serial queue
+    # ------------------------------------------------------------------
+
+    def _lock_for_queue(
+        self,
+        doctor_role_registration_id: uuid.UUID,
+        session_date: date,
+    ) -> None:
+        """Transaction-scoped advisory lock for chamber queue mutations.
+
+        Mirrors ``_lock_for_booking`` but uses a different folded key so
+        booking locks and queue locks do not collide when a doctor is
+        racing a late-arriving booking while running the queue.
+        """
+
+        bind = self.db.get_bind()
+        if bind.dialect.name != "postgresql":
+            return
+        u = int(doctor_role_registration_id.int)
+        key = (u ^ (u >> 32)) & 0x7FFFFFFFFFFFFFFF
+        key = key ^ (date.toordinal(session_date) << 1) ^ 0x5A5A5A5A
+        self.db.execute(
+            select(func.pg_advisory_xact_lock(key))
+        ).scalar()
+
+    def get_practice_session_for_doctor(
+        self,
+        *,
+        doctor_role_registration_id: uuid.UUID,
+        facility_id: uuid.UUID,
+        session_date: date,
+    ) -> DoctorPracticeSession | None:
+        return self.db.scalar(
+            select(DoctorPracticeSession).where(
+                DoctorPracticeSession.doctor_role_registration_id
+                == doctor_role_registration_id,
+                DoctorPracticeSession.facility_id == facility_id,
+                DoctorPracticeSession.session_date == session_date,
+            )
+        )
+
+    def list_queue_entries_for_session(
+        self, session_id: uuid.UUID
+    ) -> Sequence[AppointmentQueueEntry]:
+        statement = (
+            select(AppointmentQueueEntry)
+            .where(AppointmentQueueEntry.practice_session_id == session_id)
+            .order_by(
+                AppointmentQueueEntry.appointment_id.asc(),
+            )
+        )
+        return list(self.db.scalars(statement))
+
+    def current_queue_entry(
+        self, session_id: uuid.UUID
+    ) -> AppointmentQueueEntry | None:
+        return self.db.scalar(
+            select(AppointmentQueueEntry).where(
+                AppointmentQueueEntry.practice_session_id == session_id,
+                AppointmentQueueEntry.queue_status == QueueStatus.CURRENT.value,
+            )
+        )
+
+    def get_queue_entry_owned_by_doctor(
+        self,
+        *,
+        queue_id: uuid.UUID,
+        doctor_role_registration_id: uuid.UUID,
+    ) -> AppointmentQueueEntry | None:
+        """Return the queue entry only if it belongs to the doctor's session."""
+
+        statement = (
+            select(AppointmentQueueEntry)
+            .join(
+                DoctorPracticeSession,
+                DoctorPracticeSession.id
+                == AppointmentQueueEntry.practice_session_id,
+            )
+            .where(
+                AppointmentQueueEntry.id == queue_id,
+                DoctorPracticeSession.doctor_role_registration_id
+                == doctor_role_registration_id,
+            )
+            .options()
+        )
+        return self.db.scalar(statement)
 
 
 __all__ = [
