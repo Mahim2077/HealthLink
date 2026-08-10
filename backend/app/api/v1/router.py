@@ -10,6 +10,10 @@ from app.citizens.routes import citizen_router
 from app.doctors.routes import doctor_router
 from app.professionals.routes import auth_router as professional_auth_router
 from app.professionals.routes import professional_router
+from app.visits.routes import (
+    citizen_visits_router,
+    doctor_visits_router,
+)
 
 
 api_router = APIRouter()
@@ -24,3 +28,5 @@ api_router.include_router(professional_router)
 api_router.include_router(admin_auth_router)
 api_router.include_router(admin_router)
 api_router.include_router(doctor_router)
+api_router.include_router(doctor_visits_router)
+api_router.include_router(citizen_visits_router)
