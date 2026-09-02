@@ -8,12 +8,14 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -58,6 +60,17 @@ class PatientAccessGrant(Base):
             "access_scope IN ('FULL_RECORD','LIMITED')",
             name="valid_scope",
         ),
+        Index("ix_patient_access_grants_citizen_id", "citizen_id"),
+        Index(
+            "ix_patient_access_grants_professional_role_registration_id",
+            "professional_role_registration_id",
+        ),
+        Index(
+            "ix_patient_access_grants_active",
+            "citizen_id",
+            "professional_role_registration_id",
+            postgresql_where=text("revoked_at IS NULL"),
+        ).ddl_if(dialect="postgresql"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -73,7 +86,6 @@ class PatientAccessGrant(Base):
         String(length=50),
         nullable=False,
         default=PatientAccessScope.FULL_RECORD.value,
-        server_default=PatientAccessScope.FULL_RECORD.value,
     )
     granted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
@@ -106,7 +118,21 @@ class MedicalVisit(Base):
             "status IN ('DRAFT','FINALIZED')",
             name="valid_status",
         ),
-        UniqueConstraint("appointment_id", name="uq_medical_visits_appointment"),
+        UniqueConstraint(
+            "appointment_id", name="uq_medical_visits_appointment_id"
+        ),
+        Index("ix_medical_visits_citizen_id", "citizen_id"),
+        Index(
+            "ix_medical_visits_doctor_role_registration_id",
+            "doctor_role_registration_id",
+        ),
+        Index("ix_medical_visits_facility_id", "facility_id"),
+        Index(
+            "ix_medical_visits_draft",
+            "citizen_id",
+            "doctor_role_registration_id",
+            postgresql_where=text("status = 'DRAFT'"),
+        ).ddl_if(dialect="postgresql"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -154,6 +180,10 @@ class MedicalVisit(Base):
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
+    )
+
+    appointment: Mapped["Appointment | None"] = relationship(  # noqa: F821
+        "Appointment", foreign_keys=[appointment_id], lazy="select"
     )
 
 

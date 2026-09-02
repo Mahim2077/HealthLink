@@ -13,7 +13,9 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -61,6 +63,20 @@ class DoctorPracticeSession(Base):
         CheckConstraint(
             "status IN ('NOT_STARTED','ACTIVE','COMPLETED')",
             name="valid_status",
+        ),
+        UniqueConstraint(
+            "doctor_role_registration_id",
+            "facility_id",
+            "session_date",
+            name="uq_doctor_practice_sessions_doctor_role_reg_facility_date",
+        ),
+        Index(
+            "ix_doctor_practice_sessions_doctor_role_registration_id",
+            "doctor_role_registration_id",
+        ),
+        Index(
+            "ix_doctor_practice_sessions_facility_id",
+            "facility_id",
         ),
     )
 
@@ -117,11 +133,19 @@ class Appointment(Base):
             "serial_number >= 1",
             name="serial_number_positive",
         ),
+        UniqueConstraint(
+            "doctor_role_registration_id",
+            "facility_id",
+            "appointment_date",
+            "serial_number",
+            name="uq_appointments_doctor_role_reg_facility_date_serial",
+        ),
         Index(
             "ix_appointments_doctor_role_registration_id",
             "doctor_role_registration_id",
         ),
         Index("ix_appointments_citizen_id", "citizen_id"),
+        Index("ix_appointments_facility_id", "facility_id"),
         Index("ix_appointments_status", "status"),
     )
 
@@ -180,6 +204,10 @@ class AppointmentQueueEntry(Base):
             "'REMOVED','CANCELLED')",
             name="valid_status",
         ),
+        UniqueConstraint(
+            "appointment_id",
+            name="uq_appointment_queue_entries_appointment_id",
+        ),
         Index(
             "ix_appointment_queue_entries_practice_session_id",
             "practice_session_id",
@@ -188,6 +216,12 @@ class AppointmentQueueEntry(Base):
             "ix_appointment_queue_entries_queue_status",
             "queue_status",
         ),
+        Index(
+            "uq_one_current_queue_entry_per_session",
+            "practice_session_id",
+            unique=True,
+            postgresql_where=text("queue_status = 'CURRENT'"),
+        ).ddl_if(dialect="postgresql"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

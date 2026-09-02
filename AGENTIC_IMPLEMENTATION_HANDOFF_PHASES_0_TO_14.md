@@ -1,17 +1,21 @@
 # HealthLink Phase 0–14 implementation handoff
 
-Last updated: 2026-08-10 (Asia/Dhaka)  
-Repository: `D:\HealthLink_V_1`  
-Branch: `main`  
-Last committed Phase checkpoint: `9bb612f (tag: phase-10-complete) feat: complete phase 10 frontend citizen appointment booking`
-Last verified phase backend-completion: Phase 11 (backend only — 6 modified
-backend files + 2 new test files staged for commit; SQLite chamber tests 13/13
-green; full backend suite 163 passed / 30 skipped; PostgreSQL chamber test
-file syntax-correct and collectable; live PG run against Supabase needs to be
-re-run after killing the orphan python.exe fan-out that caused the last
-attempt to hang — see "Current agent session status" below).
-verified, and the remaining work through Phase 14. It does not replace the
-three governing documents.
+Last updated: 2026-09-02 (Asia/Dhaka)
+Repository: `D:\HealthLink_V_1`
+Branch: `main`
+Last committed Phase checkpoint before this deployment snapshot:
+`9da7b60 (tag: phase-12-complete) feat(phase-12): visits and consultations frontend`.
+
+Current uncommitted implementation at the time of this update: the Phase 13
+backend, migrations `0021` through `0023`, structured prescription APIs,
+authorization, private local-storage abstraction, PDF generation, and backend
+tests. The full backend suite passes (190 passed, 33 PostgreSQL-only tests
+skipped without a dedicated safe test database), all 163 frontend tests pass,
+frontend lint/type-check/build pass, and `alembic check` reports no metadata
+drift against the configured PostgreSQL schema. Phase 13 is still incomplete as
+a vertical slice because its frontend and browser-flow verification are not
+implemented. Phase 14 has not started. This handoff does not replace the three
+governing documents.
 
 Before changing the repository, read all three files completely in this exact
 priority order:
@@ -66,11 +70,32 @@ There are 15 requested phases numbered 0 through 14.
 
 | State | Count | Phases |
 | --- | ---: | --- |
-| Fully implemented, verified, documented, committed | 11 | 0–10 |
-| Backend fully implemented and verified; frontend pending | 1 | 11 |
-| Not started | 3 | 12–14 |
+| Fully implemented, verified, documented, committed | 13 | 0–12 |
+| Backend implemented and locally verified; frontend/browser gate pending | 1 | 13 |
+| Not started | 1 | 14 |
 
-Therefore, four phase gates remain: ship Phase 11 frontend, then complete Phases 12–14.
+Therefore, two phase gates remain: finish the Phase 13 vertical slice, then
+implement and verify Phase 14. Stop after Phase 14.
+
+### Superseding current snapshot (2026-09-02)
+
+- Phase 12 is the latest completed phase checkpoint at `9da7b60` and tag
+  `phase-12-complete`.
+- Phase 13 backend work is present: prescription header/items/document schema,
+  author-doctor and citizen ownership guards, structured CRUD, PDF rendering,
+  and private local storage.
+- Phase 13 is **not complete**: there is no prescription frontend flow or live
+  browser verification, and the local PDF adapter is not durable on Vercel's
+  ephemeral filesystem. Do not create a `phase-13-complete` tag yet.
+- Phase 14 finish-appointment/automatic-next-serial work has not started.
+- Deployment infrastructure is present for a single Vercel Services project:
+  GitHub Actions runs PostgreSQL migrations and backend/frontend quality gates,
+  then performs a prebuilt production deployment and smoke test.
+- Scratch generators and local admin probes were removed. Local `.env` files,
+  `.vercel/project.json`, and production credentials remain ignored and must
+  never be committed.
+- Older chronological sections below document earlier handoffs. When their
+  state conflicts with this snapshot, this snapshot and Git history are newer.
 
 ## Verified commit checkpoints
 
@@ -85,11 +110,16 @@ a5ec66c  feat: complete phase 6 professional verification
 628c97e (tag: phase-9-backend)  feat: complete phase 9 backend doctor discovery and practice schedule
 bdb2f70 (tag: phase-9-complete) Phase 9 frontend: citizen doctor search, doctor profile, and verified-doctor practice-schedule editor
 1a761e6 (tag: phase-10-backend)  feat: complete phase 10 backend appointments and queue
-9bb612f (tag: phase-10-complete) feat: complete phase 10 frontend citizen appointment booking   ← HEAD
+9bb612f (tag: phase-10-complete) feat: complete phase 10 frontend citizen appointment booking
+cf9cee5 (tag: phase-11-backend) feat(phase-11): chamber session + serial queue backend
+39590fa (tag: phase-11-complete) feat(phase-11): chamber queue frontend + dashboard link + docs evidence
+3109dee (tag: phase-12-backend) feat(phase-12): visits and prescriptions backend
+9da7b60 (tag: phase-12-complete) feat(phase-12): visits and consultations frontend   ← HEAD before this snapshot
 ```
 
-The worktree at HEAD (`9bb612f`) contains intentional, uncommitted Phase 11
-backend work. Do not discard or reset it.
+The worktree based on `9da7b60` contains intentional Phase 13 backend and
+deployment work. Do not discard or reset it. Finish Phase 13 before starting
+Phase 14.
 
 ## Completed phase summary
 
@@ -426,7 +456,7 @@ backend full suite (SQLite): 163 passed, 30 skipped (chamber PG tests skipped wi
 Backend imports / app boots: clean
 ```
 
-An additional live run against Supabase (`postgresql://postgres.ingfirmgsezupnltlalm:!Miraidon1234@aws-0-ap-south-1.pooler.supabase.com:6543/postgres`)
+An additional live run against Supabase (using a securely supplied test database URL)
 is recorded in the "Current agent session status" block below. The
 chamber PG test file is syntactically valid and collectable by pytest;
 the live run was interrupted by a hanging `python.exe` fan-out from a
@@ -532,14 +562,14 @@ pick up exactly where the previous run stopped.
    must run this command again in a clean shell:
 
    ```powershell
-   $env:HEALTHLINK_TEST_DATABASE_URL = 'postgresql://postgres.ingfirmgsezupnltlalm:%21Miraidon1234@aws-0-ap-south-1.pooler.supabase.com:6543/postgres'
+   # Set HEALTHLINK_TEST_DATABASE_URL from an untracked local secret source first.
    .\.venv\Scripts\python.exe -m pytest backend/tests/test_chamber_postgresql.py -v --tb=short
    ```
 
    The Supabase pooler requires `disable_prepared_statements=True`
-   (already wired through `create_database_engine`) and the URL has
-   the literal `!` URL-encoded as `%21` (already correct in the
-   env-var value above).
+   (already wired through `create_database_engine`). Keep the connection URL
+   only in an ignored local environment file or secret manager; never place it
+   in documentation or source code.
 
 5. Pending after the live PG run passes:
    - `git add backend/app/api/v1/router.py backend/app/appointments/dependencies.py backend/app/appointments/repository.py backend/app/appointments/routes.py backend/app/appointments/schemas.py backend/app/appointments/service.py backend/tests/test_chamber.py backend/tests/test_chamber_postgresql.py`

@@ -59,6 +59,21 @@ class Settings(BaseSettings):
         validation_alias="REFRESH_TOKEN_EXPIRE_DAYS",
     )
 
+    # Phase 13: prescription PDF storage backend. Default ``local`` writes
+    # the binary under ``prescription_storage_path`` (or
+    # ``<backend>/.prescription_storage`` when blank) and is the only
+    # implementation Phase 13 ships; the abstraction in
+    # ``app/prescriptions/storage.py`` leaves room for an object-storage
+    # adapter in production without changing the routes.
+    prescription_storage_backend: Literal["local"] = Field(
+        default="local",
+        validation_alias="PRESCRIPTION_STORAGE_BACKEND",
+    )
+    prescription_storage_path: str = Field(
+        default="",
+        validation_alias="PRESCRIPTION_STORAGE_PATH",
+    )
+
     @field_validator("debug", mode="before")
     @classmethod
     def normalize_debug_mode(cls, value: object) -> object:

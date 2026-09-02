@@ -24,6 +24,7 @@ dist/
 
 node_modules/
 .next/
+.vercel/
 out/
 *.tsbuildinfo
 
@@ -42,6 +43,7 @@ Thumbs.db
 
 # Private generated prescriptions in local development
 private_storage/
+.prescription_storage/
 
 # Workspace-local PostgreSQL used only for verification
 .postgres-data/
@@ -49,4 +51,8 @@ private_storage/
 
 # Puku editor scratchpad and ad-hoc probe scripts
 .puku/
+.runtime/
+tmp_*.py
 scripts_probe_*.py
+backend/scripts/probe_*.py
+backend/scripts/write_*_test.py

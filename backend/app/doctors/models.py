@@ -56,6 +56,14 @@ class DoctorPracticeSchedule(Base):
             "facility_id",
             "weekday",
         ),
+        Index(
+            "ix_doctor_practice_schedules_doctor_user_id",
+            "doctor_user_id",
+        ),
+        Index(
+            "ix_doctor_practice_schedules_facility_id",
+            "facility_id",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
