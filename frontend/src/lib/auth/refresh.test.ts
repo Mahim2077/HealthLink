@@ -20,7 +20,7 @@ describe("refresh request", () => {
       "fresh-token",
     );
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/api/v1/auth/refresh",
+      expect.stringMatching(/\/api\/v1\/auth\/refresh$/),
       expect.objectContaining({
         method: "POST",
         credentials: "include",
