@@ -39,7 +39,7 @@ jobs:
       REFRESH_TOKEN_EXPIRE_DAYS: "7"
       FRONTEND_URL: http://localhost:3000
       PRESCRIPTION_STORAGE_BACKEND: local
-      PRESCRIPTION_STORAGE_PATH: ${{ runner.temp }}/healthlink-prescriptions
+      PRESCRIPTION_STORAGE_PATH: /tmp/healthlink-prescriptions
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
