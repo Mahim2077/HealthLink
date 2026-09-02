@@ -158,3 +158,27 @@ V6 remains authoritative if an assumption ever conflicts with it.
 - The list route accepts an optional `verification_status` filter and returns
   all statuses when it is omitted. The interface opens on `PENDING` for the
   operational queue and offers explicit All, Verified, and Rejected views.
+
+## Deployment infrastructure
+
+- Vercel deployment uses one `healthlink-sd` project with Vercel Services:
+  `frontend/` is the Next.js service and `backend/` is the FastAPI service.
+  This infrastructure does not change or complete any HealthLink
+  implementation phase.
+- Production deployment runs only after a push to `main` passes the backend,
+  frontend, and migration gates. Pull requests run CI without changing the
+  production database or deploying.
+- Browser API requests use the root-relative `/api/v1` URL. Vercel routes them
+  to the backend service on the same origin, preserving the existing host-only
+  HttpOnly refresh-cookie model without weakening `SameSite=Lax` or adding a
+  broad preview-origin CORS rule.
+- `healthlink-sd` is the Vercel project slug and
+  `healthlink-sd.vercel.app` is its deployed stable domain. A separately
+  purchased custom domain can be attached later.
+- Vercel Services and the Vercel Python runtime must be enabled for the account;
+  Services is access-controlled while it remains in private beta. Nginx is not
+  used because Vercel does not run persistent reverse-proxy processes.
+- Local prescription storage is suitable only for development. Vercel's
+  function filesystem is ephemeral, so Phase 13 prescription PDFs require a
+  durable private object-storage adapter before that workflow is production
+  ready.

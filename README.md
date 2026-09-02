@@ -17,7 +17,7 @@ documents and are preserved under their attached filenames.
 ## Local prerequisites
 
 - Python 3.13+
-- Node.js 20.9+
+- Node.js 24.15+
 - PostgreSQL 17+ (or a Neon PostgreSQL connection)
 
 ## Backend quick start
@@ -57,3 +57,6 @@ npm.cmd run build
 
 See [implementation progress](docs/implementation-progress.md) for phase-by-phase
 status and verification evidence.
+
+For production CI/CD and Vercel setup, see the
+[GitHub Actions and Vercel deployment guide](docs/VERCEL_GITHUB_ACTIONS_DEPLOYMENT.md).

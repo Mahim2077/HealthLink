@@ -2,12 +2,19 @@ const DEFAULT_API_BASE_URL = "http://localhost:8000/api/v1";
 
 export function normalizeApiBaseUrl(value: string): string {
   const trimmedValue = value.trim();
+
+  if (trimmedValue.startsWith("/") && !trimmedValue.startsWith("//")) {
+    return trimmedValue.replace(/\/+$/, "") || "/";
+  }
+
   let url: URL;
 
   try {
     url = new URL(trimmedValue);
   } catch {
-    throw new Error("NEXT_PUBLIC_API_BASE_URL must be a valid absolute URL.");
+    throw new Error(
+      "NEXT_PUBLIC_API_BASE_URL must be an HTTP(S) URL or a root-relative path.",
+    );
   }
 
   if (url.protocol !== "http:" && url.protocol !== "https:") {
