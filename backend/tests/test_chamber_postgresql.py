@@ -195,6 +195,11 @@ def _cleanup(
 
     with engine.begin() as connection:
         if facility_ids:
+            connection.execute(
+                delete(DoctorPracticeSchedule).where(
+                    DoctorPracticeSchedule.facility_id.in_(facility_ids)
+                )
+            )
             practice_session_ids = select(DoctorPracticeSession.id).where(
                 DoctorPracticeSession.facility_id.in_(facility_ids)
             )
@@ -240,6 +245,11 @@ def _cleanup(
                 delete(AuthSession).where(AuthSession.user_id.in_(user_ids))
             )
             connection.execute(
+                delete(DoctorPracticeSchedule).where(
+                    DoctorPracticeSchedule.doctor_user_id.in_(user_ids)
+                )
+            )
+            connection.execute(
                 delete(CitizenProfile).where(
                     CitizenProfile.user_id.in_(user_ids)
                 )
@@ -271,11 +281,6 @@ def _cleanup(
             connection.execute(
                 delete(ProfessionalRoleRegistration).where(
                     ProfessionalRoleRegistration.facility_id.in_(facility_ids)
-                )
-            )
-            connection.execute(
-                delete(DoctorPracticeSchedule).where(
-                    DoctorPracticeSchedule.facility_id.in_(facility_ids)
                 )
             )
             connection.execute(
