@@ -19,18 +19,28 @@ import type {
 } from "@/lib/appointments/types";
 import { citizenErrorMessage } from "@/lib/citizen/presentation";
 
-const STATUS_ORDER: AppointmentStatus[] = ["BOOKED", "COMPLETED", "CANCELLED"];
+const STATUS_ORDER: AppointmentStatus[] = [
+  "BOOKED",
+  "COMPLETED",
+  "NO_SHOW",
+  "CANCELLED",
+  "REMOVED_BY_DOCTOR",
+];
 
 const STATUS_LABEL: Record<AppointmentStatus, string> = {
   BOOKED: "Booked",
   CANCELLED: "Cancelled",
   COMPLETED: "Completed",
+  NO_SHOW: "No show",
+  REMOVED_BY_DOCTOR: "Removed by doctor",
 };
 
 const STATUS_STYLE: Record<AppointmentStatus, string> = {
   BOOKED: "bg-sky-50 text-sky-800",
   CANCELLED: "bg-slate-200 text-slate-700",
   COMPLETED: "bg-emerald-50 text-emerald-700",
+  NO_SHOW: "bg-rose-50 text-rose-700",
+  REMOVED_BY_DOCTOR: "bg-orange-50 text-orange-700",
 };
 
 function formatDate(value: string): string {
@@ -63,6 +73,8 @@ function groupByStatus(
     BOOKED: [],
     CANCELLED: [],
     COMPLETED: [],
+    NO_SHOW: [],
+    REMOVED_BY_DOCTOR: [],
   };
   for (const appointment of appointments) {
     grouped[appointment.status].push(appointment);

@@ -7,18 +7,18 @@ export type AppointmentStatus =
   | "BOOKED"
   | "CANCELLED"
   | "COMPLETED"
-  | "NO_SHOW"
-  | "REMOVED";
+  | "REMOVED_BY_DOCTOR"
+  | "NO_SHOW";
 
 export type QueueStatus =
   | "WAITING"
   | "CURRENT"
-  | "COMPLETED"
   | "SKIPPED"
-  | "NO_SHOW"
-  | "REMOVED";
+  | "DONE"
+  | "REMOVED"
+  | "CANCELLED";
 
-export type SessionStatus = "OPEN" | "FINISHED";
+export type SessionStatus = "NOT_STARTED" | "ACTIVE" | "COMPLETED";
 
 export type ChamberAppointmentView = {
   queue_id: string;
@@ -75,7 +75,6 @@ export type ChamberSessionStartRequest = {
 
 export type ChamberQueueActionName =
   | "call-next"
-  | "complete"
   | "skip"
   | "remove"
   | "no-show";
@@ -87,22 +86,24 @@ export function describeQueueStatus(status: QueueStatus): string {
       return "Waiting";
     case "CURRENT":
       return "With doctor";
-    case "COMPLETED":
+    case "DONE":
       return "Completed";
     case "SKIPPED":
       return "Skipped";
-    case "NO_SHOW":
-      return "No-show";
     case "REMOVED":
       return "Removed";
+    case "CANCELLED":
+      return "Cancelled";
   }
 }
 
 export function describeSessionStatus(status: SessionStatus): string {
   switch (status) {
-    case "OPEN":
+    case "NOT_STARTED":
+      return "Not started";
+    case "ACTIVE":
       return "In progress";
-    case "FINISHED":
+    case "COMPLETED":
       return "Closed for the day";
   }
 }

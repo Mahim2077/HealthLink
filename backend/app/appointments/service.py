@@ -16,10 +16,14 @@ from app.appointments.models import (
     QueueStatus,
     SessionStatus,
 )
-from app.appointments.repository import AppointmentRepository
+from app.appointments.repository import (
+    AppointmentFinishContext,
+    AppointmentRepository,
+)
 from app.appointments.schemas import (
     AppointmentBookingRequest,
     AppointmentBookingResponse,
+    AppointmentFinishResponse,
     AppointmentListEntry,
     AppointmentListResponse,
     AppointmentQueueEntryView,
@@ -33,6 +37,8 @@ from app.core.exceptions import HealthLinkError
 from app.doctors.models import PracticeWeekday
 from app.facilities.models import HealthcareFacility
 from app.professionals.dependencies import ProfessionalAuthContext
+from app.visits.models import MedicalVisit, VisitStatus
+from app.visits.repository import VisitsRepository
 
 
 class AppointmentValidationError(HealthLinkError):
@@ -113,6 +119,7 @@ class AppointmentService:
         self.db = db
         self.settings = settings
         self.repository = AppointmentRepository(db)
+        self.visits_repository = VisitsRepository(db)
 
     # ------------------------------------------------------------------
     # Booking
@@ -485,10 +492,11 @@ class AppointmentService:
             appointment = appointments_by_id.get(entry.appointment_id)
             if appointment is None:
                 continue
-            if appointment.status != AppointmentStatus.BOOKED.value:
-                continue
             status_value = entry.queue_status
-            if status_value == QueueStatus.WAITING.value:
+            if (
+                status_value == QueueStatus.WAITING.value
+                and appointment.status == AppointmentStatus.BOOKED.value
+            ):
                 waiting.append(self._queue_view(entry, appointment))
             elif status_value in terminal_statuses:
                 finished.append(self._queue_view(entry, appointment))
@@ -533,6 +541,162 @@ class AppointmentService:
             ) from error
         return next_entry
 
+    def _finish_response(
+        self,
+        context: AppointmentFinishContext,
+        visit: MedicalVisit,
+        next_current: AppointmentQueueEntry | None,
+    ) -> AppointmentFinishResponse:
+        appointment = context.appointment
+        entry = context.queue_entry
+        if (
+            appointment.completed_at is None
+            or entry.finished_at is None
+            or visit.finalized_at is None
+        ):
+            raise ChamberQueueStateError(
+                "Appointment finish timestamps are incomplete."
+            )
+
+        next_view = None
+        if next_current is not None:
+            next_appointment = self.repository.get_appointment_by_id(
+                next_current.appointment_id
+            )
+            if next_appointment is not None:
+                next_view = self._queue_view(next_current, next_appointment)
+
+        return AppointmentFinishResponse(
+            appointment_id=appointment.id,
+            visit_id=visit.id,
+            queue_id=entry.id,
+            serial_number=appointment.serial_number,
+            appointment_status=AppointmentStatus(appointment.status),
+            queue_status=QueueStatus(entry.queue_status),
+            visit_status=VisitStatus(visit.status),
+            completed_at=appointment.completed_at,
+            finished_at=entry.finished_at,
+            finalized_at=visit.finalized_at,
+            next_current=next_view,
+        )
+
+    def finish_appointment(
+        self,
+        context: ProfessionalAuthContext,
+        appointment_id: uuid.UUID,
+    ) -> AppointmentFinishResponse:
+        """Finalize one CURRENT consultation and advance the queue atomically."""
+
+        registration = context.role_registration
+        initial = self.repository.get_appointment_finish_context(
+            appointment_id=appointment_id,
+            doctor_role_registration_id=registration.id,
+        )
+        if initial is None:
+            raise AppointmentNotFoundError(
+                "Appointment not found for this doctor."
+            )
+
+        self.repository._lock_for_queue(
+            doctor_role_registration_id=registration.id,
+            session_date=initial.practice_session.session_date,
+        )
+        locked = self.repository.get_appointment_finish_context(
+            appointment_id=appointment_id,
+            doctor_role_registration_id=registration.id,
+            for_update=True,
+        )
+        if locked is None:  # pragma: no cover - deleted rows are RESTRICTed.
+            raise AppointmentNotFoundError(
+                "Appointment not found for this doctor."
+            )
+
+        appointment = locked.appointment
+        entry = locked.queue_entry
+        session = locked.practice_session
+        visit = self.visits_repository.get_visit_for_appointment(
+            appointment.id,
+            for_update=True,
+        )
+
+        already_finished = (
+            visit is not None
+            and appointment.status == AppointmentStatus.COMPLETED.value
+            and entry.queue_status == QueueStatus.DONE.value
+            and visit.status == VisitStatus.FINALIZED.value
+        )
+        if already_finished:
+            return self._finish_response(
+                locked,
+                visit,
+                self.repository.current_queue_entry(session.id),
+            )
+
+        if (
+            appointment.status == AppointmentStatus.COMPLETED.value
+            or entry.queue_status == QueueStatus.DONE.value
+            or (visit is not None and visit.status == VisitStatus.FINALIZED.value)
+        ):
+            raise ChamberQueueStateError(
+                "Appointment finish state is inconsistent."
+            )
+        if session.status != SessionStatus.ACTIVE.value:
+            raise ChamberSessionStateError(
+                "Appointment can only finish in an active chamber session."
+            )
+        if (
+            appointment.status != AppointmentStatus.BOOKED.value
+            or entry.queue_status != QueueStatus.CURRENT.value
+        ):
+            raise ChamberQueueStateError(
+                "Only the current queue appointment can be finished."
+            )
+        if visit is None:
+            raise ChamberQueueStateError(
+                "Open the medical visit before finishing the appointment."
+            )
+        if (
+            visit.doctor_role_registration_id != registration.id
+            or visit.citizen_id != appointment.citizen_id
+            or visit.facility_id != appointment.facility_id
+        ):
+            raise ChamberQueueStateError(
+                "Medical visit does not match the current appointment."
+            )
+        if visit.status != VisitStatus.DRAFT.value:
+            raise ChamberQueueStateError(
+                "Only a draft medical visit can be finalized."
+            )
+
+        now = datetime.now(timezone.utc)
+        try:
+            visit.status = VisitStatus.FINALIZED.value
+            visit.finalized_at = now
+            appointment.status = AppointmentStatus.COMPLETED.value
+            appointment.completed_at = now
+            entry.queue_status = QueueStatus.DONE.value
+            entry.finished_at = now
+
+            # Release the partial CURRENT index before promoting its successor.
+            self.db.flush()
+            promoted = self._promote_lowest_waiting(session.id)
+            self.db.commit()
+        except IntegrityError as error:
+            self.db.rollback()
+            raise ChamberQueueStateError(
+                "Unable to finish appointment."
+            ) from error
+        except Exception:
+            self.db.rollback()
+            raise
+
+        self.db.refresh(appointment)
+        self.db.refresh(entry)
+        self.db.refresh(visit)
+        if promoted is not None:
+            self.db.refresh(promoted)
+        return self._finish_response(locked, visit, promoted)
+
     def call_next(
         self,
         context: ProfessionalAuthContext,
@@ -551,7 +715,7 @@ class AppointmentService:
         current = self.repository.current_queue_entry(session.id)
         if current is not None:
             raise ChamberQueueStateError(
-                "A patient is already in the chamber. Complete or skip first."
+                "A patient is already in the chamber. Finish or skip first."
             )
         promoted = self._promote_lowest_waiting(session.id)
         try:
@@ -578,19 +742,6 @@ class AppointmentService:
             finished_at=None,
             removed_at=None,
             next_current=None,
-        )
-
-    def complete_current(
-        self,
-        context: ProfessionalAuthContext,
-        queue_id: uuid.UUID,
-    ) -> ChamberQueueActionResponse:
-        return self._apply_queue_action(
-            context,
-            queue_id,
-            target_status=QueueStatus.DONE,
-            appointment_status=AppointmentStatus.COMPLETED,
-            set_finished=True,
         )
 
     def skip_current(

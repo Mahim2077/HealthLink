@@ -1,7 +1,7 @@
 "use client";
 
 // Phase 11 chamber queue: shows current/waiting/finished serials and
-// the seven chamber actions. Rendered behind the verified-doctor
+// the permitted chamber actions. Rendered behind the verified-doctor
 // portal guard. Data plane is injected via `chamberDeps` so unit tests
 // can mock fetch without touching the real apiClient.
 
@@ -38,7 +38,7 @@ export type ChamberDeps = {
   ) => Promise<ChamberQueueActionResponse>;
   actOnCurrent: (
     queue_id: string,
-    action: "complete" | "skip" | "no-show",
+    action: "skip" | "no-show",
   ) => Promise<ChamberQueueActionResponse>;
   removeEntry: (queue_id: string) => Promise<ChamberQueueActionResponse>;
 };
@@ -52,7 +52,6 @@ type SessionState =
 type ActionKey =
   | "start"
   | "call-next"
-  | "complete"
   | "skip"
   | "no-show"
   | "remove"
@@ -71,13 +70,13 @@ function badgeClass(status: QueueStatus): string {
       return "bg-emerald-50 text-emerald-700";
     case "WAITING":
       return "bg-amber-50 text-amber-800";
-    case "COMPLETED":
+    case "DONE":
       return "bg-sky-50 text-sky-700";
     case "SKIPPED":
       return "bg-orange-50 text-orange-700";
-    case "NO_SHOW":
-      return "bg-rose-50 text-rose-700";
     case "REMOVED":
+      return "bg-slate-100 text-slate-600";
+    case "CANCELLED":
       return "bg-slate-100 text-slate-600";
   }
 }
@@ -171,10 +170,10 @@ export function ChamberQueue({
           (row) => row.queue_id !== response.queue_id,
         );
         const finished =
-          response.queue_status === "COMPLETED" ||
-          response.queue_status === "NO_SHOW" ||
+          response.queue_status === "DONE" ||
           response.queue_status === "SKIPPED" ||
-          response.queue_status === "REMOVED"
+          response.queue_status === "REMOVED" ||
+          response.queue_status === "CANCELLED"
             ? [...prev.session.finished.filter((row) => row.queue_id !== response.queue_id), acted]
             : prev.session.finished.filter((row) => row.queue_id !== response.queue_id);
         return {
@@ -208,21 +207,29 @@ export function ChamberQueue({
     );
 
   const onFinish = () =>
-    runAction("finish", () =>
-      chamberDeps.finishSession(facility_id, sessionDate),
-    );
+    runAction("finish", async () => {
+      const response = await chamberDeps.finishSession(
+        facility_id,
+        sessionDate,
+      );
+      setState((previous) => {
+        if (previous.kind !== "ready" || !previous.session) return previous;
+        return {
+          kind: "ready",
+          session: {
+            ...previous.session,
+            status: response.status,
+            ended_at: response.ended_at,
+          },
+        };
+      });
+      return response;
+    });
 
   const onCallNext = () =>
     runAction(
       "call-next",
       () => chamberDeps.callNext(facility_id, sessionDate),
-      applyQueueAction,
-    );
-
-  const onComplete = (queue_id: string) =>
-    runAction(
-      "complete",
-      () => chamberDeps.actOnCurrent(queue_id, "complete"),
       applyQueueAction,
     );
 
@@ -252,8 +259,9 @@ export function ChamberQueue({
     state.kind === "ready" && state.session
       ? state.session.status
       : null;
-  const isFinished = sessionStatus === "FINISHED";
-  const isOpen = sessionStatus === "OPEN";
+  const isFinished = sessionStatus === "COMPLETED";
+  const isOpen = sessionStatus === "ACTIVE";
+  const isNotStarted = sessionStatus === "NOT_STARTED";
 
   const rows = useMemo(() => {
     if (state.kind !== "ready" || !state.session) return null;
@@ -338,7 +346,7 @@ export function ChamberQueue({
               </button>
             </>
           ) : null}
-          {!rows.id && !isFinished ? (
+          {isNotStarted ? (
             <button
               type="button"
               onClick={onStart}
@@ -366,7 +374,6 @@ export function ChamberQueue({
           isFinished={isFinished}
           isOpen={isOpen}
           pending={pending}
-          onComplete={onComplete}
           onSkip={onSkip}
           onNoShow={onNoShow}
           onRemove={onRemove}
@@ -398,7 +405,6 @@ function CurrentColumn({
   isFinished,
   isOpen,
   pending,
-  onComplete,
   onSkip,
   onNoShow,
   onRemove,
@@ -407,7 +413,6 @@ function CurrentColumn({
   isFinished: boolean;
   isOpen: boolean;
   pending: ActionKey | null;
-  onComplete: (id: string) => Promise<void>;
   onSkip: (id: string) => Promise<void>;
   onNoShow: (id: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
@@ -431,15 +436,7 @@ function CurrentColumn({
             <p className="mt-3 text-sm text-slate-700">{current.reason}</p>
           ) : null}
           {isOpen ? (
-            <div className="mt-5 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => onComplete(current.queue_id)}
-                disabled={pending !== null}
-                className="min-h-11 rounded-xl bg-emerald-600 px-3 text-sm font-bold text-white disabled:opacity-60"
-              >
-                {pending === "complete" ? "…" : "Complete"}
-              </button>
+            <div className="mt-5 grid gap-2 sm:grid-cols-3">
               <button
                 type="button"
                 onClick={() => onSkip(current.queue_id)}

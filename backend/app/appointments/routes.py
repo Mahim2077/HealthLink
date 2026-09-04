@@ -14,6 +14,7 @@ from app.appointments.dependencies import (
 from app.appointments.schemas import (
     AppointmentBookingRequest,
     AppointmentBookingResponse,
+    AppointmentFinishResponse,
     AppointmentListResponse,
     ChamberQueueActionResponse,
     ChamberSessionFinishResponse,
@@ -34,6 +35,10 @@ appointments_router = APIRouter(
 chamber_router = APIRouter(
     prefix="/professionals/chamber",
     tags=["doctor-chamber"],
+)
+appointment_lifecycle_router = APIRouter(
+    prefix="/appointments",
+    tags=["appointments"],
 )
 
 
@@ -156,23 +161,23 @@ def call_next_patient(
     )
 
 
-@chamber_router.post(
-    "/queue/{queue_id}/complete",
-    response_model=ChamberQueueActionResponse,
-    summary="Complete the CURRENT chamber patient and advance the queue",
+@appointment_lifecycle_router.post(
+    "/{appointment_id}/finish",
+    response_model=AppointmentFinishResponse,
+    summary="Finalize the current consultation and advance the queue",
 )
-def complete_current_patient(
-    queue_id: uuid.UUID,
+def finish_appointment(
+    appointment_id: uuid.UUID,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     context: Annotated[
         ProfessionalAuthContext,
         Depends(get_current_verified_doctor_for_chamber),
     ],
-) -> ChamberQueueActionResponse:
+) -> AppointmentFinishResponse:
     return AppointmentService(
         db, _settings(request)
-    ).complete_current(context, queue_id)
+    ).finish_appointment(context, appointment_id)
 
 
 @chamber_router.post(
@@ -259,4 +264,8 @@ def finish_chamber_session(
     )
 
 
-__all__ = ["appointments_router", "chamber_router"]
+__all__ = [
+    "appointment_lifecycle_router",
+    "appointments_router",
+    "chamber_router",
+]

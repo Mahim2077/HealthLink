@@ -23,7 +23,7 @@ class PrescriptionsRepository:
     """SQLAlchemy helpers used by the Phase 13 service + routes.
 
     Mirrors the pattern used by :class:`app.visits.repository.VisitsRepository`
-    � methods are class-bound to a session so callers (service and
+    All methods are class-bound to a session so callers (service and
     dependencies) don't need to thread the session through themselves.
     """
 

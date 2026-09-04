@@ -12,6 +12,7 @@ import {
   ErrorState,
   LoadingState,
 } from "@/components/ui/async-state";
+import { finishAppointment } from "@/lib/appointments/api";
 import {
   loadCurrentPatient,
   readDoctorVisit,
@@ -23,6 +24,7 @@ import type { ProfessionalMe } from "@/lib/professional/types";
 import { citizenErrorMessage } from "@/lib/citizen/presentation";
 
 const defaultDeps: VisitsDeps = {
+  finishAppointment,
   loadCurrentPatient,
   readVisit: readDoctorVisit,
   startVisitForCurrent,

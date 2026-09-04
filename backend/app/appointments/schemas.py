@@ -7,6 +7,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.appointments.models import AppointmentStatus, QueueStatus, SessionStatus
+from app.visits.models import VisitStatus
 
 
 class AppointmentBookingRequest(BaseModel):
@@ -149,7 +150,7 @@ class ChamberSessionView(BaseModel):
 
 
 class ChamberQueueActionResponse(BaseModel):
-    """Result of any queue action (call-next, skip, remove, no-show, complete)."""
+    """Result of a chamber queue action outside consultation completion."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -162,8 +163,26 @@ class ChamberQueueActionResponse(BaseModel):
     finished_at: datetime | None
     removed_at: datetime | None
     # After the action, the next CURRENT row (if any) — populated for
-    # call-next / skip / remove / no-show / complete that promote a
+    # call-next / skip / remove / no-show actions that promote a
     # successor; absent when no WAITING rows remain.
+    next_current: ChamberAppointmentView | None = None
+
+
+class AppointmentFinishResponse(BaseModel):
+    """Atomic Phase 14 appointment/visit/queue transition result."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    appointment_id: uuid.UUID
+    visit_id: uuid.UUID
+    queue_id: uuid.UUID
+    serial_number: int
+    appointment_status: AppointmentStatus
+    queue_status: QueueStatus
+    visit_status: VisitStatus
+    completed_at: datetime
+    finished_at: datetime
+    finalized_at: datetime
     next_current: ChamberAppointmentView | None = None
 
 

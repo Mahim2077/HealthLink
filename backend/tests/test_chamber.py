@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, time, timezone
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -25,6 +26,8 @@ from app.professionals.models import (
     ProfessionalRole,
     ProfessionalRoleRegistration,
 )
+from app.appointments.service import AppointmentService
+from app.visits.models import MedicalVisit, VisitStatus
 
 
 CITIZEN_PASSWORD = "StrongPassword123!"
@@ -226,6 +229,75 @@ def _start_session(
     return response.json()
 
 
+def _phase14_current_fixture(
+    client: TestClient,
+    db_session,
+    *,
+    appointment_count: int = 2,
+) -> dict:
+    """Create an active doctor queue with serial 1 as CURRENT."""
+
+    facility = _make_facility(
+        db_session,
+        name=f"Phase 14 Clinic {uuid.uuid4().hex[:8]}",
+    )
+    doctor_user_id, registration_id, nid, password = _make_verified_doctor(
+        db_session,
+        first_name="Finish",
+        last_name="Doctor",
+        facility=facility,
+        nid_number=f"NID-FINISH-{uuid.uuid4().hex[:16]}",
+    )
+    _add_schedule(
+        db_session,
+        doctor_user_id=doctor_user_id,
+        facility=facility,
+        weekday="MONDAY",
+        max_patients=max(appointment_count, 1) + 2,
+    )
+    target = date.today()
+    while target.strftime("%A").upper() != "MONDAY":
+        from datetime import timedelta
+
+        target = target + timedelta(days=1)
+
+    bookings: list[dict] = []
+    citizen_tokens: list[str] = []
+    for _ in range(appointment_count):
+        citizen_token, _ = _register_citizen(client)
+        citizen_tokens.append(citizen_token)
+        bookings.append(
+            _book(
+                client,
+                citizen_token,
+                doctor_user_id=doctor_user_id,
+                facility_id=facility.id,
+                appointment_date=target,
+            )
+        )
+
+    doctor_token = _login_professional(
+        client,
+        nid_number=nid,
+        password=password,
+    )
+    started = _start_session(
+        client,
+        doctor_token,
+        facility_id=facility.id,
+        session_date=target,
+    )
+    return {
+        "bookings": bookings,
+        "citizen_tokens": citizen_tokens,
+        "doctor_token": doctor_token,
+        "facility": facility,
+        "registration_id": registration_id,
+        "started": started,
+        "target": target,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Auth and role gates
 # ---------------------------------------------------------------------------
@@ -393,10 +465,17 @@ def test_call_next_advances_through_serial_queue(
     )
     assert blocked.status_code == 409
 
-    # Complete serial 1 -> serial 2 becomes CURRENT.
+    # Phase 14 finishes serial 1 only after its medical visit exists, then
+    # serial 2 becomes CURRENT.
     queue_id_one = started["current"]["queue_id"]
+    appointment_id_one = started["current"]["appointment_id"]
+    opened = client.post(
+        f"/api/v1/doctors/me/visits/start-for-current/{queue_id_one}",
+        headers=headers,
+    )
+    assert opened.status_code == 200, opened.text
     completed = client.post(
-        f"/api/v1/professionals/chamber/queue/{queue_id_one}/complete",
+        f"/api/v1/appointments/{appointment_id_one}/finish",
         headers=headers,
     )
     assert completed.status_code == 200, completed.text
@@ -693,14 +772,323 @@ def test_queue_action_rejects_foreign_doctors(
         client, token_a, facility_id=facility_a.id, session_date=target
     )
     queue_id = started_a["current"]["queue_id"]
+    appointment_id = started_a["current"]["appointment_id"]
+    opened = client.post(
+        f"/api/v1/doctors/me/visits/start-for-current/{queue_id}",
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert opened.status_code == 200, opened.text
 
     token_b = _login_professional(client, nid_number=nid_b, password=password_b)
     forbidden = client.post(
-        f"/api/v1/professionals/chamber/queue/{queue_id}/complete",
+        f"/api/v1/appointments/{appointment_id}/finish",
         headers={"Authorization": f"Bearer {token_b}"},
     )
     assert forbidden.status_code == 404
     del booked
+
+
+# ---------------------------------------------------------------------------
+# Phase 14 — finish appointment + automatic next serial
+# ---------------------------------------------------------------------------
+
+
+def test_finish_appointment_requires_professional_auth(
+    client: TestClient, db_session
+) -> None:
+    fixture = _phase14_current_fixture(client, db_session)
+    appointment_id = fixture["started"]["current"]["appointment_id"]
+
+    unauthenticated = client.post(
+        f"/api/v1/appointments/{appointment_id}/finish"
+    )
+    assert unauthenticated.status_code == 401
+
+    citizen = client.post(
+        f"/api/v1/appointments/{appointment_id}/finish",
+        headers={
+            "Authorization": f"Bearer {fixture['citizen_tokens'][0]}"
+        },
+    )
+    assert citizen.status_code == 403
+
+
+def test_finish_current_finalizes_visit_without_requiring_prescription(
+    client: TestClient, db_session
+) -> None:
+    fixture = _phase14_current_fixture(
+        client,
+        db_session,
+        appointment_count=3,
+    )
+    current = fixture["started"]["current"]
+    headers = {
+        "Authorization": f"Bearer {fixture['doctor_token']}"
+    }
+    opened = client.post(
+        f"/api/v1/doctors/me/visits/start-for-current/{current['queue_id']}",
+        headers=headers,
+    )
+    assert opened.status_code == 200, opened.text
+
+    finished = client.post(
+        f"/api/v1/appointments/{current['appointment_id']}/finish",
+        headers=headers,
+    )
+    assert finished.status_code == 200, finished.text
+    body = finished.json()
+    assert body["appointment_status"] == "COMPLETED"
+    assert body["queue_status"] == "DONE"
+    assert body["visit_status"] == "FINALIZED"
+    assert body["completed_at"] is not None
+    assert body["finished_at"] is not None
+    assert body["finalized_at"] is not None
+    assert body["next_current"]["serial_number"] == 2
+    assert body["next_current"]["queue_status"] == "CURRENT"
+
+    db_session.expire_all()
+    appointment = db_session.get(
+        Appointment, uuid.UUID(current["appointment_id"])
+    )
+    queue_entry = db_session.get(
+        AppointmentQueueEntry, uuid.UUID(current["queue_id"])
+    )
+    visit = db_session.get(MedicalVisit, uuid.UUID(opened.json()["id"]))
+    assert appointment.status == AppointmentStatus.COMPLETED.value
+    assert queue_entry.queue_status == QueueStatus.DONE.value
+    assert visit.status == VisitStatus.FINALIZED.value
+
+    current_rows = list(
+        db_session.scalars(
+            select(AppointmentQueueEntry).where(
+                AppointmentQueueEntry.practice_session_id
+                == uuid.UUID(fixture["started"]["id"]),
+                AppointmentQueueEntry.queue_status
+                == QueueStatus.CURRENT.value,
+            )
+        )
+    )
+    assert len(current_rows) == 1
+
+
+def test_finish_appointment_requires_current_queue_entry_and_visit(
+    client: TestClient, db_session
+) -> None:
+    fixture = _phase14_current_fixture(client, db_session)
+    current = fixture["started"]["current"]
+    waiting = fixture["started"]["waiting"][0]
+    headers = {
+        "Authorization": f"Bearer {fixture['doctor_token']}"
+    }
+
+    missing_visit = client.post(
+        f"/api/v1/appointments/{current['appointment_id']}/finish",
+        headers=headers,
+    )
+    assert missing_visit.status_code == 409
+    assert "medical visit" in missing_visit.json()["detail"].lower()
+
+    waiting_booking = next(
+        row
+        for row in fixture["bookings"]
+        if row["id"] == waiting["appointment_id"]
+    )
+    db_session.add(
+        MedicalVisit(
+            citizen_id=uuid.UUID(waiting_booking["citizen_id"]),
+            doctor_role_registration_id=fixture["registration_id"],
+            facility_id=fixture["facility"].id,
+            appointment_id=uuid.UUID(waiting["appointment_id"]),
+            status=VisitStatus.DRAFT.value,
+        )
+    )
+    db_session.commit()
+    not_current = client.post(
+        f"/api/v1/appointments/{waiting['appointment_id']}/finish",
+        headers=headers,
+    )
+    assert not_current.status_code == 409
+    assert "current queue" in not_current.json()["detail"].lower()
+
+    db_session.expire_all()
+    current_entry = db_session.get(
+        AppointmentQueueEntry, uuid.UUID(current["queue_id"])
+    )
+    assert current_entry.queue_status == QueueStatus.CURRENT.value
+
+
+def test_finish_appointment_is_idempotent_and_does_not_skip_successor(
+    client: TestClient, db_session
+) -> None:
+    fixture = _phase14_current_fixture(
+        client,
+        db_session,
+        appointment_count=3,
+    )
+    current = fixture["started"]["current"]
+    headers = {
+        "Authorization": f"Bearer {fixture['doctor_token']}"
+    }
+    opened = client.post(
+        f"/api/v1/doctors/me/visits/start-for-current/{current['queue_id']}",
+        headers=headers,
+    )
+    assert opened.status_code == 200, opened.text
+
+    path = f"/api/v1/appointments/{current['appointment_id']}/finish"
+    first = client.post(path, headers=headers)
+    second = client.post(path, headers=headers)
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+    assert first.json()["next_current"]["serial_number"] == 2
+    assert second.json()["next_current"]["serial_number"] == 2
+
+    session_id = uuid.UUID(fixture["started"]["id"])
+    queue_rows = list(
+        db_session.scalars(
+            select(AppointmentQueueEntry).where(
+                AppointmentQueueEntry.practice_session_id == session_id
+            )
+        )
+    )
+    statuses = [row.queue_status for row in queue_rows]
+    assert statuses.count(QueueStatus.DONE.value) == 1
+    assert statuses.count(QueueStatus.CURRENT.value) == 1
+    assert statuses.count(QueueStatus.WAITING.value) == 1
+
+
+def test_finish_last_patient_leaves_no_current_queue(
+    client: TestClient, db_session
+) -> None:
+    fixture = _phase14_current_fixture(
+        client,
+        db_session,
+        appointment_count=1,
+    )
+    current = fixture["started"]["current"]
+    headers = {
+        "Authorization": f"Bearer {fixture['doctor_token']}"
+    }
+    opened = client.post(
+        f"/api/v1/doctors/me/visits/start-for-current/{current['queue_id']}",
+        headers=headers,
+    )
+    assert opened.status_code == 200, opened.text
+    finished = client.post(
+        f"/api/v1/appointments/{current['appointment_id']}/finish",
+        headers=headers,
+    )
+    assert finished.status_code == 200, finished.text
+    assert finished.json()["next_current"] is None
+    assert (
+        db_session.scalar(
+            select(AppointmentQueueEntry).where(
+                AppointmentQueueEntry.practice_session_id
+                == uuid.UUID(fixture["started"]["id"]),
+                AppointmentQueueEntry.queue_status
+                == QueueStatus.CURRENT.value,
+            )
+        )
+        is None
+    )
+
+
+def test_finish_appointment_rolls_back_every_state_on_promotion_failure(
+    client: TestClient, db_session, monkeypatch
+) -> None:
+    fixture = _phase14_current_fixture(client, db_session)
+    current = fixture["started"]["current"]
+    headers = {
+        "Authorization": f"Bearer {fixture['doctor_token']}"
+    }
+    opened = client.post(
+        f"/api/v1/doctors/me/visits/start-for-current/{current['queue_id']}",
+        headers=headers,
+    )
+    assert opened.status_code == 200, opened.text
+
+    def fail_promotion(self, session_id):
+        del self, session_id
+        raise RuntimeError("synthetic promotion failure")
+
+    monkeypatch.setattr(
+        AppointmentService,
+        "_promote_lowest_waiting",
+        fail_promotion,
+    )
+    with pytest.raises(RuntimeError, match="synthetic promotion failure"):
+        client.post(
+            f"/api/v1/appointments/{current['appointment_id']}/finish",
+            headers=headers,
+        )
+
+    db_session.expire_all()
+    appointment = db_session.get(
+        Appointment, uuid.UUID(current["appointment_id"])
+    )
+    queue_entry = db_session.get(
+        AppointmentQueueEntry, uuid.UUID(current["queue_id"])
+    )
+    visit = db_session.get(MedicalVisit, uuid.UUID(opened.json()["id"]))
+    assert appointment.status == AppointmentStatus.BOOKED.value
+    assert appointment.completed_at is None
+    assert queue_entry.queue_status == QueueStatus.CURRENT.value
+    assert queue_entry.finished_at is None
+    assert visit.status == VisitStatus.DRAFT.value
+    assert visit.finalized_at is None
+
+
+def test_author_can_edit_prescription_after_appointment_finish(
+    client: TestClient, db_session
+) -> None:
+    fixture = _phase14_current_fixture(
+        client,
+        db_session,
+        appointment_count=1,
+    )
+    current = fixture["started"]["current"]
+    headers = {
+        "Authorization": f"Bearer {fixture['doctor_token']}"
+    }
+    opened = client.post(
+        f"/api/v1/doctors/me/visits/start-for-current/{current['queue_id']}",
+        headers=headers,
+    )
+    assert opened.status_code == 200, opened.text
+    prescription_payload = {
+        "items": [
+            {
+                "medicine_name": "Medicine",
+                "dosage": "5 mg",
+                "frequency": "Once daily",
+                "duration": "2 days",
+                "instructions": None,
+            }
+        ],
+        "diagnostic_information": None,
+        "medical_advice": None,
+        "notes": None,
+    }
+    prescription = client.post(
+        f"/api/v1/visits/{opened.json()['id']}/prescription",
+        headers=headers,
+        json=prescription_payload,
+    )
+    assert prescription.status_code == 201, prescription.text
+    finished = client.post(
+        f"/api/v1/appointments/{current['appointment_id']}/finish",
+        headers=headers,
+    )
+    assert finished.status_code == 200, finished.text
+
+    prescription_payload["items"][0]["dosage"] = "10 mg"
+    updated = client.put(
+        f"/api/v1/prescriptions/{prescription.json()['id']}",
+        headers=headers,
+        json=prescription_payload,
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["items"][0]["dosage"] == "10 mg"
 
 
 def test_finish_session_blocks_further_queue_actions(

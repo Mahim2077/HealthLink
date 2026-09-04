@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date
 
 from sqlalchemy import and_, func, select
@@ -28,6 +29,15 @@ from app.professionals.models import (
     ProfessionalRole,
     ProfessionalRoleRegistration,
 )
+
+
+@dataclass(frozen=True)
+class AppointmentFinishContext:
+    """Rows that participate in the Phase 14 finish transaction."""
+
+    appointment: Appointment
+    queue_entry: AppointmentQueueEntry
+    practice_session: DoctorPracticeSession
 
 
 class AppointmentBookingConflictError(Exception):
@@ -329,10 +339,12 @@ class AppointmentRepository:
     ) -> Sequence[AppointmentQueueEntry]:
         statement = (
             select(AppointmentQueueEntry)
-            .where(AppointmentQueueEntry.practice_session_id == session_id)
-            .order_by(
-                AppointmentQueueEntry.appointment_id.asc(),
+            .join(
+                Appointment,
+                Appointment.id == AppointmentQueueEntry.appointment_id,
             )
+            .where(AppointmentQueueEntry.practice_session_id == session_id)
+            .order_by(Appointment.serial_number.asc())
         )
         return list(self.db.scalars(statement))
 
@@ -370,8 +382,59 @@ class AppointmentRepository:
         )
         return self.db.scalar(statement)
 
+    def get_appointment_finish_context(
+        self,
+        *,
+        appointment_id: uuid.UUID,
+        doctor_role_registration_id: uuid.UUID,
+        for_update: bool = False,
+    ) -> AppointmentFinishContext | None:
+        """Load an appointment only when the active doctor owns its queue.
+
+        ``FOR UPDATE`` is used after the queue advisory lock is acquired so a
+        concurrent retry observes either the complete pre-finish state or the
+        complete post-finish state, never a partial transition.
+        """
+
+        statement = (
+            select(
+                Appointment,
+                AppointmentQueueEntry,
+                DoctorPracticeSession,
+            )
+            .join(
+                AppointmentQueueEntry,
+                AppointmentQueueEntry.appointment_id == Appointment.id,
+            )
+            .join(
+                DoctorPracticeSession,
+                DoctorPracticeSession.id
+                == AppointmentQueueEntry.practice_session_id,
+            )
+            .where(
+                Appointment.id == appointment_id,
+                Appointment.doctor_role_registration_id
+                == doctor_role_registration_id,
+                DoctorPracticeSession.doctor_role_registration_id
+                == doctor_role_registration_id,
+            )
+        )
+        if for_update:
+            statement = statement.with_for_update().execution_options(
+                populate_existing=True
+            )
+        row = self.db.execute(statement).one_or_none()
+        if row is None:
+            return None
+        return AppointmentFinishContext(
+            appointment=row[0],
+            queue_entry=row[1],
+            practice_session=row[2],
+        )
+
 
 __all__ = [
+    "AppointmentFinishContext",
     "AppointmentRepository",
     "AppointmentBookingConflictError",
 ]

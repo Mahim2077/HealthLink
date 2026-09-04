@@ -61,6 +61,7 @@ function buildDeps(
   overrides: Partial<VisitsDeps> = {},
 ): { deps: VisitsDeps; spies: VisitsDeps } {
   const spies: VisitsDeps = {
+    finishAppointment: vi.fn().mockResolvedValue({} as never),
     loadCurrentPatient: vi.fn().mockResolvedValue(null),
     readVisit: vi.fn().mockResolvedValue({} as never),
     startVisitForCurrent: vi.fn().mockResolvedValue({} as never),
@@ -133,6 +134,87 @@ describe("ConsultationWorkspace", () => {
         expect.objectContaining({ clinical_notes: "Temp 38C" }),
       );
     });
+  });
+
+  it("finishes the appointment and naturally loads the next serial", async () => {
+    const nextCurrent = baseCurrent({
+      appointment_id: "appt-2",
+      queue_id: "queue-2",
+      serial_number: 2,
+      visit: null,
+    });
+    const loadCurrentPatient = vi
+      .fn()
+      .mockResolvedValueOnce(baseCurrent({ visit: baseVisit({}) }))
+      .mockResolvedValueOnce(nextCurrent);
+    const finishAppointment = vi.fn().mockResolvedValue({
+      appointment_id: "appt-1",
+      appointment_status: "COMPLETED",
+      completed_at: "2026-08-10T10:00:00Z",
+      finalized_at: "2026-08-10T10:00:00Z",
+      finished_at: "2026-08-10T10:00:00Z",
+      next_current: {
+        appointment_id: "appt-2",
+        appointment_status: "BOOKED",
+        became_current_at: "2026-08-10T10:00:00Z",
+        booked_at: "2026-08-10T08:30:00Z",
+        finished_at: null,
+        queue_id: "queue-2",
+        queue_status: "CURRENT",
+        reason: null,
+        removed_at: null,
+        serial_number: 2,
+        status: "BOOKED",
+      },
+      queue_id: "queue-1",
+      queue_status: "DONE",
+      serial_number: 1,
+      visit_id: "visit-1",
+      visit_status: "FINALIZED",
+    });
+    const { deps } = buildDeps({
+      finishAppointment,
+      loadCurrentPatient,
+    });
+
+    render(<ConsultationWorkspace visitsDeps={deps} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: /finish appointment/i }),
+    );
+
+    await waitFor(() => {
+      expect(finishAppointment).toHaveBeenCalledWith("appt-1");
+    });
+    expect(
+      await screen.findByRole("heading", { name: /serial #2/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /serial #2 is now with the doctor/i,
+    );
+  });
+
+  it("shows finish failures without replacing the current consultation", async () => {
+    const finishAppointment = vi
+      .fn()
+      .mockRejectedValue(new Error("Current appointment changed"));
+    const { deps } = buildDeps({
+      finishAppointment,
+      loadCurrentPatient: vi
+        .fn()
+        .mockResolvedValue(baseCurrent({ visit: baseVisit({}) })),
+    });
+
+    render(<ConsultationWorkspace visitsDeps={deps} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: /finish appointment/i }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /current appointment changed/i,
+    );
+    expect(
+      screen.getByRole("heading", { name: /serial #1/i }),
+    ).toBeInTheDocument();
   });
 
   it("disables editing when the visit is finalized", async () => {

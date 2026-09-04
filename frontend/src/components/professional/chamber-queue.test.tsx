@@ -32,7 +32,7 @@ function buildSession(overrides: Partial<ChamberSessionView>): ChamberSessionVie
     id: "session-1",
     session_date: "2026-08-10",
     started_at: "2026-08-10T09:00:00Z",
-    status: "OPEN",
+    status: "ACTIVE",
     waiting: [],
     ...overrides,
   };
@@ -84,6 +84,30 @@ describe("ChamberQueue", () => {
     });
   });
 
+  it("opens an existing not-started session", async () => {
+    const session = buildSession({
+      started_at: null,
+      status: "NOT_STARTED",
+    });
+    const started = buildSession({ status: "ACTIVE" });
+    const { deps } = buildDeps({
+      loadSession: vi.fn().mockResolvedValue(session),
+      startSession: vi.fn().mockResolvedValue(started),
+    });
+
+    render(<ChamberQueue facility_id={baseFacility} chamberDeps={deps} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /open today's chamber/i }),
+    );
+    await waitFor(() => {
+      expect(deps.startSession).toHaveBeenCalledWith({
+        facility_id: baseFacility,
+        session_date: expect.any(String),
+      });
+    });
+  });
+
   it("shows waiting and finished lists plus current actions", async () => {
     const session = buildSession({
       current: baseAppointment({
@@ -96,7 +120,7 @@ describe("ChamberQueue", () => {
         baseAppointment({
           finished_at: "2026-08-10T09:00:00Z",
           queue_id: "finished-1",
-          queue_status: "COMPLETED",
+          queue_status: "DONE",
           serial_number: 0,
           status: "COMPLETED",
         }),
@@ -124,11 +148,12 @@ describe("ChamberQueue", () => {
     const removeButtons = screen.getAllByRole("button", { name: "Remove" });
     expect(removeButtons.length).toBeGreaterThanOrEqual(2);
 
-    // Click Complete and wait for the call to land.
-    fireEvent.click(screen.getByRole("button", { name: "Complete" }));
-    await waitFor(() => {
-      expect(spies.actOnCurrent).toHaveBeenCalledWith("current-1", "complete");
-    });
+    expect(
+      screen.queryByRole("button", { name: "Complete" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /open consultation/i }),
+    ).toHaveAttribute("href", "/professional/visits");
 
     // Call-next fires.
     fireEvent.click(
@@ -197,12 +222,12 @@ describe("ChamberQueue", () => {
         baseAppointment({
           finished_at: "2026-08-10T17:00:00Z",
           queue_id: "finished-1",
-          queue_status: "COMPLETED",
+          queue_status: "DONE",
           serial_number: 1,
           status: "COMPLETED",
         }),
       ],
-      status: "FINISHED",
+      status: "COMPLETED",
       ended_at: "2026-08-10T17:00:00Z",
       waiting: [],
     });
@@ -241,7 +266,7 @@ describe("ChamberQueue", () => {
     render(<ChamberQueue facility_id={baseFacility} chamberDeps={deps} />);
 
     await screen.findByText("Serial #1", { selector: "p" });
-    fireEvent.click(screen.getByRole("button", { name: "Complete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
 
     expect(
       await screen.findByRole("alert"),

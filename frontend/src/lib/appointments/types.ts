@@ -3,22 +3,30 @@
 // fields surfaced by the citizen booking endpoints; no BMDC numbers or
 // professional contact details leak through here.
 
+import type { ChamberAppointmentView } from "@/lib/chamber/types";
+
 export type AppointmentStatus =
   | "BOOKED"
   | "CANCELLED"
-  | "COMPLETED";
+  | "COMPLETED"
+  | "REMOVED_BY_DOCTOR"
+  | "NO_SHOW";
 
 export const APPOINTMENT_STATUSES: AppointmentStatus[] = [
   "BOOKED",
   "CANCELLED",
   "COMPLETED",
+  "REMOVED_BY_DOCTOR",
+  "NO_SHOW",
 ];
 
 export type QueueStatus =
   | "WAITING"
   | "CURRENT"
+  | "SKIPPED"
   | "DONE"
-  | "REMOVED";
+  | "REMOVED"
+  | "CANCELLED";
 
 export type AppointmentBookingRequest = {
   doctor_user_id: string;
@@ -67,4 +75,18 @@ export type AppointmentListEntry = {
 
 export type AppointmentListResponse = {
   appointments: AppointmentListEntry[];
+};
+
+export type AppointmentFinishResponse = {
+  appointment_id: string;
+  visit_id: string;
+  queue_id: string;
+  serial_number: number;
+  appointment_status: "COMPLETED";
+  queue_status: "DONE";
+  visit_status: "FINALIZED";
+  completed_at: string;
+  finished_at: string;
+  finalized_at: string;
+  next_current: ChamberAppointmentView | null;
 };

@@ -20,9 +20,11 @@ from app.appointments.models import (
     QueueStatus,
     SessionStatus,
 )
+from app.appointments.service import AppointmentService
 from app.doctors.models import DoctorPracticeSchedule, PracticeScheduleStatus
 from app.auth.models import AuthSession, User
 from app.citizens.models import CitizenProfile, UserNationalIdentifier
+from app.core.config import Settings
 from app.db.base import Base
 from app.db.session import create_database_engine
 from app.facilities.models import HealthcareFacility
@@ -35,6 +37,8 @@ from app.professionals.models import (
     ProfessionalRole,
     ProfessionalRoleRegistration,
 )
+from app.professionals.dependencies import ProfessionalAuthContext
+from app.visits.models import MedicalVisit, VisitStatus
 
 
 POSTGRES_TEST_DATABASE_URL = os.getenv("HEALTHLINK_TEST_DATABASE_URL")
@@ -207,6 +211,13 @@ def _cleanup(
             connection.execute(
                 delete(AppointmentQueueEntry).where(
                     AppointmentQueueEntry.appointment_id.in_(
+                        appointment_ids.scalar_subquery()
+                    )
+                )
+            )
+            connection.execute(
+                delete(MedicalVisit).where(
+                    MedicalVisit.appointment_id.in_(
                         appointment_ids.scalar_subquery()
                     )
                 )
@@ -551,6 +562,156 @@ def test_postgresql_concurrent_promote_keeps_single_current() -> None:
                 )
             ).all()
             assert len(current_rows) == 1
+    finally:
+        _cleanup(
+            engine,
+            user_ids=[doctor_user_id, citizen_user_id],
+            facility_ids=[facility_id],
+        )
+
+
+@pytest.mark.skipif(
+    not POSTGRES_TEST_DATABASE_URL,
+    reason="HEALTHLINK_TEST_DATABASE_URL is required for finish concurrency coverage",
+)
+def test_postgresql_concurrent_finish_is_idempotent_and_advances_once() -> None:
+    """Concurrent finish retries serialize and never skip serial 2."""
+
+    assert POSTGRES_TEST_DATABASE_URL is not None
+    engine = create_database_engine(
+        POSTGRES_TEST_DATABASE_URL,
+        poolclass=NullPool,
+        disable_prepared_statements=True,
+    )
+    Base.metadata.create_all(engine)
+    (
+        doctor_user_id,
+        registration_id,
+        facility_id,
+        session_id,
+        citizen_user_id,
+        citizen_profile_id,
+    ) = _seed_chamber_fixture(
+        engine,
+        max_patients=4,
+        seed_appointments=3,
+    )
+
+    visit_id = uuid.uuid4()
+    appointment_id: uuid.UUID | None = None
+    queue_id: uuid.UUID | None = None
+    with engine.begin() as connection:
+        first = connection.execute(
+            select(Appointment.id, AppointmentQueueEntry.id)
+            .join(
+                AppointmentQueueEntry,
+                AppointmentQueueEntry.appointment_id == Appointment.id,
+            )
+            .where(
+                AppointmentQueueEntry.practice_session_id == session_id
+            )
+            .order_by(Appointment.serial_number.asc())
+            .limit(1)
+        ).one()
+        appointment_id, queue_id = first
+        connection.execute(
+            AppointmentQueueEntry.__table__.update()
+            .where(AppointmentQueueEntry.id == queue_id)
+            .values(
+                queue_status=QueueStatus.CURRENT.value,
+                became_current_at=datetime.now(timezone.utc),
+            )
+        )
+        connection.execute(
+            MedicalVisit.__table__.insert().values(
+                id=visit_id,
+                citizen_id=citizen_profile_id,
+                doctor_role_registration_id=registration_id,
+                facility_id=facility_id,
+                appointment_id=appointment_id,
+                status=VisitStatus.DRAFT.value,
+            )
+        )
+    assert appointment_id is not None
+    assert queue_id is not None
+
+    settings = Settings(
+        _env_file=None,
+        app_name="HealthLink Finish Concurrency Test",
+        app_env="test",
+        debug=False,
+        database_url=POSTGRES_TEST_DATABASE_URL,
+        frontend_url="http://localhost:3000",
+        jwt_secret_key="phase-14-concurrency-secret-at-least-32-characters",
+    )
+    barrier = Barrier(2)
+    outcomes: list[tuple[bool, int | str]] = []
+
+    def _finish() -> None:
+        with Session(engine, expire_on_commit=False) as session:
+            registration = session.get(
+                ProfessionalRoleRegistration,
+                registration_id,
+            )
+            assert registration is not None
+            context = ProfessionalAuthContext(
+                auth=None,  # type: ignore[arg-type] - service uses role only.
+                role_registration=registration,
+            )
+            try:
+                barrier.wait()
+                response = AppointmentService(
+                    session,
+                    settings,
+                ).finish_appointment(context, appointment_id)
+                outcomes.append(
+                    (
+                        True,
+                        response.next_current.serial_number
+                        if response.next_current is not None
+                        else "none",
+                    )
+                )
+            except Exception as error:  # pragma: no cover - assertion reports.
+                session.rollback()
+                outcomes.append((False, repr(error)))
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(_finish) for _ in range(2)]
+            for future in futures:
+                future.result()
+
+        assert len(outcomes) == 2
+        assert all(outcome == (True, 2) for outcome in outcomes), outcomes
+
+        with Session(engine) as session:
+            appointment = session.get(Appointment, appointment_id)
+            visit = session.get(MedicalVisit, visit_id)
+            finished_entry = session.get(AppointmentQueueEntry, queue_id)
+            assert appointment.status == AppointmentStatus.COMPLETED.value
+            assert visit.status == VisitStatus.FINALIZED.value
+            assert finished_entry.queue_status == QueueStatus.DONE.value
+
+            rows = session.execute(
+                select(
+                    Appointment.serial_number,
+                    AppointmentQueueEntry.queue_status,
+                )
+                .join(
+                    AppointmentQueueEntry,
+                    AppointmentQueueEntry.appointment_id == Appointment.id,
+                )
+                .where(
+                    AppointmentQueueEntry.practice_session_id == session_id
+                )
+                .order_by(Appointment.serial_number.asc())
+            ).all()
+            assert rows == [
+                (1, QueueStatus.DONE.value),
+                (2, QueueStatus.CURRENT.value),
+                (3, QueueStatus.WAITING.value),
+            ]
     finally:
         _cleanup(
             engine,

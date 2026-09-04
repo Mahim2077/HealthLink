@@ -63,7 +63,7 @@ export async function callNextPatient(
 
 export async function actOnCurrentPatient(
   queue_id: string,
-  action: "complete" | "skip" | "no-show",
+  action: "skip" | "no-show",
 ): Promise<ChamberQueueActionResponse> {
   return apiClient.post<ChamberQueueActionResponse, Record<string, never>>(
     `professionals/chamber/queue/${queue_id}/${action}`,

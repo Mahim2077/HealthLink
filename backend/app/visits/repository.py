@@ -289,6 +289,21 @@ class VisitsRepository:
         self.db.flush()
         return visit
 
+    def get_visit_for_appointment(
+        self,
+        appointment_id: uuid.UUID,
+        *,
+        for_update: bool = False,
+    ) -> MedicalVisit | None:
+        """Load the appointment's single visit for the finish transaction."""
+
+        statement = select(MedicalVisit).where(
+            MedicalVisit.appointment_id == appointment_id
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        return self.db.scalar(statement)
+
     # ------------------------------------------------------------------
     # Manual access-grant lookup
     # ------------------------------------------------------------------

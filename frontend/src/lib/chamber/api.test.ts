@@ -37,7 +37,7 @@ describe("Chamber API", () => {
       session_date: "2026-08-10",
       started_at: null,
       ended_at: null,
-      status: "OPEN" as const,
+      status: "ACTIVE" as const,
       waiting: [],
     };
     apiMocks.get.mockResolvedValue(view);
@@ -67,7 +67,7 @@ describe("Chamber API", () => {
       session_date: "2026-08-10",
       started_at: "2026-08-10T09:00:00Z",
       ended_at: null,
-      status: "OPEN" as const,
+      status: "ACTIVE" as const,
       waiting: [],
     };
     apiMocks.post.mockResolvedValue(view);
@@ -94,23 +94,17 @@ describe("Chamber API", () => {
     );
   });
 
-  it("posts to the right action endpoint for complete/skip/no-show", async () => {
+  it("posts to the right action endpoint for skip/no-show", async () => {
     apiMocks.post.mockResolvedValue({});
-    await actOnCurrentPatient("queue-1", "complete");
     await actOnCurrentPatient("queue-1", "skip");
     await actOnCurrentPatient("queue-1", "no-show");
     expect(apiMocks.post).toHaveBeenNthCalledWith(
       1,
-      "professionals/chamber/queue/queue-1/complete",
-      {},
-    );
-    expect(apiMocks.post).toHaveBeenNthCalledWith(
-      2,
       "professionals/chamber/queue/queue-1/skip",
       {},
     );
     expect(apiMocks.post).toHaveBeenNthCalledWith(
-      3,
+      2,
       "professionals/chamber/queue/queue-1/no-show",
       {},
     );
@@ -133,7 +127,7 @@ describe("Chamber API", () => {
       remaining_waiting: 0,
       session_date: "2026-08-10",
       started_at: "2026-08-10T09:00:00Z",
-      status: "FINISHED" as const,
+      status: "COMPLETED" as const,
     };
     apiMocks.post.mockResolvedValue(finish);
     await expect(

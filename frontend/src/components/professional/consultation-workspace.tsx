@@ -13,6 +13,7 @@ import {
   PrescriptionPanel,
   type PrescriptionDeps,
 } from "@/components/prescriptions/prescription-panel";
+import type { AppointmentFinishResponse } from "@/lib/appointments/types";
 import {
   badgeClassForVisit,
   describeVisitStatus,
@@ -30,6 +31,9 @@ export type VisitsDeps = {
     visit_id: string,
     payload: VisitDraftUpdateRequest,
   ) => Promise<VisitDraftView>;
+  finishAppointment: (
+    appointment_id: string,
+  ) => Promise<AppointmentFinishResponse>;
 };
 
 type CurrentPatientState =
@@ -38,7 +42,7 @@ type CurrentPatientState =
   | { kind: "error"; message: string }
   | { kind: "ready"; current: DoctorCurrentPatientView | null };
 
-type ActionKey = "start" | "save";
+type ActionKey = "start" | "save" | "finish";
 
 export function ConsultationWorkspace({
   visitsDeps,
@@ -51,6 +55,7 @@ export function ConsultationWorkspace({
   const [pending, setPending] = useState<ActionKey | null>(null);
   const [version, setVersion] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [finishNotice, setFinishNotice] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setState({ kind: "loading" });
@@ -81,6 +86,7 @@ export function ConsultationWorkspace({
     if (!current) return;
     setPending("start");
     setActionError(null);
+    setFinishNotice(null);
     try {
       const next = await visitsDeps.startVisitForCurrent(current.queue_id);
       setState({
@@ -101,6 +107,7 @@ export function ConsultationWorkspace({
       if (!visit) return;
       setPending("save");
       setActionError(null);
+      setFinishNotice(null);
       try {
         const next = await visitsDeps.updateVisit(visit.id, payload);
         if (current) {
@@ -119,6 +126,33 @@ export function ConsultationWorkspace({
     },
     [current, visit, visitsDeps],
   );
+
+  const onFinish = useCallback(async () => {
+    if (!current || !visit || finalized) return;
+    setPending("finish");
+    setActionError(null);
+    setFinishNotice(null);
+    try {
+      const result = await visitsDeps.finishAppointment(
+        current.appointment_id,
+      );
+      const next = await visitsDeps.loadCurrentPatient();
+      setState({ kind: "ready", current: next });
+      setFinishNotice(
+        result.next_current
+          ? `Appointment completed. Serial #${result.next_current.serial_number} is now with the doctor.`
+          : "Appointment completed. No patients are waiting.",
+      );
+    } catch (reason) {
+      setActionError(
+        reason instanceof Error
+          ? reason.message
+          : "Unable to finish appointment",
+      );
+    } finally {
+      setPending(null);
+    }
+  }, [current, finalized, visit, visitsDeps]);
 
   const patientName = useMemo(() => {
     if (!current) return null;
@@ -144,10 +178,20 @@ export function ConsultationWorkspace({
   }
   if (!current) {
     return (
-      <EmptyState
-        title="No active patient"
-        message="Call the next patient from the chamber queue to begin a consultation."
-      />
+      <div className="space-y-4">
+        {finishNotice ? (
+          <p
+            role="status"
+            className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800"
+          >
+            {finishNotice}
+          </p>
+        ) : null}
+        <EmptyState
+          title="No active patient"
+          message="Call the next patient from the chamber queue to begin a consultation."
+        />
+      </div>
     );
   }
 
@@ -156,14 +200,14 @@ export function ConsultationWorkspace({
       <header className="flex flex-col gap-3 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-sky-700">
-            Consultation � {current.facility_name}
+            Consultation · {current.facility_name}
           </p>
           <h2 className="mt-2 text-2xl font-bold text-slate-950">
-            Serial #{current.serial_number} � {patientName}
+            Serial #{current.serial_number} · {patientName}
           </h2>
           <p className="mt-2 text-sm text-slate-600">
             {visit
-              ? `Visit started � ${describeVisitStatus(visit.status)}`
+              ? `Visit started · ${describeVisitStatus(visit.status)}`
               : "No draft visit yet for this serial."}
           </p>
         </div>
@@ -181,7 +225,7 @@ export function ConsultationWorkspace({
               disabled={pending !== null}
               className="inline-flex min-h-11 items-center rounded-xl bg-sky-700 px-5 text-sm font-bold text-white disabled:opacity-60"
             >
-              {pending === "start" ? "Starting�" : "Open consultation"}
+              {pending === "start" ? "Starting…" : "Open consultation"}
             </button>
           )}
         </div>
@@ -196,6 +240,15 @@ export function ConsultationWorkspace({
         </p>
       ) : null}
 
+      {finishNotice ? (
+        <p
+          role="status"
+          className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800"
+        >
+          {finishNotice}
+        </p>
+      ) : null}
+
       <div className="mt-6 grid gap-6 lg:grid-cols-[260px,1fr]">
         <PatientPanel current={current} />
         <DraftForm
@@ -206,7 +259,7 @@ export function ConsultationWorkspace({
         />
       </div>
       {visit ? (
-        <div className="mt-6">
+        <div className="mt-6 space-y-6">
           <PrescriptionPanel
             deps={prescriptionDeps}
             editable
@@ -214,6 +267,27 @@ export function ConsultationWorkspace({
             prescriptionId={visit.prescription_id}
             visitId={visit.id}
           />
+          {!finalized ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:flex sm:items-center sm:justify-between sm:gap-6">
+              <div>
+                <p className="font-bold text-emerald-950">
+                  Consultation complete?
+                </p>
+                <p className="mt-1 text-sm text-emerald-800">
+                  Finishing finalizes this visit and calls the next waiting
+                  serial. A prescription is optional.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onFinish}
+                disabled={pending !== null}
+                className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-5 text-sm font-bold text-white disabled:opacity-60 sm:mt-0"
+              >
+                {pending === "finish" ? "Finishing…" : "Finish Appointment"}
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </section>
@@ -237,23 +311,23 @@ function PatientPanel({
       <dl className="mt-3 space-y-1 text-sm text-slate-700">
         <div className="flex justify-between">
           <dt className="font-semibold text-slate-600">Gender</dt>
-          <dd>{current.patient.gender ?? "�"}</dd>
+          <dd>{current.patient.gender ?? "—"}</dd>
         </div>
         <div className="flex justify-between">
           <dt className="font-semibold text-slate-600">Date of birth</dt>
-          <dd>{dob ?? "�"}</dd>
+          <dd>{dob ?? "—"}</dd>
         </div>
         <div className="flex justify-between">
           <dt className="font-semibold text-slate-600">Age</dt>
           <dd>
             {current.patient.age_years !== null
               ? `${current.patient.age_years} yrs`
-              : "�"}
+              : "—"}
           </dd>
         </div>
         <div className="flex justify-between">
           <dt className="font-semibold text-slate-600">Blood group</dt>
-          <dd>{current.patient.blood_group ?? "�"}</dd>
+          <dd>{current.patient.blood_group ?? "—"}</dd>
         </div>
       </dl>
     </aside>
@@ -321,7 +395,7 @@ function DraftForm({
       <p className="mt-2 text-sm text-slate-600">
         {finalized
           ? "This visit is finalized; further edits are disabled."
-          : "Save drafts often � Phase 14 finalises the visit on appointment close."}
+          : "Save drafts often. Finish Appointment finalizes the visit."}
       </p>
 
       <div className="mt-5 grid gap-4">
@@ -375,7 +449,7 @@ function DraftForm({
           disabled={finalized || pending !== null}
           className="inline-flex min-h-11 items-center rounded-xl bg-sky-700 px-5 text-sm font-bold text-white disabled:opacity-60"
         >
-          {pending === "save" ? "Saving�" : "Save draft"}
+          {pending === "save" ? "Saving…" : "Save draft"}
         </button>
       </div>
     </form>
