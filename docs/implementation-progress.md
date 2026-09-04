@@ -414,11 +414,14 @@ nid_number, birth_certificate_number, email, user_id,
   GET `/api/v1/professionals/chamber/sessions/today`,
   POST `/api/v1/professionals/chamber/sessions` (start), POST
   `/api/v1/professionals/chamber/sessions/{session_id}/call-next`, POST
-  `/api/v1/professionals/chamber/sessions/{session_id}/complete`, POST
+  `/api/v1/professionals/chamber/sessions/{session_id}/complete` (the
+  provisional queue-only completion route later removed by Phase 14), POST
   `/api/v1/professionals/chamber/sessions/{session_id}/skip`, POST
   `/api/v1/professionals/chamber/sessions/{session_id}/no-show`, POST
   `/api/v1/professionals/chamber/sessions/{session_id}/remove/{entry_id}`,
   and POST `/api/v1/professionals/chamber/sessions/{session_id}/finish`.
+  The current completion contract is the Phase 14 canonical
+  `POST /api/v1/appointments/{id}/finish` route documented below.
   All seven chamber mutations go through the repository's
   `_lock_for_queue(registration_id, session_date)` which issues
   `pg_advisory_xact_lock` followed by the select-then-update-by-id pattern
@@ -616,3 +619,56 @@ nid_number, birth_certificate_number, email, user_id,
   confirmed in the private `healthlink-prescriptions` Vercel Blob store. The
   exact synthetic rows, auth sessions, and Blob object were removed afterward;
   the dedicated store returned to zero objects.
+
+## Phase 14 verification evidence
+
+- Database and migrations: Phase 14 requires no new schema. It reuses the
+  `medical_visits.status/finalized_at`, `appointments.status/completed_at`, and
+  `appointment_queue_entries.queue_status/finished_at/became_current_at`
+  columns plus the PostgreSQL partial unique index that permits at most one
+  CURRENT row per practice session. The configured Supabase database remains
+  at `0023_prescription_documents (head)` and `alembic check` reports no
+  metadata drift.
+- Backend: the canonical `POST /api/v1/appointments/{id}/finish` route requires
+  a verified active DOCTOR role that owns the appointment, an ACTIVE practice
+  session, a BOOKED/CURRENT appointment and queue row, and a matching DRAFT
+  medical visit. A prescription is intentionally optional. Under the existing
+  per-doctor/date PostgreSQL advisory lock and row locks, one transaction
+  finalizes the visit, marks the appointment COMPLETED, marks the queue row
+  DONE, and promotes the lowest BOOKED/WAITING serial. A fully completed retry
+  is idempotent and returns the existing successor; partial terminal states are
+  rejected as conflicts. The provisional Phase 11 queue-only `complete` route
+  was removed because it could complete a serial without the required medical
+  visit.
+- Authorization and invariants: unauthenticated and citizen sessions cannot
+  finish appointments; another verified doctor receives a non-revealing 404;
+  a non-current appointment or missing visit receives 409; rollback coverage
+  proves a promotion failure leaves visit, appointment, and queue state
+  unchanged. The verified author role can still edit its prescription after
+  completion. No payment table, API, billing state, or gateway was added.
+- Frontend: the consultation workspace exposes `Finish Appointment` only for a
+  DRAFT visit, explains that prescription creation is optional, calls the
+  canonical appointment route, reloads the authoritative current-patient view,
+  and naturally displays the next serial or the no-patients-waiting state. The
+  chamber page no longer exposes the old queue-only Complete action. Exact
+  backend appointment, queue, and session enums are mirrored in frontend
+  types, including citizen history labels for NO_SHOW and
+  REMOVED_BY_DOCTOR.
+- Automated gates: the full backend suite passed against the workspace-local
+  PostgreSQL 17 test database with `236 passed`; the SQLite run passed with
+  `202 passed, 34 PostgreSQL-only skipped`. The four chamber PostgreSQL tests
+  include concurrent double-finish coverage proving both callers observe
+  serial 2 and the queue remains exactly DONE/CURRENT/WAITING. ESLint and
+  TypeScript passed, all 37 Vitest files / 173 tests passed, `pip check`
+  passed, and the optimized Next.js build generated all 22 pages. GitHub
+  Actions HealthLink CI/CD run 12 passed the same PostgreSQL/backend,
+  frontend, migration, Vercel deployment, and smoke-test gates for commit
+  `170e952`.
+- Live production flow: an isolated synthetic active doctor session with two
+  patients was exercised on the stable deployment. In the real browser, the
+  consultation workspace showed serial 1, accepted Finish Appointment without
+  a prescription, and changed naturally to serial 2. Live API follow-up proved
+  the first finish was idempotent, opened and finished serial 2, returned no
+  next CURRENT patient, and persisted both visits as FINALIZED, both
+  appointments as COMPLETED, and both queue entries as DONE in Supabase. Every
+  exact synthetic row and auth session was removed afterward.

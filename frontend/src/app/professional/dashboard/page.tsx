@@ -32,8 +32,8 @@ function ChamberDashboardCard() {
             Today&rsquo;s chamber queue
           </h2>
           <p className="mt-2 text-sm text-slate-600">
-            Open today&rsquo;s chamber, call the next serial, and complete or
-            skip patients.
+            Open today&rsquo;s chamber, call the next serial, or handle queue
+            exceptions before consultation.
           </p>
         </div>
         <Link
@@ -46,7 +46,7 @@ function ChamberDashboardCard() {
       <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
         <p>
           The chamber page calls today&rsquo;s session, lists waiting serials,
-          and exposes the seven chamber actions.
+          and links the current patient to the consultation workspace.
         </p>
       </div>
     </section>
@@ -82,7 +82,8 @@ function ConsultationsDashboardCard() {
       <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
         <p>
           The visits page loads the current patient, lets you open the visit
-          draft, edit clinical fields, and save progress.
+          draft, save clinical progress, optionally prescribe, and finish the
+          appointment.
         </p>
       </div>
     </section>

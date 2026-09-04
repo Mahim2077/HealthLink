@@ -202,3 +202,24 @@ V6 remains authoritative if an assumption ever conflicts with it.
 - Appointment completion in Phase 14 does not close prescription editing. The
   verified author doctor's active role registration remains the permanent
   authorization key, exactly as required by the governing prompt.
+
+## Phase 14
+
+- No Alembic revision is added. The Phase 10–12 schema already contains every
+  required lifecycle status, timestamp, relationship, and the one-CURRENT-row
+  PostgreSQL invariant needed for the finish transaction.
+- A finish request is idempotent only when the visit, appointment, and queue
+  entry are all already in their documented terminal states. Any partial
+  terminal combination is treated as inconsistent data and returns a conflict
+  rather than silently completing the remaining writes.
+- The existing per-doctor/date transaction-scoped advisory lock serializes
+  finish with the other queue mutations; `FOR UPDATE` refreshes the owned
+  appointment, queue, session, and visit rows after that lock is acquired. This
+  lets a concurrent retry observe the complete committed result and prevents
+  it from promoting a second successor.
+- After a successful finish, the consultation UI reloads the canonical current
+  patient rather than constructing clinical data from the queue response. The
+  response's `next_current` projection is used only for the success message.
+- Prescription creation remains optional and verified-author editing remains
+  available after appointment completion. Offline payment has no database or
+  application representation through Phase 14.

@@ -34,12 +34,12 @@ merges their routes behind the same project domain according to the root
 - The owner explicitly authorized a direct bootstrap deployment of the current
   worktree. Deployment `dpl_3EGupRwXyCFYHNcij6ArrEMz6GJJ` is live at
   `https://healthlink-sd.vercel.app`.
-- Phase 13 includes its frontend and private production Blob adapter. Commit
-  `ea07255` passed GitHub Actions run 8 and deployed through the documented
-  pipeline. The stable-domain prescription/PDF production verification passed.
-- The local CI gates are green: 195 backend tests pass (33 PostgreSQL-only
-  tests skip without their dedicated test URL), all 169 frontend tests pass,
-  lint/type-check/build pass, and `alembic check` reports no metadata drift.
+- Phases 0–14 are deployed. Commit `170e952` passed GitHub Actions run 12 and
+  deployed through the documented pipeline. Stable-domain Phase 14 browser,
+  API, and Supabase lifecycle verification passed.
+- The final local gates are green: 236 backend tests pass against PostgreSQL
+  17, all 173 frontend tests pass, lint/type-check/build pass, and `alembic
+  check` reports no metadata drift.
 
 ## 1. Understand the deployment gate
 
@@ -65,7 +65,8 @@ At the time this deployment snapshot was prepared:
 
 - The production PostgreSQL database and repository migration chain are both
   at `0023_prescription_documents`.
-- Phase 13 backend, frontend, authorization, and storage-adapter tests pass.
+- Phase 14 backend, frontend, authorization, transaction, concurrency, and
+  automatic-next-serial tests pass.
 - A private Vercel Blob store is connected to production, and the backend
   selects it with `PRESCRIPTION_STORAGE_BACKEND=vercel_blob`.
 - The local filesystem adapter remains development-only.
@@ -73,8 +74,8 @@ At the time this deployment snapshot was prepared:
 The workflow deliberately retains every quality gate. The first production
 snapshot was released directly through Vercel CLI only because the owner
 explicitly requested a bootstrap deployment. Continuous deployment now
-publishes verified `main` commits; Phase 13's GitHub Actions deployment and
-stable-domain prescription/PDF flow both passed. Do not downgrade or rewrite
+publishes verified `main` commits; Phase 14's GitHub Actions deployment and
+stable-domain finish-appointment flow both passed. Do not downgrade or rewrite
 the existing database; database state and deployed source migration history
 must remain aligned.
 
