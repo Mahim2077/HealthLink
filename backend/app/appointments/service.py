@@ -282,6 +282,23 @@ class AppointmentService:
         user_ids = list({user_id for user_id in prof_to_user.values()})
         users_by_id = self.repository.list_users_by_id(user_ids)
 
+        # Phase 13 exposes the prescription through the existing citizen
+        # appointment history without creating a second, redundant history
+        # endpoint. One query maps appointment -> visit -> prescription.
+        from app.prescriptions.models import Prescription
+        from app.visits.models import MedicalVisit
+
+        appointment_ids = [row[0].id for row in rows]
+        prescription_rows = self.db.execute(
+            select(MedicalVisit.appointment_id, Prescription.id)
+            .join(Prescription, Prescription.visit_id == MedicalVisit.id)
+            .where(MedicalVisit.appointment_id.in_(appointment_ids))
+        ).all()
+        prescription_by_appointment = {
+            appointment_id: prescription_id
+            for appointment_id, prescription_id in prescription_rows
+        }
+
         entries: list[AppointmentListEntry] = []
         for appointment, registration in rows:
             user_id = prof_to_user.get(registration.professional_id)
@@ -304,6 +321,9 @@ class AppointmentService:
                     booked_at=appointment.booked_at,
                     cancelled_at=appointment.cancelled_at,
                     completed_at=appointment.completed_at,
+                    prescription_id=prescription_by_appointment.get(
+                        appointment.id
+                    ),
                 )
             )
         return AppointmentListResponse(appointments=entries)

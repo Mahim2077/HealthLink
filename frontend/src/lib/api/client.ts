@@ -76,6 +76,19 @@ export class ApiClient {
     return this.request<TResponse>(path, { ...options, method: "GET" });
   }
 
+  async getBlob(
+    path: string,
+    options: Omit<ApiRequestOptions, "method"> = {},
+  ): Promise<Blob> {
+    const headers = new Headers(options.headers);
+    headers.set("Accept", "application/pdf");
+    return this.request<Blob>(path, {
+      ...options,
+      headers,
+      method: "GET",
+    });
+  }
+
   async post<TResponse, TBody = undefined>(
     path: string,
     body?: TBody,
@@ -306,6 +319,10 @@ export class ApiClient {
     const contentType = response.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {
       return (await response.json()) as TResponse;
+    }
+
+    if (contentType.includes("application/pdf")) {
+      return (await response.blob()) as TResponse;
     }
 
     return (await response.text()) as TResponse;

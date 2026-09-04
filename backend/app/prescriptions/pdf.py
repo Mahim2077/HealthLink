@@ -13,6 +13,7 @@ import io
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from html import escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -121,10 +122,13 @@ def _assert_no_forbidden_text(value: str | None, location: str) -> None:
 
 def _patient_block(styles: dict[str, ParagraphStyle], view: PrescriptionPdfView) -> list:
     rows = [
-        ["Patient name", view.patient_name],
-        ["Age / DOB", view.patient_age],
-        ["Serial", view.serial_label],
-        ["Visit date", view.visit_date.strftime("%Y-%m-%d %H:%M UTC")],
+        ["Patient name", Paragraph(escape(view.patient_name), styles["body"])],
+        ["Age / DOB", Paragraph(escape(view.patient_age), styles["body"])],
+        ["Serial", Paragraph(escape(view.serial_label), styles["body"])],
+        [
+            "Visit date",
+            Paragraph(view.visit_date.strftime("%Y-%m-%d %H:%M UTC"), styles["body"]),
+        ],
     ]
     table = Table(rows, colWidths=[35 * mm, 110 * mm])
     table.setStyle(
@@ -142,13 +146,13 @@ def _patient_block(styles: dict[str, ParagraphStyle], view: PrescriptionPdfView)
 
 def _doctor_block(styles: dict[str, ParagraphStyle], doctor: PrescriptionDoctor) -> list:
     return [
-        Paragraph(f"Dr. {doctor.full_name}", styles["body"]),
+        Paragraph(f"Dr. {escape(doctor.full_name)}", styles["body"]),
         Paragraph(
-            f"BM&DC reg. {doctor.bm_dc_registration_no}",
+            f"BM&amp;DC reg. {escape(doctor.bm_dc_registration_no)}",
             styles["body"],
         ),
-        Paragraph(f"Designation: {doctor.designation}", styles["body"]),
-        Paragraph(f"Facility: {doctor.facility_name}", styles["body"]),
+        Paragraph(f"Designation: {escape(doctor.designation)}", styles["body"]),
+        Paragraph(f"Facility: {escape(doctor.facility_name)}", styles["body"]),
     ]
 
 
@@ -158,11 +162,11 @@ def _items_table(styles: dict[str, ParagraphStyle], items: tuple[PrescriptionIte
     for item in items:
         rows.append(
             [
-                item.medicine_name,
-                item.dosage,
-                item.frequency,
-                item.duration,
-                item.instructions or "",
+                Paragraph(escape(item.medicine_name), styles["body"]),
+                Paragraph(escape(item.dosage), styles["body"]),
+                Paragraph(escape(item.frequency), styles["body"]),
+                Paragraph(escape(item.duration), styles["body"]),
+                Paragraph(escape(item.instructions or ""), styles["body"]),
             ]
         )
     table = Table(rows, colWidths=[40 * mm, 25 * mm, 25 * mm, 25 * mm, 40 * mm])
@@ -190,7 +194,7 @@ def _optional_section(
         return []
     return [
         Paragraph(heading, styles["section"]),
-        Paragraph(value.replace("\n", "<br/>"), styles["body"]),
+        Paragraph(escape(value).replace("\n", "<br/>"), styles["body"]),
     ]
 
 
@@ -230,7 +234,7 @@ def generate_prescription_pdf_bytes(view: PrescriptionPdfView) -> bytes:
     story.append(Paragraph("HealthLink Electronic Prescription", styles["title"]))
     story.append(
         Paragraph(
-            f"Prescription id: {view.prescription_id}",
+            f"Prescription id: {escape(view.prescription_id)}",
             styles["subtitle"],
         )
     )

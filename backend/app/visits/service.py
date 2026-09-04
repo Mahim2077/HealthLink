@@ -67,6 +67,11 @@ def _visit_view_from_ctx(
         doctor_role_registration_id=ctx.appointment.doctor_role_registration_id,
         facility_id=ctx.facility.id,
         appointment_id=ctx.appointment.id if visit is not None else None,
+        prescription_id=(
+            visit.prescription.id
+            if visit is not None and visit.prescription is not None
+            else None
+        ),
         visit_date=visit.visit_date if visit is not None else datetime.now(tz=timezone.utc),
         chief_complaint=visit.chief_complaint if visit is not None else None,
         clinical_notes=visit.clinical_notes if visit is not None else None,
@@ -314,6 +319,11 @@ class VisitsService:
             doctor_role_registration_id=visit.doctor_role_registration_id,
             facility_id=facility.id,
             appointment_id=appointment.id,
+            prescription_id=(
+                visit.prescription.id
+                if visit.prescription is not None
+                else None
+            ),
             visit_date=visit.visit_date,
             chief_complaint=visit.chief_complaint,
             clinical_notes=visit.clinical_notes,
@@ -355,6 +365,11 @@ class VisitsService:
                     facility_id=facility.id,
                     facility_name=facility.name,
                     appointment_id=visit.appointment_id,
+                    prescription_id=(
+                        visit.prescription.id
+                        if visit.prescription is not None
+                        else None
+                    ),
                     serial_number=appointment.serial_number if appointment else None,
                     visit_date=visit.visit_date,
                     status=visit.status,

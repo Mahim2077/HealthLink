@@ -36,6 +36,7 @@ class VisitDraftView(BaseModel):
     doctor_role_registration_id: uuid.UUID
     facility_id: uuid.UUID
     appointment_id: uuid.UUID | None
+    prescription_id: uuid.UUID | None = None
     visit_date: datetime
     chief_complaint: str | None
     clinical_notes: str | None
@@ -84,6 +85,7 @@ class CitizenVisitSummary(BaseModel):
     facility_id: uuid.UUID
     facility_name: str
     appointment_id: uuid.UUID | None
+    prescription_id: uuid.UUID | None = None
     serial_number: int | None
     visit_date: datetime
     status: VisitStatus

@@ -118,6 +118,14 @@ function AppointmentRow({ appointment }: { appointment: AppointmentListEntry }) 
               Completed at: {formatTimestamp(appointment.completed_at)}
             </p>
           ) : null}
+          {appointment.prescription_id ? (
+            <Link
+              className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-4 text-sm font-bold text-teal-800 transition hover:border-teal-300"
+              href={`/citizen/prescriptions/${appointment.prescription_id}`}
+            >
+              View prescription
+            </Link>
+          ) : null}
         </div>
       </div>
     </article>

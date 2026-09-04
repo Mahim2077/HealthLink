@@ -40,6 +40,7 @@ const baseCurrent = (
 const baseVisit = (overrides: Partial<VisitDraftView>): VisitDraftView => ({
   access_source: "queue",
   appointment_id: "appt-1",
+  prescription_id: null,
   chief_complaint: null,
   citizen_id: "citizen-1",
   clinical_notes: null,

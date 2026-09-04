@@ -62,6 +62,7 @@ export type AppointmentListEntry = {
   booked_at: string;
   cancelled_at: string | null;
   completed_at: string | null;
+  prescription_id: string | null;
 };
 
 export type AppointmentListResponse = {

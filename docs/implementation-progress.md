@@ -20,7 +20,7 @@ apply to that phase have passed.
 | 10 | Appointment Booking and MAX Serial Assignment | Completed |
 | 11 | Doctor Daily Chamber Session and Serial Queue | Completed |
 | 12 | Current Patient Clinical Access and Consultation Workspace | Completed |
-| 13 | Chamber Prescription Form and Electronic PDF | Not started |
+| 13 | Chamber Prescription Form and Electronic PDF | Implementation complete; production verification pending |
 | 14 | Finish Appointment and Automatic Next Serial | Not started |
 
 Phase 15 and later are explicitly outside the current implementation boundary.
@@ -571,3 +571,45 @@ equire_super_admin, so non-super-admin operators
   `date.today()` / `today.strftime("%A").upper()` for booking and
   scheduling (matching the rest of the backend suite) while leaving the
   assertion on the backend's "today" filter intact.
+
+## Phase 13 verification evidence (pre-production checkpoint)
+
+- Database and migrations: the sequential revisions `0021_prescriptions`,
+  `0022_prescription_items`, and `0023_prescription_documents` remain the
+  single Alembic head. The configured Supabase PostgreSQL schema reports
+  `0023_prescription_documents (head)`, and `alembic check` reports no metadata
+  drift.
+- Backend: the canonical V6 routes are implemented at
+  `POST /api/v1/visits/{visit_id}/prescription`,
+  `GET|PUT /api/v1/prescriptions/{id}`, and
+  `GET /api/v1/prescriptions/{id}/pdf`. The owning citizen has read/PDF access
+  but no write access; the verified author doctor is compared by active role
+  registration and can read, edit, and regenerate after appointment completion.
+  Structured data commits even when rendering or storage fails, and a later
+  author PUT retries generation.
+- Private documents: local development uses a traversal-safe private filesystem
+  adapter. Production uses the official Python Vercel SDK against a private
+  Vercel Blob store, with versioned object keys and best-effort superseded-object
+  cleanup. Storage keys never leave the backend; PDF bytes are streamed only
+  after citizen/author authorization succeeds.
+- Frontend: the consultation workspace contains the dynamic structured form,
+  including `+ Add Medicine`, `Remove Medicine`, diagnostic information,
+  medical advice, and notes. Citizen appointment history links to a read-only
+  prescription detail route with authenticated PDF preview/download; the author
+  has a dedicated editable detail route and explicit retry guidance.
+- Automated gates: `pip check` passed; 195 backend tests passed with 33
+  PostgreSQL-only cases skipped because `HEALTHLINK_TEST_DATABASE_URL` was not
+  supplied; ESLint and TypeScript passed; 37 Vitest files / 169 tests passed;
+  and the optimized Next.js build generated both prescription detail routes.
+- Real browser/database flow: an isolated synthetic CURRENT-patient fixture was
+  exercised through local Next.js/FastAPI against the configured Supabase
+  schema. A verified doctor saved two medicines, opened the protected PDF,
+  edited the record, and observed a newer generated timestamp. The citizen
+  route rejected the active professional portal. Backend logs recorded
+  successful canonical POST, PDF GET, and PUT calls. The fixture and PDF were
+  removed afterward.
+- Production checkpoint: the private `healthlink-prescriptions` Blob store is
+  linked to `healthlink-sd` in Mumbai (`bom1`), production has
+  `BLOB_READ_WRITE_TOKEN`, and `PRESCRIPTION_STORAGE_BACKEND=vercel_blob`.
+  Phase 13 remains pending until the pushed GitHub Actions deployment and
+  stable-domain PDF verification pass.

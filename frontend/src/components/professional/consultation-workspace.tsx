@@ -10,6 +10,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import {
+  PrescriptionPanel,
+  type PrescriptionDeps,
+} from "@/components/prescriptions/prescription-panel";
+import {
   badgeClassForVisit,
   describeVisitStatus,
   isFinalized,
@@ -38,8 +42,10 @@ type ActionKey = "start" | "save";
 
 export function ConsultationWorkspace({
   visitsDeps,
+  prescriptionDeps,
 }: {
   visitsDeps: VisitsDeps;
+  prescriptionDeps?: PrescriptionDeps;
 }) {
   const [state, setState] = useState<CurrentPatientState>({ kind: "idle" });
   const [pending, setPending] = useState<ActionKey | null>(null);
@@ -199,6 +205,17 @@ export function ConsultationWorkspace({
           onSave={onSave}
         />
       </div>
+      {visit ? (
+        <div className="mt-6">
+          <PrescriptionPanel
+            deps={prescriptionDeps}
+            editable
+            key={`${visit.id}-${visit.prescription_id ?? "new"}`}
+            prescriptionId={visit.prescription_id}
+            visitId={visit.id}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }

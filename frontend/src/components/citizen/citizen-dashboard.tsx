@@ -272,6 +272,9 @@ function DashboardContent({
             <Link className="ml-0 mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-5 text-sm font-bold text-teal-800 hover:border-teal-300 sm:ml-3" href="/citizen/doctors/search">
               Find a verified doctor
             </Link>
+            <Link className="ml-0 mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-sky-200 bg-sky-50 px-5 text-sm font-bold text-sky-800 hover:border-sky-300 sm:ml-3" href="/citizen/appointments">
+              Appointments &amp; prescriptions
+            </Link>
           </div>
         </div>
       </section>

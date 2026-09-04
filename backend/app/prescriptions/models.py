@@ -4,9 +4,8 @@ Three tables from V6 sections 26-28:
 
 * ``prescriptions`` - header row, UNIQUE on ``visit_id`` so the
   "at most one prescription per visit" invariant holds at the database
-  level. Authorised for edits by the author doctor (an intentional
-  exception to ordinary finalized-record immutability; Phase 14 closes
-  the window once the appointment is finished).
+  level. Authorised for later edits by the author doctor as an intentional
+  exception to ordinary finalized-record immutability.
 * ``prescription_items`` - structured medicines rows; ``CASCADE`` on
   delete so removing a prescription wipes its medicines.
 * ``prescription_documents`` - pointer to the rendered PDF binary that
@@ -88,6 +87,9 @@ class Prescription(Base):
         uselist=False,
         cascade="all, delete-orphan",
         passive_deletes=True,
+    )
+    visit: Mapped["MedicalVisit"] = relationship(  # noqa: F821
+        "MedicalVisit", back_populates="prescription"
     )
 
 

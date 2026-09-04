@@ -84,6 +84,7 @@ class AppointmentListEntry(BaseModel):
     booked_at: datetime
     cancelled_at: datetime | None
     completed_at: datetime | None
+    prescription_id: uuid.UUID | None = None
 
 
 class AppointmentListResponse(BaseModel):

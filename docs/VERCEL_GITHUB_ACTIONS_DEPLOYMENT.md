@@ -20,7 +20,7 @@ Instead, Vercel Services builds `frontend/` and `backend/` independently and
 merges their routes behind the same project domain according to the root
 `vercel.json`.
 
-### Current Vercel setup state (2026-09-01)
+### Current Vercel setup state (2026-09-04)
 
 - Vercel CLI 59.10.0 is authenticated locally as `mahimchow2077-3904`.
 - `mahimchow2077-3904s-projects/healthlink-sd` has been created and linked to the
@@ -34,11 +34,11 @@ merges their routes behind the same project domain according to the root
 - The owner explicitly authorized a direct bootstrap deployment of the current
   worktree. Deployment `dpl_3EGupRwXyCFYHNcij6ArrEMz6GJJ` is live at
   `https://healthlink-sd.vercel.app`.
-- The direct bootstrap release contains the current Phase 13 backend work, but
-  Phase 13 is not a complete vertical slice until its frontend and durable
-  production PDF storage are implemented and browser-verified.
-- The local CI gates are green: 190 backend tests pass (33 PostgreSQL-only
-  tests skip without their dedicated test URL), all 163 frontend tests pass,
+- Phase 13 now includes its frontend and private production Blob adapter. Its
+  completion tag remains gated on the next GitHub Actions deployment and
+  stable-domain prescription/PDF verification.
+- The local CI gates are green: 195 backend tests pass (33 PostgreSQL-only
+  tests skip without their dedicated test URL), all 169 frontend tests pass,
   lint/type-check/build pass, and `alembic check` reports no metadata drift.
 
 ## 1. Understand the deployment gate
@@ -59,23 +59,24 @@ Pull requests run only the CI jobs. They do not migrate production or deploy.
 A push to `main`, or a manual run on `main`, can deploy only after both CI jobs
 pass.
 
-### Current repository warning
+### Current repository checkpoint
 
 At the time this deployment snapshot was prepared:
 
 - The production PostgreSQL database and repository migration chain are both
   at `0023_prescription_documents`.
-- The current Phase 13 backend tests and migration metadata checks pass.
-- The Phase 13 frontend prescription workflow is not implemented yet.
-- The local PDF adapter is intentionally development-only and is not durable
-  on Vercel's ephemeral filesystem.
+- Phase 13 backend, frontend, authorization, and storage-adapter tests pass.
+- A private Vercel Blob store is connected to production, and the backend
+  selects it with `PRESCRIPTION_STORAGE_BACKEND=vercel_blob`.
+- The local filesystem adapter remains development-only.
 
 The workflow deliberately retains every quality gate. The first production
 snapshot was released directly through Vercel CLI only because the owner
-explicitly requested a bootstrap deployment. Continuous deployment can publish
-this verified development snapshot, but it must not be described as a completed
-Phase 13 vertical slice. Do not downgrade or rewrite the existing database;
-database state and deployed source migration history must remain aligned.
+explicitly requested a bootstrap deployment. Continuous deployment publishes
+the verified commit, but Phase 13 should be tagged complete only after its
+stable-domain prescription/PDF flow succeeds. Do not downgrade or rewrite the
+existing database; database state and deployed source migration history must
+remain aligned.
 
 ## 2. Obtain Vercel Services access
 
@@ -144,8 +145,9 @@ deployments are introduced later.
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `7` |
 | `NEXT_PUBLIC_API_BASE_URL` | `/api/v1` |
-| `PRESCRIPTION_STORAGE_BACKEND` | `local` only for the incomplete development adapter |
-| `PRESCRIPTION_STORAGE_PATH` | `/tmp/healthlink-prescriptions` only for temporary testing |
+| `PRESCRIPTION_STORAGE_BACKEND` | `vercel_blob` |
+| `BLOB_READ_WRITE_TOKEN` | Automatically added by the linked private Vercel Blob store; treat as sensitive |
+| `PRESCRIPTION_STORAGE_PATH` | Not used in production; optional local-development path only |
 
 Vercel Services supplies a service-aware `FRONTEND_URL` for the service named
 `frontend`. This project also sets it explicitly to
@@ -168,13 +170,13 @@ Remove-Variable secret, bytes
 
 Paste the clipboard value directly into Vercel and GitHub secret forms.
 
-### Prescription PDF limitation
+### Prescription PDF storage
 
-Vercel Functions have an ephemeral filesystem. `/tmp` may disappear between
-requests, instances, or deployments. Therefore the Phase 13 local PDF adapter
-is not production-safe. The structured Phase 0–12 features can be demonstrated,
-but prescription PDFs must use a durable private object-storage adapter before
-Phase 13 is declared production-ready.
+Vercel Functions have an ephemeral filesystem, so production must not select
+the local adapter. Create and link a private Blob store, retain its generated
+`BLOB_READ_WRITE_TOKEN`, and set `PRESCRIPTION_STORAGE_BACKEND=vercel_blob`.
+The backend uses versioned private objects and serves bytes only through the
+authorized `/api/v1/prescriptions/{id}/pdf` route.
 
 ## 5. Create the Vercel access token
 

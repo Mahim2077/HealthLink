@@ -59,19 +59,22 @@ class Settings(BaseSettings):
         validation_alias="REFRESH_TOKEN_EXPIRE_DAYS",
     )
 
-    # Phase 13: prescription PDF storage backend. Default ``local`` writes
-    # the binary under ``prescription_storage_path`` (or
-    # ``<backend>/.prescription_storage`` when blank) and is the only
-    # implementation Phase 13 ships; the abstraction in
-    # ``app/prescriptions/storage.py`` leaves room for an object-storage
-    # adapter in production without changing the routes.
-    prescription_storage_backend: Literal["local"] = Field(
+    # Phase 13 prescription PDFs use private local storage in development and
+    # a private Vercel Blob store in production. The application always serves
+    # the bytes through an authorized API route; raw storage keys never reach
+    # the browser.
+    prescription_storage_backend: Literal["local", "vercel_blob"] = Field(
         default="local",
         validation_alias="PRESCRIPTION_STORAGE_BACKEND",
     )
     prescription_storage_path: str = Field(
         default="",
         validation_alias="PRESCRIPTION_STORAGE_PATH",
+    )
+    blob_read_write_token: str = Field(
+        default="",
+        validation_alias="BLOB_READ_WRITE_TOKEN",
+        repr=False,
     )
 
     @field_validator("debug", mode="before")
@@ -87,7 +90,12 @@ class Settings(BaseSettings):
             return False
         return value
 
-    @field_validator("database_url", "frontend_url", "jwt_secret_key")
+    @field_validator(
+        "database_url",
+        "frontend_url",
+        "jwt_secret_key",
+        "blob_read_write_token",
+    )
     @classmethod
     def strip_surrounding_whitespace(cls, value: str) -> str:
         return value.strip()

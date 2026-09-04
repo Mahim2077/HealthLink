@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class PrescriptionItemPayload(BaseModel):
@@ -17,6 +17,29 @@ class PrescriptionItemPayload(BaseModel):
     frequency: str = Field(min_length=1, max_length=100)
     duration: str = Field(min_length=1, max_length=100)
     instructions: str | None = Field(default=None, max_length=4000)
+
+    @field_validator(
+        "medicine_name",
+        "dosage",
+        "frequency",
+        "duration",
+        mode="before",
+    )
+    @classmethod
+    def normalize_required_text(cls, value: object) -> object:
+        if isinstance(value, str):
+            normalized = value.strip()
+            if not normalized:
+                raise ValueError("Medicine fields cannot be blank.")
+            return normalized
+        return value
+
+    @field_validator("instructions", mode="before")
+    @classmethod
+    def normalize_optional_text(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
 
 
 class PrescriptionItemView(BaseModel):
@@ -40,6 +63,15 @@ class PrescriptionCreateRequest(BaseModel):
     medical_advice: str | None = Field(default=None, max_length=8000)
     notes: str | None = Field(default=None, max_length=8000)
 
+    @field_validator(
+        "diagnostic_information", "medical_advice", "notes", mode="before"
+    )
+    @classmethod
+    def normalize_optional_text(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
 
 class PrescriptionUpdateRequest(BaseModel):
     """Payload for ``PUT /api/v1/prescriptions/{id}``."""
@@ -50,6 +82,15 @@ class PrescriptionUpdateRequest(BaseModel):
     diagnostic_information: str | None = Field(default=None, max_length=8000)
     medical_advice: str | None = Field(default=None, max_length=8000)
     notes: str | None = Field(default=None, max_length=8000)
+
+    @field_validator(
+        "diagnostic_information", "medical_advice", "notes", mode="before"
+    )
+    @classmethod
+    def normalize_optional_text(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
 
 
 class PrescriptionView(BaseModel):

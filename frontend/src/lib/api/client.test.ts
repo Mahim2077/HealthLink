@@ -93,6 +93,35 @@ describe("ApiClient", () => {
     );
   });
 
+  it("downloads an authenticated PDF response as a blob", async () => {
+    tokenStore.set("access-token");
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response("%PDF-1.7", {
+        status: 200,
+        headers: { "content-type": "application/pdf" },
+      }),
+    );
+    const client = new ApiClient({
+      baseUrl: "https://api.healthlink.test/api/v1",
+      fetchImplementation: fetchMock,
+      refreshAccessToken: vi.fn(),
+      tokenStore,
+    });
+
+    const result = await client.getBlob("prescriptions/rx-1/pdf");
+
+    expect(result).toBeInstanceOf(Blob);
+    expect(await result.text()).toBe("%PDF-1.7");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(
+      "https://api.healthlink.test/api/v1/prescriptions/rx-1/pdf",
+    );
+    expect(new Headers(init?.headers).get("Accept")).toBe("application/pdf");
+    expect(new Headers(init?.headers).get("Authorization")).toBe(
+      "Bearer access-token",
+    );
+  });
+
   it("serializes typed JSON request bodies", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

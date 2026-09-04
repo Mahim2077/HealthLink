@@ -1,21 +1,24 @@
 # HealthLink Phase 0–14 implementation handoff
 
-Last updated: 2026-09-02 (Asia/Dhaka)
+Last updated: 2026-09-04 (Asia/Dhaka)
 Repository: `D:\HealthLink_V_1`
 Branch: `main`
 Last committed Phase checkpoint before this deployment snapshot:
 `9da7b60 (tag: phase-12-complete) feat(phase-12): visits and consultations frontend`.
 
-Current uncommitted implementation at the time of this update: the Phase 13
-backend, migrations `0021` through `0023`, structured prescription APIs,
-authorization, private local-storage abstraction, PDF generation, and backend
-tests. The full backend suite passes (190 passed, 33 PostgreSQL-only tests
-skipped without a dedicated safe test database), all 163 frontend tests pass,
-frontend lint/type-check/build pass, and `alembic check` reports no metadata
-drift against the configured PostgreSQL schema. Phase 13 is still incomplete as
-a vertical slice because its frontend and browser-flow verification are not
-implemented. Phase 14 has not started. This handoff does not replace the three
-governing documents.
+Current working checkpoint: Phase 13 implementation is complete and awaits its
+GitHub Actions production verification before the `phase-13-complete` tag. The
+canonical structured prescription API, citizen/author-role authorization,
+failure-safe PDF regeneration, dynamic doctor form, citizen read-only detail,
+and private Vercel Blob adapter are implemented. The full backend suite passes
+(195 passed, 33 PostgreSQL-only tests skipped without the dedicated test URL),
+all 169 frontend tests pass, frontend lint/type-check/build pass, the configured
+Supabase schema is at `0023_prescription_documents`, and `alembic check` reports
+no metadata drift. A real local browser flow against Supabase passed two-item
+create, authenticated PDF preview, author edit/regeneration, and wrong-portal
+denial; its synthetic fixture was removed. The production project now has a
+private Blob store and selects `vercel_blob`. Phase 14 has not started. This
+handoff does not replace the three governing documents.
 
 Before changing the repository, read all three files completely in this exact
 priority order:

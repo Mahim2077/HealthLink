@@ -22,6 +22,7 @@ export type VisitDraftView = {
   doctor_role_registration_id: string;
   facility_id: string;
   appointment_id: string | null;
+  prescription_id: string | null;
   visit_date: string;
   chief_complaint: string | null;
   clinical_notes: string | null;
@@ -59,6 +60,7 @@ export type CitizenVisitSummary = {
   facility_id: string;
   facility_name: string;
   appointment_id: string | null;
+  prescription_id: string | null;
   serial_number: number | null;
   visit_date: string;
   status: VisitStatus;

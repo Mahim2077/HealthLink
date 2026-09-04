@@ -185,6 +185,9 @@ class MedicalVisit(Base):
     appointment: Mapped["Appointment | None"] = relationship(  # noqa: F821
         "Appointment", foreign_keys=[appointment_id], lazy="select"
     )
+    prescription: Mapped["Prescription | None"] = relationship(  # noqa: F821
+        "Prescription", back_populates="visit", uselist=False, lazy="select"
+    )
 
 
 __all__ = [

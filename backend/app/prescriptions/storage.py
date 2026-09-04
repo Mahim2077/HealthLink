@@ -1,18 +1,18 @@
-"""Phase 13 private prescription PDF storage abstraction.
+"""Private prescription PDF storage adapters for Phase 13.
 
-V6 section 28 places the rendered PDF in private object storage. Only
-Phase 13 ships a local filesystem backend; the ``PrescriptionStorage``
-protocol leaves room for an object-storage adapter in production
-without changing routes or services.
-
-Keys are opaque to callers; the local backend derives them from the
-prescription id so the directory tree stays predictable and easy to
-wipe in development.
+Local development uses a private filesystem directory. Production uses a
+private Vercel Blob store so documents survive function restarts and
+deployments. Storage keys remain backend-only and are never returned to a
+browser.
 """
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Any
+
+from vercel.blob import BlobClient
+from vercel.blob.errors import BlobNotFoundError
 
 from app.core.config import BACKEND_DIRECTORY, get_settings
 
@@ -55,18 +55,76 @@ class LocalPrescriptionStorage(PrescriptionStorage):
         target.write_bytes(payload)
         return str(target.relative_to(self._root))
 
+    def _target_for_key(self, storage_key: str) -> Path:
+        target = (self._root / storage_key).resolve()
+        try:
+            target.relative_to(self._root)
+        except ValueError as error:
+            raise FileNotFoundError(
+                "Invalid prescription storage key."
+            ) from error
+        return target
+
     def load(self, storage_key: str) -> bytes:
-        return (self._root / storage_key).read_bytes()
+        return self._target_for_key(storage_key).read_bytes()
 
     def delete(self, storage_key: str) -> None:
-        target = self._root / storage_key
+        target = self._target_for_key(storage_key)
         try:
             target.unlink()
         except FileNotFoundError:
             pass
 
     def exists(self, storage_key: str) -> bool:
-        return (self._root / storage_key).is_file()
+        return self._target_for_key(storage_key).is_file()
+
+
+class VercelBlobPrescriptionStorage(PrescriptionStorage):
+    """Private, durable production storage backed by Vercel Blob."""
+
+    def __init__(self, token: str, *, client: Any | None = None) -> None:
+        normalized_token = token.strip()
+        if not normalized_token:
+            raise RuntimeError(
+                "BLOB_READ_WRITE_TOKEN is required for vercel_blob storage."
+            )
+        self._client = client or BlobClient(token=normalized_token)
+
+    def save(
+        self, prescription_id, file_name: str, payload: bytes
+    ) -> str:
+        pathname = (
+            f"prescriptions/{prescription_id}/{Path(file_name).name}"
+        )
+        uploaded = self._client.put(
+            pathname,
+            payload,
+            access="private",
+            content_type="application/pdf",
+            overwrite=False,
+            cache_control_max_age=60,
+        )
+        return uploaded.pathname
+
+    def load(self, storage_key: str) -> bytes:
+        result = self._client.get(
+            storage_key,
+            access="private",
+            use_cache=True,
+        )
+        if result is None or result.status_code != 200:
+            raise FileNotFoundError(storage_key)
+        return bytes(result)
+
+    def delete(self, storage_key: str) -> None:
+        self._client.delete(storage_key)
+
+    def exists(self, storage_key: str) -> bool:
+        try:
+            self._client.head(storage_key)
+        except BlobNotFoundError:
+            return False
+        return True
 
 
 def _resolve_storage_root() -> Path:
@@ -85,12 +143,20 @@ def get_prescription_storage() -> PrescriptionStorage:
 
     global _storage_singleton
     if _storage_singleton is None:
-        backend = get_settings().prescription_storage_backend
-        if backend != "local":
+        settings = get_settings()
+        backend = settings.prescription_storage_backend
+        if backend == "local":
+            _storage_singleton = LocalPrescriptionStorage(
+                _resolve_storage_root()
+            )
+        elif backend == "vercel_blob":
+            _storage_singleton = VercelBlobPrescriptionStorage(
+                settings.blob_read_write_token
+            )
+        else:  # pragma: no cover - Settings rejects unsupported literals.
             raise RuntimeError(
                 f"Unsupported prescription storage backend: {backend!r}"
             )
-        _storage_singleton = LocalPrescriptionStorage(_resolve_storage_root())
     return _storage_singleton
 
 
@@ -112,6 +178,7 @@ def reset_prescription_storage_for_tests(
 __all__ = [
     "LocalPrescriptionStorage",
     "PrescriptionStorage",
+    "VercelBlobPrescriptionStorage",
     "get_prescription_storage",
     "reset_prescription_storage_for_tests",
 ]

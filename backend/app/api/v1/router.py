@@ -9,10 +9,8 @@ from app.citizens.routes import auth_router as citizen_auth_router
 from app.citizens.routes import citizen_router
 from app.doctors.routes import doctor_router
 from app.prescriptions.routes import (
-    citizen_prescription_router,
-    doctor_prescription_router,
-    doctor_visits_prescription_router,
-    prescription_pdf_router,
+    prescriptions_router,
+    visits_prescription_router,
 )
 from app.professionals.routes import auth_router as professional_auth_router
 from app.professionals.routes import professional_router
@@ -36,7 +34,5 @@ api_router.include_router(admin_router)
 api_router.include_router(doctor_router)
 api_router.include_router(doctor_visits_router)
 api_router.include_router(citizen_visits_router)
-api_router.include_router(doctor_visits_prescription_router)
-api_router.include_router(doctor_prescription_router)
-api_router.include_router(citizen_prescription_router)
-api_router.include_router(prescription_pdf_router)
+api_router.include_router(visits_prescription_router)
+api_router.include_router(prescriptions_router)

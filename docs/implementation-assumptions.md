@@ -178,7 +178,27 @@ V6 remains authoritative if an assumption ever conflicts with it.
 - Vercel Services and the Vercel Python runtime must be enabled for the account;
   Services is access-controlled while it remains in private beta. Nginx is not
   used because Vercel does not run persistent reverse-proxy processes.
-- Local prescription storage is suitable only for development. Vercel's
-  function filesystem is ephemeral, so Phase 13 prescription PDFs require a
-  durable private object-storage adapter before that workflow is production
-  ready.
+- Local prescription storage is suitable only for development. Production uses
+  a private Vercel Blob store in the Mumbai region through the official Python
+  SDK; the application streams every object through its authorized FastAPI
+  route and never exposes raw Blob URLs or storage keys.
+
+## Phase 13
+
+- The four V6 prescription operations use one canonical route family rather
+  than portal-prefixed duplicates. Portal-specific authorization is resolved by
+  the backend dependency: only the owning citizen or verified author-doctor
+  role registration can read, and only the author doctor can write.
+- A citizen requesting another citizen's prescription receives `404` instead of
+  a revealing ownership error. An authenticated citizen requesting their own
+  record may read its structured data and PDF but receives `403` on PUT.
+- Structured prescription data is the source of truth. If PDF rendering or
+  object upload fails, any stale document pointer is removed and the structured
+  transaction is committed. The author can submit PUT again to regenerate.
+- Production object names include a random version component. The database
+  points to exactly one current object; after a successful pointer commit the
+  replaced object is deleted on a best-effort basis. This prevents readers from
+  receiving a PDF that describes an older structured record.
+- Appointment completion in Phase 14 does not close prescription editing. The
+  verified author doctor's active role registration remains the permanent
+  authorization key, exactly as required by the governing prompt.

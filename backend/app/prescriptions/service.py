@@ -7,6 +7,7 @@ exercised from unit tests without going through FastAPI.
 """
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from dataclasses import dataclass
@@ -46,6 +47,9 @@ from app.professionals.models import (
     ProfessionalRoleRegistration,
 )
 from app.visits.models import MedicalVisit
+
+
+logger = logging.getLogger(__name__)
 
 
 # Service-layer mirror of the PDF forbidden-pattern guard. The PDF
@@ -268,12 +272,17 @@ def _write_pdf(
     repository: PrescriptionsRepository,
     prescription: Prescription,
     view: PrescriptionPdfView,
-) -> PrescriptionDocument:
+) -> tuple[PrescriptionDocument, str | None]:
     payload = generate_prescription_pdf_bytes(view)
-    storage_key = storage.save(
-        prescription.id, "prescription.pdf", payload
-    )
     document = repository.get_document_for_prescription(prescription.id)
+    previous_storage_key = (
+        document.storage_key if document is not None else None
+    )
+    storage_key = storage.save(
+        prescription.id,
+        f"prescription-{uuid.uuid4().hex}.pdf",
+        payload,
+    )
     if document is None:
         document = PrescriptionDocument(
             id=uuid.uuid4(),
@@ -289,7 +298,8 @@ def _write_pdf(
         document.file_name = "prescription.pdf"
         document.content_type = "application/pdf"
         document.file_size_bytes = len(payload)
-    return document
+        document.generated_at = datetime.now(timezone.utc)
+    return document, previous_storage_key
 
 
 def _prescription_view(prescription: Prescription) -> PrescriptionView:
@@ -333,6 +343,89 @@ class PrescriptionsService:
         self._repository = PrescriptionsRepository(db)
         self._storage = storage or get_prescription_storage()
 
+    def _delete_storage_quietly(self, storage_key: str | None) -> None:
+        if not storage_key:
+            return
+        try:
+            self._storage.delete(storage_key)
+        except Exception:  # pragma: no cover - best-effort orphan cleanup.
+            logger.exception(
+                "Could not delete superseded prescription PDF object."
+            )
+
+    def _reload_view(self, prescription_id: uuid.UUID) -> PrescriptionView:
+        self._db.expire_all()
+        prescription = self._repository.get_prescription_by_id(
+            prescription_id
+        )
+        if prescription is None:  # pragma: no cover - invariant protection.
+            raise HealthLinkError(
+                "Prescription could not be reloaded.", status_code=500
+            )
+        return _prescription_view(prescription)
+
+    def _commit_with_best_effort_pdf(
+        self,
+        prescription: Prescription,
+    ) -> PrescriptionView:
+        """Commit structured data even when PDF generation/storage fails.
+
+        A new object is uploaded under a versioned key before the database
+        document pointer is committed. On success the old object is removed.
+        On render/upload failure the stale document row is removed and the
+        structured prescription is still committed, making a later PUT a safe
+        regeneration retry.
+        """
+
+        previous_document = self._repository.get_document_for_prescription(
+            prescription.id
+        )
+        previous_storage_key = (
+            previous_document.storage_key
+            if previous_document is not None
+            else None
+        )
+        new_storage_key: str | None = None
+
+        try:
+            pdf_view = _build_pdf_view(
+                self._db, prescription, list(prescription.items)
+            )
+            document, previous_storage_key = _write_pdf(
+                self._storage,
+                self._repository,
+                prescription,
+                pdf_view,
+            )
+            new_storage_key = document.storage_key
+        except Exception:
+            logger.exception(
+                "Prescription %s was saved without a PDF; regeneration is "
+                "available through the author update flow.",
+                prescription.id,
+            )
+            if previous_document is not None:
+                self._db.delete(previous_document)
+            try:
+                self._db.commit()
+            except Exception:
+                self._db.rollback()
+                self._delete_storage_quietly(new_storage_key)
+                raise
+            self._delete_storage_quietly(previous_storage_key)
+            return self._reload_view(prescription.id)
+
+        try:
+            self._db.commit()
+        except Exception:
+            self._db.rollback()
+            self._delete_storage_quietly(new_storage_key)
+            raise
+
+        if previous_storage_key != new_storage_key:
+            self._delete_storage_quietly(previous_storage_key)
+        return self._reload_view(prescription.id)
+
     # ---- read paths ---------------------------------------------------
 
     def read_for_doctor(
@@ -345,10 +438,9 @@ class PrescriptionsService:
             raise HealthLinkError(
                 "Prescription not found.", status_code=404
             )
-        # Any verified doctor who currently has the patient on the
-        # chamber queue can READ. Author-only applies to writes; a
-        # second verified doctor rotating onto the same appointment
-        # may need to inspect the open prescription.
+        # The route dependency already enforces author-only professional
+        # access. Keep the visit ownership check here as a service-layer
+        # invariant so direct callers cannot cross doctor boundaries.
         visit = self._repository.get_visit_for_prescription(prescription)
         if visit is None:
             raise HealthLinkError(
@@ -413,11 +505,7 @@ class PrescriptionsService:
         )
         self._db.add(prescription)
         self._db.flush()
-        pdf_view = _build_pdf_view(self._db, prescription, list(prescription.items))
-        _write_pdf(self._storage, self._repository, prescription, pdf_view)
-        self._db.commit()
-        self._db.refresh(prescription)
-        return _prescription_view(prescription)
+        return self._commit_with_best_effort_pdf(prescription)
 
     def update(
         self,
@@ -458,11 +546,7 @@ class PrescriptionsService:
         self._repository.replace_items(
             prescription, _materialise_items(payload.items)
         )
-        pdf_view = _build_pdf_view(self._db, prescription, list(prescription.items))
-        _write_pdf(self._storage, self._repository, prescription, pdf_view)
-        self._db.commit()
-        self._db.refresh(prescription)
-        return _prescription_view(prescription)
+        return self._commit_with_best_effort_pdf(prescription)
 
     # ---- pdf streaming ------------------------------------------------
 

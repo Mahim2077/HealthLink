@@ -9,8 +9,8 @@ prescription is bound to a single medical visit (UNIQUE constraint) and
 to the doctor role registration that authored it. Prescriptions remain
 mutable by the author doctor even after the visit is finalized — that
 intentional exception to ordinary finalized-record immutability is what
-allows late-stage medicine edits while the appointment is still open
-(Phase 14 will eventually close that window).
+allows the author doctor to make later corrections. Phase 14 appointment
+closure does not revoke this documented author-only edit permission.
 
 The PDF that represents a prescription is rendered from the structured
 fields by ``app/prescriptions/pdf.py`` and stored in private

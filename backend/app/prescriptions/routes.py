@@ -3,15 +3,17 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
+from fastapi import APIRouter, Depends, Path, Response, status
 from sqlalchemy.orm import Session
 
+from app.appointments.dependencies import (
+    get_current_verified_doctor_for_chamber,
+)
+from app.core.exceptions import HealthLinkError
 from app.db.session import get_db
 from app.prescriptions.dependencies import (
-    CitizenPrescriptionAccess,
-    DoctorPrescriptionAccess,
-    get_citizen_prescription_access,
-    get_doctor_prescription_access,
+    PrescriptionAccess,
+    get_prescription_access,
 )
 from app.prescriptions.schemas import (
     PrescriptionCreateRequest,
@@ -20,175 +22,128 @@ from app.prescriptions.schemas import (
 )
 from app.prescriptions.service import PrescriptionsService
 from app.professionals.dependencies import ProfessionalAuthContext
-from app.appointments.dependencies import (
-    get_current_verified_doctor_for_chamber,
-)
 from app.visits.models import MedicalVisit
 
 
-doctor_visits_prescription_router = APIRouter(
-    prefix="/doctors/me/visits",
-    tags=["doctor-prescriptions"],
+visits_prescription_router = APIRouter(
+    prefix="/visits",
+    tags=["prescriptions"],
 )
 
-
-doctor_prescription_router = APIRouter(
-    prefix="/doctors/me/prescriptions",
-    tags=["doctor-prescriptions"],
-)
-
-
-citizen_prescription_router = APIRouter(
-    prefix="/citizens/me/prescriptions",
-    tags=["citizen-prescriptions"],
-)
-
-
-prescription_pdf_router = APIRouter(
+prescriptions_router = APIRouter(
     prefix="/prescriptions",
     tags=["prescriptions"],
 )
 
 
-def get_doctor_prescription_access_for_visit(
+@visits_prescription_router.post(
+    "/{visit_id}/prescription",
+    response_model=PrescriptionView,
+    status_code=status.HTTP_201_CREATED,
+    summary="Author a chamber prescription for a visit",
+)
+def create_prescription_for_visit(
+    payload: PrescriptionCreateRequest,
     visit_id: Annotated[uuid.UUID, Path(...)],
     context: Annotated[
         ProfessionalAuthContext,
         Depends(get_current_verified_doctor_for_chamber),
     ],
     db: Annotated[Session, Depends(get_db)],
-) -> DoctorPrescriptionAccess:
-    # Doctor-side guard scoped to a visit_id (create path).
+) -> PrescriptionView:
     visit = db.get(MedicalVisit, visit_id)
     if visit is None:
-        raise HTTPException(
-            status_code=404, detail="Medical visit not found."
-        )
+        raise HealthLinkError("Medical visit not found.", status_code=404)
     if visit.doctor_role_registration_id != context.role_registration.id:
-        raise HTTPException(
+        raise HealthLinkError(
+            "Only the verified doctor who owns this visit may author the "
+            "prescription.",
             status_code=403,
-            detail=(
-                "Only the verified doctor who owns this visit may "
-                "author the prescription."
-            ),
         )
-    return DoctorPrescriptionAccess(
-        doctor=context,
-        prescription_id=uuid.uuid4(),
-    )
-
-
-@doctor_visits_prescription_router.post(
-    "/{visit_id}/prescription",
-    response_model=PrescriptionView,
-    status_code=status.HTTP_201_CREATED,
-    summary="Author a chamber prescription for the given visit",
-)
-def create_prescription_for_visit(
-    payload: PrescriptionCreateRequest,
-    visit_id: Annotated[uuid.UUID, Path(...)],
-    access: Annotated[
-        DoctorPrescriptionAccess,
-        Depends(get_doctor_prescription_access_for_visit),
-    ],
-    db: Annotated[Session, Depends(get_db)],
-) -> PrescriptionView:
-    service = PrescriptionsService(db)
-    return service.create_for_visit(
-        doctor_role_registration_id=access.doctor.role_registration.id,
+    return PrescriptionsService(db).create_for_visit(
+        doctor_role_registration_id=context.role_registration.id,
         visit_id=visit_id,
         payload=payload,
     )
 
 
-@doctor_prescription_router.get(
+@prescriptions_router.get(
     "/{prescription_id}",
     response_model=PrescriptionView,
-    summary="Read a prescription authored by the verified doctor",
+    summary="Read a prescription as its citizen or author doctor",
 )
-def get_doctor_prescription(
+def get_prescription(
     access: Annotated[
-        DoctorPrescriptionAccess,
-        Depends(get_doctor_prescription_access),
+        PrescriptionAccess,
+        Depends(get_prescription_access),
     ],
     db: Annotated[Session, Depends(get_db)],
 ) -> PrescriptionView:
     service = PrescriptionsService(db)
+    if access.actor_kind == "citizen":
+        assert access.citizen_profile_id is not None
+        return service.read_for_citizen(
+            access.citizen_profile_id,
+            access.prescription_id,
+        )
+    assert access.doctor_role_registration_id is not None
     return service.read_for_doctor(
-        doctor_role_registration_id=access.doctor.role_registration.id,
-        prescription_id=access.prescription_id,
+        access.doctor_role_registration_id,
+        access.prescription_id,
     )
 
 
-@doctor_prescription_router.put(
+@prescriptions_router.put(
     "/{prescription_id}",
     response_model=PrescriptionView,
-    summary="Edit a prescription authored by the verified doctor",
+    summary="Edit and regenerate a prescription as its author doctor",
 )
-def update_doctor_prescription(
+def update_prescription(
     payload: PrescriptionUpdateRequest,
     access: Annotated[
-        DoctorPrescriptionAccess,
-        Depends(get_doctor_prescription_access),
+        PrescriptionAccess,
+        Depends(get_prescription_access),
     ],
     db: Annotated[Session, Depends(get_db)],
 ) -> PrescriptionView:
-    service = PrescriptionsService(db)
-    return service.update(
-        doctor_role_registration_id=access.doctor.role_registration.id,
+    if (
+        access.actor_kind != "author_doctor"
+        or access.doctor_role_registration_id is None
+    ):
+        raise HealthLinkError(
+            "Citizens cannot edit prescriptions.", status_code=403
+        )
+    return PrescriptionsService(db).update(
+        doctor_role_registration_id=access.doctor_role_registration_id,
         prescription_id=access.prescription_id,
         payload=payload,
     )
 
 
-@citizen_prescription_router.get(
-    "/{prescription_id}",
-    response_model=PrescriptionView,
-    summary="Citizen view of one of their prescriptions",
-)
-def get_citizen_prescription(
-    access: Annotated[
-        CitizenPrescriptionAccess,
-        Depends(get_citizen_prescription_access),
-    ],
-    db: Annotated[Session, Depends(get_db)],
-) -> PrescriptionView:
-    service = PrescriptionsService(db)
-    return service.read_for_citizen(
-        citizen_id=access.citizen.profile.id,
-        prescription_id=access.prescription_id,
-    )
-
-
-@prescription_pdf_router.get(
+@prescriptions_router.get(
     "/{prescription_id}/pdf",
-    summary="Stream the rendered PDF for a prescription",
+    summary="Stream a private prescription PDF after authorization",
     response_class=Response,
 )
 def stream_prescription_pdf(
     access: Annotated[
-        DoctorPrescriptionAccess,
-        Depends(get_doctor_prescription_access),
+        PrescriptionAccess,
+        Depends(get_prescription_access),
     ],
     db: Annotated[Session, Depends(get_db)],
 ) -> Response:
-    service = PrescriptionsService(db)
-    payload, file_name = service.stream_pdf(access.prescription_id)
+    payload, file_name = PrescriptionsService(db).stream_pdf(
+        access.prescription_id
+    )
     return Response(
         content=payload,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": (
-                "inline; filename=\"" + file_name + "\""
-            ),
+            "Content-Disposition": f'inline; filename="{file_name}"',
             "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
         },
     )
 
 
-__all__ = [
-    "citizen_prescription_router",
-    "doctor_prescription_router",
-    "doctor_visits_prescription_router",
-    "prescription_pdf_router",
-]
+__all__ = ["prescriptions_router", "visits_prescription_router"]
