@@ -34,9 +34,9 @@ merges their routes behind the same project domain according to the root
 - The owner explicitly authorized a direct bootstrap deployment of the current
   worktree. Deployment `dpl_3EGupRwXyCFYHNcij6ArrEMz6GJJ` is live at
   `https://healthlink-sd.vercel.app`.
-- Phase 13 now includes its frontend and private production Blob adapter. Its
-  completion tag remains gated on the next GitHub Actions deployment and
-  stable-domain prescription/PDF verification.
+- Phase 13 includes its frontend and private production Blob adapter. Commit
+  `ea07255` passed GitHub Actions run 8 and deployed through the documented
+  pipeline. The stable-domain prescription/PDF production verification passed.
 - The local CI gates are green: 195 backend tests pass (33 PostgreSQL-only
   tests skip without their dedicated test URL), all 169 frontend tests pass,
   lint/type-check/build pass, and `alembic check` reports no metadata drift.
@@ -72,11 +72,11 @@ At the time this deployment snapshot was prepared:
 
 The workflow deliberately retains every quality gate. The first production
 snapshot was released directly through Vercel CLI only because the owner
-explicitly requested a bootstrap deployment. Continuous deployment publishes
-the verified commit, but Phase 13 should be tagged complete only after its
-stable-domain prescription/PDF flow succeeds. Do not downgrade or rewrite the
-existing database; database state and deployed source migration history must
-remain aligned.
+explicitly requested a bootstrap deployment. Continuous deployment now
+publishes verified `main` commits; Phase 13's GitHub Actions deployment and
+stable-domain prescription/PDF flow both passed. Do not downgrade or rewrite
+the existing database; database state and deployed source migration history
+must remain aligned.
 
 ## 2. Obtain Vercel Services access
 
@@ -241,10 +241,9 @@ integration, disable automatic production deployments or disconnect the Git
 integration. Otherwise one push may produce both a Vercel-managed deployment
 and a GitHub-Actions-managed deployment.
 
-## 8. Commit safely from the current dirty worktree
+## 8. Commit safely
 
-The worktree contains unrelated Phase 13 draft files. Do not use `git add .`.
-Review and stage deployment files explicitly:
+Review the worktree and stage only the files intended for the current phase:
 
 ```powershell
 git status --short
@@ -392,9 +391,11 @@ enabled in the URL, and place the Vercel function region near the database.
 
 ### Prescription PDF disappears
 
-This is expected with the current local-storage adapter on an ephemeral Vercel
-filesystem. Implement the documented durable private object-storage adapter
-before treating prescription PDF delivery as production-ready.
+Confirm production still has `PRESCRIPTION_STORAGE_BACKEND=vercel_blob` and a
+valid `BLOB_READ_WRITE_TOKEN`. The local-storage adapter is development-only
+and must never be selected on Vercel's ephemeral filesystem. Check the private
+`healthlink-prescriptions` store and function logs without exposing storage
+tokens or raw object keys.
 
 ### Local Windows `vercel build` reports a missing lambda
 

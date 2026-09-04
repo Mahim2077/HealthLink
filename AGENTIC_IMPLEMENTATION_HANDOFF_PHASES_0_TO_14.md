@@ -3,11 +3,12 @@
 Last updated: 2026-09-04 (Asia/Dhaka)
 Repository: `D:\HealthLink_V_1`
 Branch: `main`
-Last committed Phase checkpoint before this deployment snapshot:
-`9da7b60 (tag: phase-12-complete) feat(phase-12): visits and consultations frontend`.
+Phase 13 implementation commit:
+`ea07255 feat(phase-13): complete prescriptions and private PDFs`.
+The `phase-13-complete` tag identifies the documentation checkpoint containing
+this handoff.
 
-Current working checkpoint: Phase 13 implementation is complete and awaits its
-GitHub Actions production verification before the `phase-13-complete` tag. The
+Current working checkpoint: Phase 13 is complete. The
 canonical structured prescription API, citizen/author-role authorization,
 failure-safe PDF regeneration, dynamic doctor form, citizen read-only detail,
 and private Vercel Blob adapter are implemented. The full backend suite passes
@@ -16,9 +17,12 @@ all 169 frontend tests pass, frontend lint/type-check/build pass, the configured
 Supabase schema is at `0023_prescription_documents`, and `alembic check` reports
 no metadata drift. A real local browser flow against Supabase passed two-item
 create, authenticated PDF preview, author edit/regeneration, and wrong-portal
-denial; its synthetic fixture was removed. The production project now has a
-private Blob store and selects `vercel_blob`. Phase 14 has not started. This
-handoff does not replace the three governing documents.
+denial; its synthetic fixture was removed. GitHub Actions run 8 deployed
+`ea07255`, the stable production root and health endpoint returned HTTP 200,
+and a live stable-domain production probe passed professional create/read/edit,
+citizen read/edit denial, Supabase persistence, and private Vercel Blob PDF
+delivery. Its exact synthetic rows and Blob object were removed. Phase 14 has
+not started. This handoff does not replace the three governing documents.
 
 Before changing the repository, read all three files completely in this exact
 priority order:
@@ -73,23 +77,20 @@ There are 15 requested phases numbered 0 through 14.
 
 | State | Count | Phases |
 | --- | ---: | --- |
-| Fully implemented, verified, documented, committed | 13 | 0–12 |
-| Backend implemented and locally verified; frontend/browser gate pending | 1 | 13 |
+| Fully implemented, verified, documented, committed | 14 | 0–13 |
 | Not started | 1 | 14 |
 
-Therefore, two phase gates remain: finish the Phase 13 vertical slice, then
-implement and verify Phase 14. Stop after Phase 14.
+Therefore, one phase gate remains: implement and verify Phase 14, then stop.
 
-### Superseding current snapshot (2026-09-02)
+### Superseding current snapshot (2026-09-04)
 
-- Phase 12 is the latest completed phase checkpoint at `9da7b60` and tag
-  `phase-12-complete`.
-- Phase 13 backend work is present: prescription header/items/document schema,
-  author-doctor and citizen ownership guards, structured CRUD, PDF rendering,
-  and private local storage.
-- Phase 13 is **not complete**: there is no prescription frontend flow or live
-  browser verification, and the local PDF adapter is not durable on Vercel's
-  ephemeral filesystem. Do not create a `phase-13-complete` tag yet.
+- Phase 13 is complete: canonical structured CRUD, author/citizen ownership,
+  failure-safe private PDF generation, dynamic/read-only frontend flows, local
+  browser verification, GitHub Actions deployment, and a stable-domain
+  Supabase/Vercel Blob production probe all passed.
+- `ea07255` is the deployed Phase 13 implementation commit. The
+  `phase-13-complete` tag points to the documentation checkpoint containing
+  this superseding snapshot.
 - Phase 14 finish-appointment/automatic-next-serial work has not started.
 - Deployment infrastructure is present for a single Vercel Services project:
   GitHub Actions runs PostgreSQL migrations and backend/frontend quality gates,
@@ -117,12 +118,14 @@ bdb2f70 (tag: phase-9-complete) Phase 9 frontend: citizen doctor search, doctor 
 cf9cee5 (tag: phase-11-backend) feat(phase-11): chamber session + serial queue backend
 39590fa (tag: phase-11-complete) feat(phase-11): chamber queue frontend + dashboard link + docs evidence
 3109dee (tag: phase-12-backend) feat(phase-12): visits and prescriptions backend
-9da7b60 (tag: phase-12-complete) feat(phase-12): visits and consultations frontend   ← HEAD before this snapshot
+9da7b60 (tag: phase-12-complete) feat(phase-12): visits and consultations frontend
+ea07255  feat(phase-13): complete prescriptions and private PDFs
+phase-13-complete  tag on the documentation checkpoint containing this handoff
 ```
 
-The worktree based on `9da7b60` contains intentional Phase 13 backend and
-deployment work. Do not discard or reset it. Finish Phase 13 before starting
-Phase 14.
+Begin Phase 14 from the `phase-13-complete` checkpoint. Preserve all Phase 13
+storage, authorization, and permanent author-edit behavior while implementing
+the finish-appointment transaction.
 
 ## Completed phase summary
 
@@ -625,6 +628,10 @@ The phases below have not started.
 - Structured prescription service/routes, private storage abstraction, PDF
   generation, authorization, explicit failure/retry/regeneration behavior, and
   author-role edit enforcement.
+- Dynamic professional authoring and citizen read-only pages are complete.
+  Local browser verification and the stable-domain Supabase/private-Blob
+  production flow passed; GitHub Actions run 8 deployed implementation commit
+  `ea07255` successfully.
 - Do not pull Phase 20 audit infrastructure forward; only use audit support that
   actually exists.
 

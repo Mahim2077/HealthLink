@@ -20,7 +20,7 @@ apply to that phase have passed.
 | 10 | Appointment Booking and MAX Serial Assignment | Completed |
 | 11 | Doctor Daily Chamber Session and Serial Queue | Completed |
 | 12 | Current Patient Clinical Access and Consultation Workspace | Completed |
-| 13 | Chamber Prescription Form and Electronic PDF | Implementation complete; production verification pending |
+| 13 | Chamber Prescription Form and Electronic PDF | Completed |
 | 14 | Finish Appointment and Automatic Next Serial | Not started |
 
 Phase 15 and later are explicitly outside the current implementation boundary.
@@ -286,38 +286,34 @@ Phase 15 and later are explicitly outside the current implementation boundary.
 
 - Database: no new migration was required. Phase 8 only reads and updates the
   users, user_national_identifiers, citizen_profiles, citizen_identifiers,
-  and dmin_action_logs tables introduced by Phases 1�5. The remote
+  and admin_action_logs tables introduced by Phases 1–5. The remote
   PostgreSQL 17 instance (Supabase transaction pooler) was kept at head
-   014_auth_active_role with lembic check reporting no ungenerated
+  0014_auth_active_role with alembic check reporting no ungenerated
   operations.
-- Backend: a new admins sub-package (pp/admins/identity_*) introduces the
+- Backend: a new admins sub-package (app/admins/identity_*) introduces the
   three documented Phase 8 endpoints:
   GET /api/v1/admin/citizen-identities/search,
   GET /api/v1/admin/citizen-identities/{user_id}, and
   POST /api/v1/admin/citizen-identities/{user_id}/correct. The search query
   accepts q, 
-id_number, irth_certificate_number, email, user_id,
-  and limit (1�100); the correction request is constrained to
-  correction_type of NID or BCN with 
-ew_value (3�64 chars) and a
-  mandatory 
-eason (5�500 chars). The service re-checks uniqueness against
+nid_number, birth_certificate_number, email, user_id,
+  and limit (1–100); the correction request is constrained to
+  correction_type of NID or BCN with new_value (3–64 chars) and a
+  mandatory reason (5–500 chars). The service re-checks uniqueness against
   the live registry (including cross-citizen collisions for both the NID and
-  the BCN) and writes a row to dmin_action_logs whose ction_type is
+  the BCN) and writes a row to admin_action_logs whose action_type is
   CITIZEN_IDENTITY_CORRECT_NID or CITIZEN_IDENTITY_CORRECT_BCN and whose
-  
-esource_id is the corrected citizen. The AdminAccount.role is asserted
-  to be SUPER_ADMIN via 
-equire_super_admin, so non-super-admin operators
+  resource_id is the corrected citizen. The AdminAccount.role is asserted
+  to be SUPER_ADMIN via require_super_admin, so non-super-admin operators
   cannot mutate identity rows even if their access token is otherwise valid.
 - Backend automated tests: 124 SQLite tests passed (the full
-  	ests/test_admin_identity_support.py coverage plus the prior admin and
+  tests/test_admin_identity_support.py coverage plus the prior admin and
   auth suites). 5 PostgreSQL-specific tests in
-  	ests/test_admin_identity_support_postgresql.py passed against the live
+  tests/test_admin_identity_support_postgresql.py passed against the live
   Supabase database, asserting the unique constraint on
   user_national_identifiers.nid_number, the unique constraint on
   citizen_identifiers.birth_certificate_number, the foreign key from
-  dmin_action_logs.admin_user_id to users.id, the live
+  admin_action_logs.admin_user_id to users.id, the live
   POST /api/v1/admin/citizen-identities/{user_id}/correct writing the audit
   log row with the corrected resource pointer, and the service-layer conflict
   detection against an existing citizen's NID. The two known
@@ -333,10 +329,10 @@ equire_super_admin, so non-super-admin operators
   correction type toggle, submit + refresh, required reason, retry on load
   error). The production build emitted the new
   /admin/citizen-identities and /admin/citizen-identities/[user_id]
-  routes alongside the Phase 5�7 admin routes, taking the static route count
+  routes alongside the Phase 5–7 admin routes, taking the static route count
   from 15 to 17. The admin dashboard now links to the new search page.
 - Implementation deviations: the support component renders a separate
-  ormError state alongside the search error state so the "Provide at
+  FormError state alongside the search error state so the "Provide at
   least one filter" validation message is not duplicated by the search error
   banner.
 
@@ -346,11 +342,11 @@ equire_super_admin, so non-super-admin operators
   users, user_national_identifiers, healthcare_professional_profiles,
   professional_role_registrations, doctor_registration_details,
   healthcare_facilities, and new doctor_practice_schedules tables introduced
-  by Phases 4�6 and the live Supabase PostgreSQL 17 instance remained at head
-   14_auth_active_role with lembic check reporting no ungenerated
+  by Phases 4–6 and the live Supabase PostgreSQL 17 instance remained at head
+  0014_auth_active_role with alembic check reporting no ungenerated
   operations.
 - Backend: a new doctors sub-package exposes the six documented Phase 9
-  endpoints � GET /api/v1/citizens/doctors/search, GET /api/v1/citizens/doctors/{doctor_user_id},
+  endpoints — GET /api/v1/citizens/doctors/search, GET /api/v1/citizens/doctors/{doctor_user_id},
   GET /api/v1/doctors/me/practice-schedule, POST /api/v1/doctors/me/practice-schedule,
   PATCH /api/v1/doctors/me/practice-schedule/{schedule_id}, and
   DELETE /api/v1/doctors/me/practice-schedule/{schedule_id}. The admin search
@@ -360,13 +356,13 @@ equire_super_admin, so non-super-admin operators
   the repository's UPDATE/DELETE on doctor_practice_schedules with
   status = ACTIVE and the soft-delete invariant.
 - Backend automated tests: 161 passed against the live local PostgreSQL 17
-  instance (port 55432) including the new 	ests/test_doctor_search_postgresql.py
+  instance (port 55432) including the new tests/test_doctor_search_postgresql.py
   (full HTTP citizen search by name/facility/weekday, doctor profile +
   practice-days retrieval, NID and BMDC leak guards, check-constraint enforcement
-  on max_patients_positive, end_after_start, alid_weekday, alid_status,
+  on max_patients_positive, end_after_start, valid_weekday, valid_status,
   FK RESTRICT on doctor user and facility deletion, and admin route reuse); the
-  7 SQLite 	ests/test_doctor_search.py tests; and the 5 SQLite
-  	ests/test_practice_schedule.py tests covering unauthenticated rejection,
+  7 SQLite tests/test_doctor_search.py tests; and the 5 SQLite
+  tests/test_practice_schedule.py tests covering unauthenticated rejection,
   non-doctor rejection, full CRUD flow, cross-doctor isolation, and inactive
   facility rejection.
 - Frontend quality gates: passed. ESLint clean (exit 0); `tsc --noEmit` exit 0;
@@ -572,7 +568,7 @@ equire_super_admin, so non-super-admin operators
   scheduling (matching the rest of the backend suite) while leaving the
   assertion on the backend's "today" filter intact.
 
-## Phase 13 verification evidence (pre-production checkpoint)
+## Phase 13 verification evidence
 
 - Database and migrations: the sequential revisions `0021_prescriptions`,
   `0022_prescription_items`, and `0023_prescription_documents` remain the
@@ -608,8 +604,15 @@ equire_super_admin, so non-super-admin operators
   route rejected the active professional portal. Backend logs recorded
   successful canonical POST, PDF GET, and PUT calls. The fixture and PDF were
   removed afterward.
-- Production checkpoint: the private `healthlink-prescriptions` Blob store is
-  linked to `healthlink-sd` in Mumbai (`bom1`), production has
-  `BLOB_READ_WRITE_TOKEN`, and `PRESCRIPTION_STORAGE_BACKEND=vercel_blob`.
-  Phase 13 remains pending until the pushed GitHub Actions deployment and
-  stable-domain PDF verification pass.
+- Production deployment: commit `ea07255` passed GitHub Actions HealthLink
+  CI/CD run 8, including the complete backend/frontend gates, production
+  migration, prebuilt Vercel Services deployment, and root/health smoke tests.
+  The stable `https://healthlink-sd.vercel.app/` root and `/health` both
+  returned HTTP 200 after deployment.
+- Live production flow: an isolated synthetic visit exercised professional
+  login, two-item prescription creation, author read/update, protected PDF
+  delivery, citizen read/PDF delivery, and citizen edit denial through the
+  stable domain. The structured record persisted in Supabase and the PDF was
+  confirmed in the private `healthlink-prescriptions` Vercel Blob store. The
+  exact synthetic rows, auth sessions, and Blob object were removed afterward;
+  the dedicated store returned to zero objects.
