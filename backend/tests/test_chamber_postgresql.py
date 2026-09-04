@@ -7,7 +7,7 @@ from datetime import date, datetime, time, timezone
 from threading import Barrier
 
 import pytest
-from sqlalchemy import and_, delete, func, select
+from sqlalchemy import and_, delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
@@ -649,22 +649,27 @@ def test_postgresql_concurrent_finish_is_idempotent_and_advances_once() -> None:
         frontend_url="http://localhost:3000",
         jwt_secret_key="phase-14-concurrency-secret-at-least-32-characters",
     )
-    barrier = Barrier(2)
+    barrier = Barrier(2, timeout=15)
     outcomes: list[tuple[bool, int | str]] = []
 
     def _finish() -> None:
-        with Session(engine, expire_on_commit=False) as session:
-            registration = session.get(
-                ProfessionalRoleRegistration,
-                registration_id,
-            )
-            assert registration is not None
-            context = ProfessionalAuthContext(
-                auth=None,  # type: ignore[arg-type] - service uses role only.
-                role_registration=registration,
-            )
-            try:
-                barrier.wait()
+        try:
+            # Synchronize before either worker opens a transaction. A bounded
+            # barrier plus database-side timeouts makes a CI regression fail
+            # diagnostically instead of leaving the runner blocked forever.
+            barrier.wait()
+            with Session(engine, expire_on_commit=False) as session:
+                session.execute(text("SET LOCAL lock_timeout = '10s'"))
+                session.execute(text("SET LOCAL statement_timeout = '30s'"))
+                registration = session.get(
+                    ProfessionalRoleRegistration,
+                    registration_id,
+                )
+                assert registration is not None
+                context = ProfessionalAuthContext(
+                    auth=None,  # type: ignore[arg-type] - service uses role only.
+                    role_registration=registration,
+                )
                 response = AppointmentService(
                     session,
                     settings,
@@ -677,15 +682,14 @@ def test_postgresql_concurrent_finish_is_idempotent_and_advances_once() -> None:
                         else "none",
                     )
                 )
-            except Exception as error:  # pragma: no cover - assertion reports.
-                session.rollback()
-                outcomes.append((False, repr(error)))
+        except Exception as error:  # pragma: no cover - assertion reports.
+            outcomes.append((False, repr(error)))
 
     try:
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = [executor.submit(_finish) for _ in range(2)]
             for future in futures:
-                future.result()
+                future.result(timeout=45)
 
         assert len(outcomes) == 2
         assert all(outcome == (True, 2) for outcome in outcomes), outcomes
