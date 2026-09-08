@@ -1,4 +1,5 @@
 "use client";
+import { PasswordInput } from "@/components/ui/password-input";
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
@@ -46,7 +47,7 @@ export function AdminLoginForm({
         <h2 className="mt-2 text-2xl font-bold text-slate-950">Welcome back</h2>
         <form className="mt-7 space-y-5" onSubmit={submit}>
           <FormField htmlFor="admin-email" label="Email address" required><input autoComplete="email" className={citizenInputClassName} disabled={submitting} id="admin-email" maxLength={320} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} /></FormField>
-          <FormField htmlFor="admin-password" label="Password" required><input autoComplete="current-password" className={citizenInputClassName} disabled={submitting} id="admin-password" maxLength={128} onChange={(event) => setPassword(event.target.value)} required type="password" value={password} /></FormField>
+          <FormField htmlFor="admin-password" label="Password" required><PasswordInput autoComplete="current-password" className={citizenInputClassName} disabled={submitting} id="admin-password" maxLength={128} onChange={(event) => setPassword(event.target.value)} required value={password} /></FormField>
           {error ? <StatusAlert message={error} /> : null}
           <button className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-indigo-700 px-6 text-sm font-bold text-white hover:bg-indigo-800 disabled:cursor-wait disabled:opacity-60" disabled={submitting} type="submit">{submitting ? "Signing in…" : "Sign in to Admin Portal"}</button>
         </form>

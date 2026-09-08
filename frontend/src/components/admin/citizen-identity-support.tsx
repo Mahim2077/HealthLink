@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 
 import { AdminPortalGuard } from "@/components/admin/admin-portal-guard";
 import { AdminSectionHeader } from "@/components/admin/admin-section-header";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import { searchCitizenIdentities } from "@/lib/admin/api";
 import type { CitizenIdentitySummary } from "@/lib/admin/types";
-import { citizenErrorMessage } from "@/lib/citizen/presentation";
+import { citizenErrorMessage, maskIdentityValue } from "@/lib/citizen/presentation";
 
 
 function asDateTime(value: string | null): string {
@@ -17,6 +17,13 @@ function asDateTime(value: string | null): string {
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
 }
+
+type IdentityFilters = {
+  nid_number?: string;
+  birth_certificate_number?: string;
+  email?: string;
+  user_id?: string;
+};
 
 function CitizenIdentitySupportContent() {
   const [nidNumber, setNidNumber] = useState("");
@@ -27,14 +34,11 @@ function CitizenIdentitySupportContent() {
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [lastFilters, setLastFilters] = useState<IdentityFilters | null>(null);
 
   const search = useCallback(
-    async (filters: {
-      nid_number?: string;
-      birth_certificate_number?: string;
-      email?: string;
-      user_id?: string;
-    }) => {
+    async (filters: IdentityFilters) => {
+      setRows(null);
       try {
         const result = await searchCitizenIdentities({ ...filters, limit: 50 });
         setError(null);
@@ -46,24 +50,6 @@ function CitizenIdentitySupportContent() {
     },
     [],
   );
-
-  useEffect(() => {
-    let active = true;
-    void searchCitizenIdentities({ limit: 50 }).then((result) => {
-      if (!active) return;
-      setError(null);
-      setRows(result);
-      setSubmitted(true);
-    }).catch((reason) => {
-      if (!active) return;
-      setError(citizenErrorMessage(reason, "We could not search citizen identities."));
-      setRows([]);
-      setSubmitted(true);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -79,6 +65,7 @@ function CitizenIdentitySupportContent() {
     }
     setFormError(null);
     setSubmitted(true);
+    setLastFilters(trimmed);
     void search(trimmed);
   };
 
@@ -90,7 +77,8 @@ function CitizenIdentitySupportContent() {
     setError(null);
     setFormError(null);
     setSubmitted(false);
-    void search({});
+    setLastFilters(null);
+    setRows(null);
   };
 
   return (
@@ -134,7 +122,7 @@ function CitizenIdentitySupportContent() {
               />
             </label>
             <label className="text-sm font-bold text-slate-700">
-              User ID (UUID)
+              Account reference (UUID)
               <input
                 className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"
                 maxLength={64}
@@ -165,8 +153,8 @@ function CitizenIdentitySupportContent() {
           </form>
         </section>
         <section aria-label="Identity search results" className="space-y-4">
-          {!submitted && rows === null ? (
-            <LoadingState description="Preparing the search workspace." label="Loading identity search" />
+          {!submitted ? (
+            <EmptyState message="Use one or more identifiers to search. Results stay hidden until you submit the form." title="Search when you are ready" />
           ) : null}
           {submitted && rows === null && !error ? (
             <LoadingState description="Searching the trusted citizen identity registry." label="Searching identities" />
@@ -176,7 +164,7 @@ function CitizenIdentitySupportContent() {
               message={error}
               onAction={() => {
                 setError(null);
-                void search({});
+                if (lastFilters) void search(lastFilters);
               }}
               title="Identity search unavailable"
             />
@@ -217,7 +205,7 @@ function CitizenIdentitySupportContent() {
                       <div>
                         <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">NID</dt>
                         <dd className="mt-1 break-words text-sm font-semibold text-slate-900">
-                          {row.nid_number ?? "Not recorded"}
+                          {row.nid_number ? maskIdentityValue(row.nid_number) : "Not recorded"}
                         </dd>
                       </div>
                       <div>
@@ -225,7 +213,7 @@ function CitizenIdentitySupportContent() {
                           Birth Certificate Number
                         </dt>
                         <dd className="mt-1 break-words text-sm font-semibold text-slate-900">
-                          {row.birth_certificate_number ?? "Not recorded"}
+                          {row.birth_certificate_number ? maskIdentityValue(row.birth_certificate_number) : "Not recorded"}
                         </dd>
                       </div>
                       <div>

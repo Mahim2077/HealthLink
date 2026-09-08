@@ -7,6 +7,8 @@
 // apiClient.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useUnsavedChanges } from "@/components/ui/use-unsaved-changes";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import {
@@ -56,6 +58,10 @@ export function ConsultationWorkspace({
   const [version, setVersion] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [finishNotice, setFinishNotice] = useState<string | null>(null);
+  const [notesDirty, setNotesDirty] = useState(false);
+  const [prescriptionState, setPrescriptionState] = useState({ dirty: false, saving: false });
+  const unsafeToFinish = notesDirty || prescriptionState.dirty || prescriptionState.saving;
+  useUnsavedChanges(notesDirty || pending !== null);
 
   const refresh = useCallback(async () => {
     setState({ kind: "loading" });
@@ -128,15 +134,20 @@ export function ConsultationWorkspace({
   );
 
   const onFinish = useCallback(async () => {
-    if (!current || !visit || finalized) return;
+    if (!current || !visit || finalized || unsafeToFinish || pending !== null) return;
     setPending("finish");
     setActionError(null);
     setFinishNotice(null);
+    let completed = false;
     try {
       const result = await visitsDeps.finishAppointment(
         current.appointment_id,
       );
+      completed = true;
+      setState({ kind: "loading" });
       const next = await visitsDeps.loadCurrentPatient();
+      setNotesDirty(false);
+      setPrescriptionState({ dirty: false, saving: false });
       setState({ kind: "ready", current: next });
       setFinishNotice(
         result.next_current
@@ -144,6 +155,9 @@ export function ConsultationWorkspace({
           : "Appointment completed. No patients are waiting.",
       );
     } catch (reason) {
+      if (completed) {
+        setState({ kind: "error", message: "The appointment was completed, but the next patient could not be loaded. Refresh the workspace to continue safely." });
+      }
       setActionError(
         reason instanceof Error
           ? reason.message
@@ -152,7 +166,7 @@ export function ConsultationWorkspace({
     } finally {
       setPending(null);
     }
-  }, [current, finalized, visit, visitsDeps]);
+  }, [current, finalized, visit, visitsDeps, unsafeToFinish, pending]);
 
   const patientName = useMemo(() => {
     if (!current) return null;
@@ -190,6 +204,7 @@ export function ConsultationWorkspace({
         <EmptyState
           title="No active patient"
           message="Call the next patient from the chamber queue to begin a consultation."
+          action={<Link className="inline-flex min-h-11 items-center rounded-xl bg-sky-700 px-5 font-bold text-white" href="/professional/chamber">Open chamber queue</Link>}
         />
       </div>
     );
@@ -256,6 +271,7 @@ export function ConsultationWorkspace({
           finalized={finalized}
           pending={pending}
           onSave={onSave}
+          onDirtyChange={setNotesDirty}
         />
       </div>
       {visit ? (
@@ -266,6 +282,8 @@ export function ConsultationWorkspace({
             key={`${visit.id}-${visit.prescription_id ?? "new"}`}
             prescriptionId={visit.prescription_id}
             visitId={visit.id}
+            disabled={pending !== null}
+            onEditStateChange={setPrescriptionState}
           />
           {!finalized ? (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:flex sm:items-center sm:justify-between sm:gap-6">
@@ -277,11 +295,12 @@ export function ConsultationWorkspace({
                   Finishing finalizes this visit and calls the next waiting
                   serial. A prescription is optional.
                 </p>
+                {unsafeToFinish ? <p role="status" className="mt-2 font-semibold text-amber-900">Save your clinical notes and prescription changes before finishing. Wait for all saves to complete.</p> : null}
               </div>
               <button
                 type="button"
                 onClick={onFinish}
-                disabled={pending !== null}
+                disabled={pending !== null || unsafeToFinish}
                 className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-5 text-sm font-bold text-white disabled:opacity-60 sm:mt-0"
               >
                 {pending === "finish" ? "Finishing…" : "Finish Appointment"}
@@ -339,11 +358,13 @@ function DraftForm({
   finalized,
   pending,
   onSave,
+  onDirtyChange,
 }: {
   visit: VisitDraftView | null;
   finalized: boolean;
   pending: ActionKey | null;
   onSave: (payload: VisitDraftUpdateRequest) => Promise<void>;
+  onDirtyChange: (dirty: boolean) => void;
 }) {
   const [chiefComplaint, setChiefComplaint] = useState<string>(
     visit?.chief_complaint ?? "",
@@ -355,6 +376,8 @@ function DraftForm({
   const [followUp, setFollowUp] = useState<string>(
     visit?.follow_up_instructions ?? "",
   );
+  const dirty = chiefComplaint !== (visit?.chief_complaint ?? "") || clinicalNotes !== (visit?.clinical_notes ?? "") || diagnosis !== (visit?.diagnosis ?? "") || followUp !== (visit?.follow_up_instructions ?? "");
+  useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
 
   useEffect(() => {
     // The draft form mirrors the latest visit payload; re-syncing local
@@ -387,6 +410,7 @@ function DraftForm({
   return (
     <form
       className="rounded-2xl border border-slate-200 bg-white p-5"
+      onChangeCapture={() => onDirtyChange(true)}
       onSubmit={onSubmit}
     >
       <p className="text-xs font-bold uppercase tracking-[0.15em] text-sky-700">
@@ -395,7 +419,7 @@ function DraftForm({
       <p className="mt-2 text-sm text-slate-600">
         {finalized
           ? "This visit is finalized; further edits are disabled."
-          : "Save drafts often. Finish Appointment finalizes the visit."}
+          : dirty ? "Unsaved changes — save before finishing or leaving." : "All clinical notes saved. Finish Appointment finalizes the visit."}
       </p>
 
       <div className="mt-5 grid gap-4">

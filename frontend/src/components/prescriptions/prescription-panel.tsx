@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useUnsavedChanges } from "@/components/ui/use-unsaved-changes";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import {
@@ -83,11 +84,15 @@ export function PrescriptionPanel({
   prescriptionId,
   editable,
   deps = defaultDeps,
+  disabled = false,
+  onEditStateChange,
 }: {
   visitId?: string;
   prescriptionId?: string | null;
   editable: boolean;
   deps?: PrescriptionDeps;
+  disabled?: boolean;
+  onEditStateChange?: (state: { dirty: boolean; saving: boolean }) => void;
 }) {
   const [loadState, setLoadState] = useState<LoadState>(() =>
     prescriptionId
@@ -98,6 +103,7 @@ export function PrescriptionPanel({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState(false);
+  const pdfVersion = useRef(0);
 
   useEffect(() => {
     if (!prescriptionId) return;
@@ -131,19 +137,20 @@ export function PrescriptionPanel({
 
   const openPdf = useCallback(
     async (prescription: PrescriptionView) => {
+      const version = ++pdfVersion.current;
       setLoadingPdf(true);
       setPdfError(null);
       try {
         const blob = await deps.downloadPdf(prescription.id);
-        setPdfUrl(URL.createObjectURL(blob));
+        if (version === pdfVersion.current) setPdfUrl(URL.createObjectURL(blob));
       } catch (reason) {
-        setPdfError(
+        if (version === pdfVersion.current) setPdfError(
           reason instanceof Error
             ? reason.message
             : "Unable to download prescription PDF",
         );
       } finally {
-        setLoadingPdf(false);
+        if (version === pdfVersion.current) setLoadingPdf(false);
       }
     },
     [deps],
@@ -184,6 +191,10 @@ export function PrescriptionPanel({
     const saved = prescription
       ? await deps.update(prescription.id, payload)
       : await deps.create(visitId as string, payload);
+    pdfVersion.current += 1;
+    setPdfUrl(null);
+    setPdfError(null);
+    setLoadingPdf(false);
     setLoadState({ kind: "ready", prescription: saved });
   };
 
@@ -198,8 +209,7 @@ export function PrescriptionPanel({
             {prescription ? "Structured prescription" : "Create prescription"}
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Medicine rows remain the source of truth. The PDF is regenerated from
-            this structured record after every successful save.
+            {editable ? "Add medicines and instructions, then save. A new PDF is prepared after each update." : "Your doctor's medicines, instructions, and advice. You can download a copy below."}
           </p>
         </div>
         {prescription && editable ? (
@@ -217,6 +227,8 @@ export function PrescriptionPanel({
           key={prescription?.updated_at ?? `new-${visitId}`}
           initialPrescription={prescription}
           onSave={save}
+          disabled={disabled}
+          onEditStateChange={onEditStateChange}
         />
       ) : prescription ? (
         <PrescriptionReadOnly prescription={prescription} />
@@ -277,9 +289,13 @@ export function PrescriptionPanel({
 function PrescriptionForm({
   initialPrescription,
   onSave,
+  disabled,
+  onEditStateChange,
 }: {
   initialPrescription: PrescriptionView | null;
   onSave: (payload: PrescriptionPayload) => Promise<void>;
+  disabled: boolean;
+  onEditStateChange?: (state: { dirty: boolean; saving: boolean }) => void;
 }) {
   const [medicines, setMedicines] = useState<MedicineDraft[]>(() =>
     draftsFromPrescription(initialPrescription),
@@ -293,6 +309,11 @@ function PrescriptionForm({
   const [notes, setNotes] = useState(initialPrescription?.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const currentItems = medicines.map(({ medicine_name, dosage, frequency, duration, instructions }) => ({ medicine_name, dosage, frequency, duration, instructions }));
+  const baselineItems = initialPrescription?.items.map(({ medicine_name, dosage, frequency, duration, instructions }) => ({ medicine_name, dosage, frequency, duration, instructions })) ?? [{ medicine_name: "", dosage: "", frequency: "", duration: "", instructions: null }];
+  const dirty = JSON.stringify(currentItems) !== JSON.stringify(baselineItems) || diagnosticInformation !== (initialPrescription?.diagnostic_information ?? "") || medicalAdvice !== (initialPrescription?.medical_advice ?? "") || notes !== (initialPrescription?.notes ?? "");
+  useUnsavedChanges(dirty || saving);
+  useEffect(() => { onEditStateChange?.({ dirty, saving }); }, [dirty, saving, onEditStateChange]);
 
   const updateMedicine = (
     clientId: string,
@@ -351,8 +372,9 @@ function PrescriptionForm({
   };
 
   return (
-    <form className="mt-6" onSubmit={submit}>
-      <fieldset disabled={saving}>
+    <form className="mt-6" onChangeCapture={() => onEditStateChange?.({ dirty: true, saving })} onSubmit={submit}>
+      <p role="status" className="mb-4 text-sm text-slate-600">{saving ? "Saving prescription…" : dirty ? "Unsaved prescription changes" : initialPrescription ? "Prescription saved" : "No prescription yet. Medicines are optional for this visit."}</p>
+      <fieldset disabled={saving || disabled}>
         <legend className="text-sm font-bold text-slate-900">Medicines</legend>
         <div className="mt-3 space-y-4">
           {medicines.map((medicine, index) => (
@@ -461,7 +483,7 @@ function PrescriptionForm({
       ) : null}
       <button
         className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-teal-700 px-5 text-sm font-bold text-white disabled:opacity-60"
-        disabled={saving}
+        disabled={saving || disabled}
         type="submit"
       >
         {saving

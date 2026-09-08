@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { CitizenShell } from "@/components/citizen/citizen-shell";
 import { usePortalAuth } from "@/components/auth/auth-provider";
 import {
   EmptyState,
@@ -81,7 +80,7 @@ function groupByStatus(
   }
   for (const status of STATUS_ORDER) {
     grouped[status].sort((left, right) =>
-      left.appointment_date.localeCompare(right.appointment_date),
+      status === "BOOKED" ? left.appointment_date.localeCompare(right.appointment_date) : right.appointment_date.localeCompare(left.appointment_date),
     );
   }
   return grouped;
@@ -249,7 +248,7 @@ function AppointmentsContent({
         <Link
           className="inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-bold text-white transition hover:bg-teal-800"
           data-testid="book-appointment-cta"
-          href="/citizen/appointments/book"
+          href="/citizen/doctors/search"
         >
           Book new appointment
         </Link>
@@ -377,11 +376,11 @@ export function AppointmentsView({
   loadAction?: () => Promise<AppointmentListResponse>;
 } = {}) {
   return (
-    <CitizenShell>
+    <>
       <CitizenGuard>
         <AppointmentsContent loadAction={loadAction} />
       </CitizenGuard>
-    </CitizenShell>
+    </>
   );
 }
 

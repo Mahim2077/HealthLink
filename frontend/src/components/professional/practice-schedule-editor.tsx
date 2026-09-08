@@ -232,6 +232,7 @@ export function PracticeScheduleEditor({ deps }: { deps?: Partial<ScheduleEditor
 
   const handleDelete = useCallback(
     async (entry: PracticeScheduleEntry) => {
+      if (!window.confirm(`Remove your ${entry.weekday.toLowerCase()} practice window? Existing appointments will not be cancelled.`)) return;
       setSubmitError(null);
       try {
         await services.deleteRow(entry.id);

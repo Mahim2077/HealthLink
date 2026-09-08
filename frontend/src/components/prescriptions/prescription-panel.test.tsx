@@ -191,4 +191,18 @@ describe("PrescriptionPanel", () => {
       }),
     );
   });
+
+  it("clears and revokes an opened PDF after a prescription update", async () => {
+    const deps = dependencies();
+    vi.mocked(deps.read).mockResolvedValue(prescription());
+    vi.mocked(deps.downloadPdf).mockResolvedValue(new Blob(["%PDF"], { type: "application/pdf" }));
+    vi.mocked(deps.update).mockResolvedValue(prescription({ medical_advice: "Updated advice", updated_at: "2026-08-21T13:00:00Z" }));
+    render(<PrescriptionPanel deps={deps} editable prescriptionId="rx-1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "View / download PDF" }));
+    await screen.findByTitle("Prescription PDF preview");
+    fireEvent.change(screen.getByLabelText("Medical advice"), { target: { value: "Updated advice" } });
+    fireEvent.click(screen.getByRole("button", { name: "Update prescription" }));
+    await waitFor(() => expect(screen.queryByTitle("Prescription PDF preview")).not.toBeInTheDocument());
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:prescription-preview");
+  });
 });

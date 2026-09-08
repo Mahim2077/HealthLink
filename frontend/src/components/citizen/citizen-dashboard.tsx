@@ -196,6 +196,34 @@ function DashboardContent({
         </div>
       ) : null}
 
+      <section className="mt-6 rounded-[1.75rem] border border-slate-200 bg-white/80 p-6 sm:p-7">
+        <div className="flex gap-4">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
+            <svg aria-hidden="true" className="size-6" fill="none" viewBox="0 0 24 24">
+              <path d="M12 7v5l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+            </svg>
+          </span>
+          <div>
+            <h2 className="text-base font-bold text-slate-950">Your citizen account is connected</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              Keep your personal details current and, if you registered with a Birth Certificate, add your NID once.
+            </p>
+            <Link className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-bold text-white hover:bg-teal-800" href="/citizen/profile">
+              Manage profile and identity
+            </Link>
+            <Link className="ml-0 mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-bold text-slate-700 hover:border-slate-400 sm:ml-3" href="/professional/onboard">
+              Add a professional role
+            </Link>
+            <Link className="ml-0 mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-5 text-sm font-bold text-teal-800 hover:border-teal-300 sm:ml-3" href="/citizen/doctors/search">
+              Find a verified doctor
+            </Link>
+            <Link className="ml-0 mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-sky-200 bg-sky-50 px-5 text-sm font-bold text-sky-800 hover:border-sky-300 sm:ml-3" href="/citizen/appointments">
+              Appointments &amp; prescriptions
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <div className="mt-8 grid gap-6 lg:grid-cols-[0.78fr_1.22fr]">
         <section className="rounded-[1.75rem] border border-teal-100 bg-teal-950 p-6 text-white shadow-xl shadow-teal-950/10 sm:p-7">
           <div className="flex items-start justify-between gap-4">
@@ -251,33 +279,7 @@ function DashboardContent({
         </section>
       </div>
 
-      <section className="mt-6 rounded-[1.75rem] border border-slate-200 bg-white/80 p-6 sm:p-7">
-        <div className="flex gap-4">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
-            <svg aria-hidden="true" className="size-6" fill="none" viewBox="0 0 24 24">
-              <path d="M12 7v5l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
-            </svg>
-          </span>
-          <div>
-            <h2 className="text-base font-bold text-slate-950">Your citizen account is connected</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              Keep your personal details current and, if you registered with a Birth Certificate, add your NID once.
-            </p>
-            <Link className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-bold text-white hover:bg-teal-800" href="/citizen/profile">
-              Manage profile and identity
-            </Link>
-            <Link className="ml-0 mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-bold text-slate-700 hover:border-slate-400 sm:ml-3" href="/professional/onboard">
-              Add a professional role
-            </Link>
-            <Link className="ml-0 mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-5 text-sm font-bold text-teal-800 hover:border-teal-300 sm:ml-3" href="/citizen/doctors/search">
-              Find a verified doctor
-            </Link>
-            <Link className="ml-0 mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-sky-200 bg-sky-50 px-5 text-sm font-bold text-sky-800 hover:border-sky-300 sm:ml-3" href="/citizen/appointments">
-              Appointments &amp; prescriptions
-            </Link>
-          </div>
-        </div>
-      </section>
+
     </main>
   );
 }

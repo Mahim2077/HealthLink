@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { CitizenShell } from "@/components/citizen/citizen-shell";
 import { usePortalAuth } from "@/components/auth/auth-provider";
 import {
   EmptyState,
@@ -45,17 +44,6 @@ function formatTime(value: string): string {
   return value;
 }
 
-function asDateTime(value: string | null): string {
-  if (!value) {
-    return "Not recorded";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleString();
-}
-
 function sortPracticeDays(days: PracticeDay[]): PracticeDay[] {
   return [...days].sort((left, right) => {
     const leftIndex = WEEKDAY_ORDER.indexOf(left.weekday);
@@ -95,7 +83,7 @@ function PracticeDayRow({ day }: { day: PracticeDay }) {
               : "bg-slate-200 text-slate-700"
           }`}
         >
-          {day.status}
+          {day.status === "ACTIVE" ? "Accepting appointments" : "Not currently available"}
         </span>
       </div>
     </li>
@@ -196,7 +184,7 @@ function ProfileContent({
                 : "bg-slate-100 text-slate-600"
             }`}
           >
-            {profile.verified ? "VERIFIED" : "UNVERIFIED"}
+            {profile.verified ? "Verified" : "Not verified"}
           </span>
         </div>
         <h1 className="mt-3 font-display text-3xl font-bold tracking-[-0.04em] text-slate-950 sm:text-4xl">
@@ -215,6 +203,7 @@ function ProfileContent({
           </p>
         ) : null}
         <div className="mt-5 flex flex-wrap gap-3">
+          {activeDays.length > 0 ? (
           <Link
             className="inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-bold text-white transition hover:bg-teal-800"
             data-testid="book-appointment-cta"
@@ -224,6 +213,7 @@ function ProfileContent({
           >
             Book appointment
           </Link>
+          ) : <p className="text-sm text-slate-600">Booking is unavailable until this doctor publishes a practice schedule.</p>}
         </div>
       </div>
 
@@ -235,15 +225,7 @@ function ProfileContent({
           <p className="mt-2 break-words text-sm text-slate-700">
             {profile.email}
           </p>
-          <h2 className="mt-6 text-base font-bold uppercase tracking-[0.15em] text-teal-700">
-            Verification
-          </h2>
-          <p className="mt-2 text-sm text-slate-700">
-            Submitted: {asDateTime(profile.submitted_at)}
-          </p>
-          <p className="mt-1 text-sm text-slate-700">
-            Verified at: {asDateTime(profile.verified_at)}
-          </p>
+          <p className="mt-6 text-sm leading-6 text-slate-600">Appointments follow a serial queue during the published practice window. Your serial does not guarantee an exact consultation time.</p>
         </section>
 
         <section className="rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-sm">
@@ -339,10 +321,10 @@ export function DoctorProfileView({
   loadAction?: (id: string) => Promise<DoctorProfile>;
 }) {
   return (
-    <CitizenShell>
+    <>
       <CitizenGuard>
         <ProfileContent doctorUserId={doctorUserId} loadAction={loadAction} />
       </CitizenGuard>
-    </CitizenShell>
+    </>
   );
 }

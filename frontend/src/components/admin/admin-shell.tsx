@@ -1,5 +1,6 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
+import { PortalNavigation } from "@/components/auth/portal-navigation";
 
 import { HealthLinkMark } from "@/components/brand/healthlink-mark";
 
@@ -18,6 +19,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <span className="size-2 rounded-full bg-indigo-500" /> Admin portal
           </div>
         </div>
+        <Suspense fallback={null}><PortalNavigation portal="ADMIN" /></Suspense>
       </header>
       {children}
       <footer className="border-t border-slate-200/80 bg-white/55">

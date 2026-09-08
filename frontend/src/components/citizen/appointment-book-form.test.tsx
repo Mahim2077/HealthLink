@@ -30,13 +30,15 @@ const bookingResponse: AppointmentBookingResponse = {
   },
 };
 
+const doctor = {
+  id: bookingResponse.doctor_user_id,
+  name: "Dr Test",
+  facility_id: bookingResponse.facility_id,
+  facility_name: bookingResponse.facility_name,
+  practice_days: [{ id: "schedule-1", facility_id: bookingResponse.facility_id, facility_name: bookingResponse.facility_name, weekday: "THURSDAY" as const, start_time: "09:00:00", end_time: "12:00:00", max_patients: 20, status: "ACTIVE" as const }],
+};
+
 function fillForm(): void {
-  fireEvent.change(screen.getByTestId("doctor-user-id-input"), {
-    target: { value: "11111111-1111-1111-1111-111111111111" },
-  });
-  fireEvent.change(screen.getByTestId("facility-id-input"), {
-    target: { value: "22222222-2222-2222-2222-222222222222" },
-  });
   fireEvent.change(screen.getByTestId("appointment-date-input"), {
     target: { value: "2099-01-15" },
   });
@@ -51,9 +53,8 @@ describe("AppointmentBookForm", () => {
     const bookAction = vi.fn().mockResolvedValue(bookingResponse);
 
     render(
-      <AppointmentBookForm
+      <AppointmentBookForm doctor={doctor}
         bookAction={bookAction}
-        initialDoctorUserId="11111111-1111-1111-1111-111111111111"
         onBooked={onBooked}
       />,
     );
@@ -73,7 +74,7 @@ describe("AppointmentBookForm", () => {
   it("coerces a whitespace-only reason into a null payload value", async () => {
     const bookAction = vi.fn().mockResolvedValue(bookingResponse);
 
-    render(<AppointmentBookForm bookAction={bookAction} />);
+    render(<AppointmentBookForm doctor={doctor} bookAction={bookAction} />);
     fillForm();
     fireEvent.change(screen.getByTestId("reason-input"), {
       target: { value: "   " },
@@ -86,40 +87,27 @@ describe("AppointmentBookForm", () => {
 
   it("surfaces client-side validation without calling the action", () => {
     const bookAction = vi.fn();
-    render(<AppointmentBookForm bookAction={bookAction} />);
+    render(<AppointmentBookForm doctor={doctor} bookAction={bookAction} />);
 
     fireEvent.click(screen.getByTestId("book-submit"));
 
-    expect(
-      screen.getByTestId("doctor-user-id-error"),
-    ).toHaveTextContent("Doctor is required.");
-    expect(
-      screen.getByTestId("facility-id-error"),
-    ).toHaveTextContent("Facility is required.");
+    expect(screen.queryByTestId("doctor-user-id-input")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("facility-id-input")).not.toBeInTheDocument();
     expect(
       screen.getByTestId("appointment-date-error"),
     ).toHaveTextContent("Appointment date is required.");
     expect(bookAction).not.toHaveBeenCalled();
   });
 
-  it("rejects malformed UUIDs and past dates before submitting", () => {
+  it("rejects past dates before submitting", () => {
     const bookAction = vi.fn();
-    render(<AppointmentBookForm bookAction={bookAction} />);
+    render(<AppointmentBookForm doctor={doctor} bookAction={bookAction} />);
 
-    fireEvent.change(screen.getByTestId("doctor-user-id-input"), {
-      target: { value: "not-a-uuid" },
-    });
-    fireEvent.change(screen.getByTestId("facility-id-input"), {
-      target: { value: "22222222-2222-2222-2222-222222222222" },
-    });
     fireEvent.change(screen.getByTestId("appointment-date-input"), {
       target: { value: "2000-01-01" },
     });
     fireEvent.click(screen.getByTestId("book-submit"));
 
-    expect(
-      screen.getByTestId("doctor-user-id-error"),
-    ).toHaveTextContent(/UUID/);
     expect(
       screen.getByTestId("appointment-date-error"),
     ).toHaveTextContent(/cannot be in the past/);
@@ -131,7 +119,7 @@ describe("AppointmentBookForm", () => {
       .fn()
       .mockRejectedValue(new ApiError(409, "Doctor is not available on that date."));
 
-    render(<AppointmentBookForm bookAction={bookAction} />);
+    render(<AppointmentBookForm doctor={doctor} bookAction={bookAction} />);
     fillForm();
     fireEvent.click(screen.getByTestId("book-submit"));
 

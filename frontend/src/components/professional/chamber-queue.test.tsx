@@ -50,7 +50,7 @@ function buildDeps(
     finishSession: vi.fn().mockResolvedValue({} as never),
     loadSession: vi.fn().mockResolvedValue(null),
     removeEntry: vi.fn().mockResolvedValue({} as never),
-    startSession: vi.fn().mockResolvedValue({} as never),
+    startSession: vi.fn().mockResolvedValue(buildSession({ status: "ACTIVE" })),
   };
   return { deps: { ...spies, ...overrides }, spies };
 }
@@ -58,6 +58,7 @@ function buildDeps(
 describe("ChamberQueue", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -106,6 +107,30 @@ describe("ChamberQueue", () => {
         session_date: expect.any(String),
       });
     });
+    expect(await screen.findByRole("heading", { name: /in progress/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /open today's chamber/i })).not.toBeInTheDocument();
+  });
+
+  it("promotes the top-level call-next response even when next_current is null", async () => {
+    const waiting = baseAppointment({ queue_id: "waiting-7", serial_number: 7 });
+    const { deps } = buildDeps({
+      loadSession: vi.fn().mockResolvedValue(buildSession({ waiting: [waiting] })),
+      callNext: vi.fn().mockResolvedValue({ ...waiting, appointment_status: "BOOKED", queue_status: "CURRENT", became_current_at: "2026-08-10T10:00:00Z", next_current: null }),
+    });
+    render(<ChamberQueue facility_id={baseFacility} chamberDeps={deps} />);
+    fireEvent.click(await screen.findByRole("button", { name: /call next patient/i }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Skip" })).toBeEnabled());
+    expect(screen.getByText("Serial #7", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /call next patient/i })).toBeDisabled();
+    expect(screen.getByText("No patients waiting.")).toBeInTheDocument();
+  });
+
+  it("does not close the chamber when confirmation is cancelled", async () => {
+    vi.mocked(window.confirm).mockReturnValue(false);
+    const { deps } = buildDeps({ loadSession: vi.fn().mockResolvedValue(buildSession({})) });
+    render(<ChamberQueue facility_id={baseFacility} chamberDeps={deps} />);
+    fireEvent.click(await screen.findByRole("button", { name: /close chamber/i }));
+    expect(deps.finishSession).not.toHaveBeenCalled();
   });
 
   it("shows waiting and finished lists plus current actions", async () => {
@@ -155,16 +180,10 @@ describe("ChamberQueue", () => {
       screen.getByRole("link", { name: /open consultation/i }),
     ).toHaveAttribute("href", "/professional/visits");
 
-    // Call-next fires.
-    fireEvent.click(
-      screen.getByRole("button", { name: /call next patient/i }),
-    );
-    await waitFor(() => {
-      expect(spies.callNext).toHaveBeenCalledWith(
-        baseFacility,
-        expect.any(String),
-      );
-    });
+    const callNext = screen.getByRole("button", { name: /call next patient/i });
+    expect(callNext).toBeDisabled();
+    fireEvent.click(callNext);
+    expect(spies.callNext).not.toHaveBeenCalled();
   });
 
   it("fires the skip and no-show actions on the CURRENT patient", async () => {

@@ -4,11 +4,11 @@ import Link from "next/link";
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
 
-import { CitizenShell } from "@/components/citizen/citizen-shell";
 import { usePortalAuth } from "@/components/auth/auth-provider";
 import {
   EmptyState,
@@ -202,15 +202,20 @@ function SearchContent({
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [requestVersion, setRequestVersion] = useState(0);
+  const [appliedFilters, setAppliedFilters] = useState<DoctorSearchFilters>({});
+  const requestId = useRef(0);
 
   const runSearch = useCallback(
     async (activeFilters: DoctorSearchFilters) => {
+      const id = ++requestId.current;
       setSubmitting(true);
       try {
         const rows = await searchAction(activeFilters);
+        if (id !== requestId.current) return;
         setResults(rows);
         setError(null);
       } catch (reason) {
+        if (id !== requestId.current) return;
         setResults([]);
         setError(
           citizenErrorMessage(
@@ -219,7 +224,7 @@ function SearchContent({
           ),
         );
       } finally {
-        setSubmitting(false);
+        if (id === requestId.current) setSubmitting(false);
       }
     },
     [searchAction],
@@ -231,13 +236,13 @@ function SearchContent({
     }
     let active = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void runSearch(filters).then(() => {
+    void runSearch(appliedFilters).then(() => {
       if (active) setSubmitted(true);
     });
     return () => {
       active = false;
     };
-  }, [filters, requestVersion, runSearch]);
+  }, [appliedFilters, requestVersion, runSearch]);
 
   const handleSubmit = () => {
     const trimmedName = filters.name?.trim() ?? "";
@@ -251,10 +256,14 @@ function SearchContent({
     }
     setFormError(null);
     setSubmitted(true);
+    setAppliedFilters({ name: trimmedName || undefined, facility_name: trimmedFacility || undefined, weekday: filters.weekday });
     setRequestVersion((value) => value + 1);
   };
 
   const handleReset = () => {
+    requestId.current += 1;
+    setRequestVersion(0);
+    setSubmitting(false);
     setFilters({});
     setFormError(null);
     setError(null);
@@ -281,8 +290,7 @@ function SearchContent({
           Find a verified doctor
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          Search by doctor name, facility, or the weekday you need an
-          appointment. National IDs and BMDC numbers are never returned.
+          Search by doctor name, facility, or the weekday you need an appointment.
         </p>
       </div>
 
@@ -308,9 +316,9 @@ function SearchContent({
           data-testid="doctor-search-results"
         >
           {!submitted && results === null ? (
-            <LoadingState
-              description="Use the filters to begin a search."
-              label="Ready to search"
+            <EmptyState
+              message="Enter a doctor's name, a facility, or a weekday to get started."
+              title="Find the right care"
             />
           ) : null}
           {submitted && submitting && results === null ? (
@@ -329,7 +337,7 @@ function SearchContent({
               title="Doctor search unavailable"
             />
           ) : null}
-          {submitted && results && results.length === 0 ? (
+          {!error && !submitting && submitted && results && results.length === 0 ? (
             <EmptyState
               message="No verified doctor matched these filters. Try widening your search."
               title="No matches found"
@@ -346,8 +354,8 @@ function SearchContent({
       {results && results.length > 0 ? (
         <p className="mt-6 text-xs text-slate-500">
           Showing {results.length} doctor{results.length === 1 ? "" : "s"}.
-          {filters.weekday
-            ? ` Filtered to weekday ${WEEKDAY_LABEL[filters.weekday]}.`
+          {appliedFilters.weekday
+            ? ` Filtered to weekday ${WEEKDAY_LABEL[appliedFilters.weekday]}.`
             : ""}
         </p>
       ) : null}
@@ -392,7 +400,7 @@ function CitizenGuard({ children }: { children: React.ReactNode }) {
           action={
             <Link
               className="inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-bold text-white"
-              href="/citizen/login"
+              href="/citizen/login?returnTo=%2Fcitizen%2Fdoctors%2Fsearch"
             >
               Sign in to Citizen Portal
             </Link>
@@ -424,10 +432,10 @@ export function DoctorSearch({
   searchAction?: (filters: DoctorSearchFilters) => Promise<DoctorSummary[]>;
 }) {
   return (
-    <CitizenShell>
+    <>
       <CitizenGuard>
         <SearchContent searchAction={searchAction} />
       </CitizenGuard>
-    </CitizenShell>
+    </>
   );
 }

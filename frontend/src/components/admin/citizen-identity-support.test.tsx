@@ -47,27 +47,16 @@ describe("CitizenIdentitySupport", () => {
     mocks.searchCitizenIdentities.mockResolvedValue([baseRow]);
   });
 
-  it("loads the initial workspace and renders a row with a link to the detail page", async () => {
+  it("keeps identity results hidden until an explicit filtered search", () => {
     render(<CitizenIdentitySupport />);
 
-    expect(await screen.findByText("Alice Citizen")).toBeInTheDocument();
-    expect(screen.getByText("alice@example.com")).toBeInTheDocument();
-    expect(screen.getByText("1234567890")).toBeInTheDocument();
-    expect(screen.getByText("ACTIVE")).toBeInTheDocument();
-    expect(screen.getByText("Registered via NID")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open identity" })).toHaveAttribute(
-      "href",
-      "/admin/citizen-identities/11111111-1111-1111-1111-111111111111",
-    );
-    await waitFor(() =>
-      expect(mocks.searchCitizenIdentities).toHaveBeenCalledWith(expect.objectContaining({ limit: 50 })),
-    );
+    expect(screen.getByText("Search when you are ready")).toBeInTheDocument();
+    expect(screen.queryByText("Alice Citizen")).not.toBeInTheDocument();
+    expect(mocks.searchCitizenIdentities).not.toHaveBeenCalled();
   });
 
   it("submits trimmed filters and forwards them to the search api", async () => {
     render(<CitizenIdentitySupport />);
-    await screen.findByText("Alice Citizen");
-
     fireEvent.change(screen.getByLabelText("National ID (NID)"), { target: { value: "  9876543210  " } });
     fireEvent.click(screen.getByRole("button", { name: "Search identities" }));
 
@@ -85,9 +74,6 @@ describe("CitizenIdentitySupport", () => {
   it("rejects an empty filter set without calling the api", async () => {
     mocks.searchCitizenIdentities.mockClear();
     render(<CitizenIdentitySupport />);
-    await screen.findByText("Alice Citizen");
-    mocks.searchCitizenIdentities.mockClear();
-
     fireEvent.click(screen.getByRole("button", { name: "Search identities" }));
 
     expect(
@@ -99,6 +85,8 @@ describe("CitizenIdentitySupport", () => {
   it("surfaces an empty state when no rows match", async () => {
     mocks.searchCitizenIdentities.mockResolvedValue([]);
     render(<CitizenIdentitySupport />);
+    fireEvent.change(screen.getByLabelText("National ID (NID)"), { target: { value: "9876543210" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search identities" }));
 
     expect(await screen.findByText("No matches found")).toBeInTheDocument();
     expect(screen.getByText("No citizen identity matched these filters.")).toBeInTheDocument();
@@ -109,6 +97,8 @@ describe("CitizenIdentitySupport", () => {
       .mockRejectedValueOnce(new Error("boom"))
       .mockResolvedValueOnce([baseRow]);
     render(<CitizenIdentitySupport />);
+    fireEvent.change(screen.getByLabelText("National ID (NID)"), { target: { value: "9876543210" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search identities" }));
 
     expect(await screen.findByText("Identity search unavailable")).toBeInTheDocument();
 

@@ -186,19 +186,19 @@ export default function Home() {
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <a
+              <Link
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-teal-700 px-6 text-sm font-semibold text-white shadow-lg shadow-teal-900/15 transition hover:-translate-y-0.5 hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
-                href="#foundation"
+                href="/citizen/login?returnTo=%2Fcitizen%2Fdoctors%2Fsearch"
               >
-                Explore connected care
+                Find a verified doctor
                 <ArrowIcon />
-              </a>
-              <a
+              </Link>
+              <Link
                 className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-300 bg-white/75 px-6 text-sm font-semibold text-slate-800 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-400 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
-                href="#portals"
+                href="/citizen/login"
               >
-                See the portal model
-              </a>
+                Manage my care
+              </Link>
             </div>
 
             <dl className="mt-10 grid max-w-2xl grid-cols-3 gap-4 border-t border-slate-200/80 pt-7">

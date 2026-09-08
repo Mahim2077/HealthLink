@@ -9,9 +9,9 @@ export default function ProfessionalDashboardPage() {
       mode="dashboard"
       verifiedDoctorSlot={
         <div className="space-y-6">
-          <PracticeScheduleEditor />
           <ChamberDashboardCard />
           <ConsultationsDashboardCard />
+          <PracticeScheduleEditor />
         </div>
       }
     />

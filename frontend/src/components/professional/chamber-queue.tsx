@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { careDate } from "@/lib/care-date";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import {
@@ -58,10 +59,7 @@ type ActionKey =
   | "finish";
 
 function todayISO(): string {
-  // The doctor portal uses local-date for the session date, but the
-  // backend accepts an ISO-8601 date string. We use UTC date to keep
-  // the test deterministic across time zones.
-  return new Date().toISOString().slice(0, 10);
+  return careDate();
 }
 
 function badgeClass(status: QueueStatus): string {
@@ -165,9 +163,9 @@ export function ChamberQueue({
           serial_number: response.serial_number,
           status: response.appointment_status,
         };
-        const nextCurrent = response.next_current;
+        const nextCurrent = response.queue_status === "CURRENT" ? acted : response.next_current;
         const waiting = prev.session.waiting.filter(
-          (row) => row.queue_id !== response.queue_id,
+          (row) => row.queue_id !== response.queue_id && row.queue_id !== nextCurrent?.queue_id,
         );
         const finished =
           response.queue_status === "DONE" ||
@@ -193,21 +191,19 @@ export function ChamberQueue({
   const onStart = () =>
     runAction(
       "start",
-      () =>
-        chamberDeps.startSession({
+      async () => {
+        const session = await chamberDeps.startSession({
           facility_id,
           session_date: sessionDate,
-        }) as Promise<ChamberSessionView>,
-      (response) => {
-        setState({
-          kind: "ready",
-          session: response as unknown as ChamberSessionView,
         });
+        setState({ kind: "ready", session });
       },
     );
 
-  const onFinish = () =>
-    runAction("finish", async () => {
+  const onFinish = () => {
+    const session = state.kind === "ready" ? state.session : null;
+    if (!window.confirm(`Close today's chamber? ${session?.waiting.length ?? 0} patients are waiting${session?.current ? " and one patient is with the doctor" : ""}. You will not be able to continue consultations in this session.`)) return;
+    return runAction("finish", async () => {
       const response = await chamberDeps.finishSession(
         facility_id,
         sessionDate,
@@ -225,6 +221,7 @@ export function ChamberQueue({
       });
       return response;
     });
+  };
 
   const onCallNext = () =>
     runAction(
@@ -233,26 +230,34 @@ export function ChamberQueue({
       applyQueueAction,
     );
 
-  const onSkip = (queue_id: string) =>
-    runAction(
+  const onSkip = async (queue_id: string) => {
+    if (!window.confirm("Skip the current patient and call the next waiting serial?")) return;
+    return runAction(
       "skip",
       () => chamberDeps.actOnCurrent(queue_id, "skip"),
       applyQueueAction,
     );
+  };
 
-  const onNoShow = (queue_id: string) =>
-    runAction(
+  const onNoShow = async (queue_id: string) => {
+    if (!window.confirm("Mark the current patient as a no-show and call the next waiting serial?")) return;
+    return runAction(
       "no-show",
       () => chamberDeps.actOnCurrent(queue_id, "no-show"),
       applyQueueAction,
     );
+  };
 
-  const onRemove = (queue_id: string) =>
-    runAction(
+  const onRemove = async (queue_id: string) => {
+    const session = state.kind === "ready" ? state.session : null;
+    const entry = [session?.current, ...(session?.waiting ?? [])].find((row) => row?.queue_id === queue_id);
+    if (!window.confirm(`Remove serial #${entry?.serial_number ?? ""} from today's queue? The appointment history will be retained.`)) return;
+    return runAction(
       "remove",
       () => chamberDeps.removeEntry(queue_id),
       applyQueueAction,
     );
+  };
 
   const current = state.kind === "ready" ? state.session?.current ?? null : null;
   const sessionStatus =
@@ -326,12 +331,13 @@ export function ChamberQueue({
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={pending !== null} onClick={() => void refresh()} className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-bold">Refresh queue</button>
           {isOpen ? (
             <>
               <button
                 type="button"
                 onClick={onCallNext}
-                disabled={pending !== null || (rows.waiting.length === 0 && !current)}
+                disabled={pending !== null || rows.waiting.length === 0 || current !== null}
                 className="inline-flex min-h-11 items-center rounded-xl bg-sky-700 px-4 text-sm font-bold text-white disabled:opacity-60"
               >
                 {pending === "call-next" ? "Calling…" : "Call next patient"}
@@ -386,6 +392,7 @@ export function ChamberQueue({
           pending={pending}
           actionLabel="Remove"
           actionKey="remove"
+          readOnly={!isOpen}
         />
         <QueueList
           title="Finished today"
@@ -521,7 +528,7 @@ function QueueList({
                 <span
                   className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-bold ${badgeClass(row.queue_status)}`}
                 >
-                  {describeQueueStatus(row.queue_status)}
+                  {row.status === "NO_SHOW" ? "No show" : describeQueueStatus(row.queue_status)}
                 </span>
               </div>
               {!readOnly && actionLabel && actionKey ? (

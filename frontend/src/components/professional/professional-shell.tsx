@@ -1,5 +1,6 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
+import { PortalNavigation } from "@/components/auth/portal-navigation";
 
 import { HealthLinkMark } from "@/components/brand/healthlink-mark";
 
@@ -19,12 +20,13 @@ export function ProfessionalShell({ children }: { children: ReactNode }) {
             Professional portal
           </div>
         </div>
+        <Suspense fallback={null}><PortalNavigation portal="PROFESSIONAL" /></Suspense>
       </header>
       {children}
       <footer className="border-t border-slate-200/80 bg-white/55">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-5 py-7 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
-          <p>Professional access starts only after role-specific verification.</p>
-          <p>One HealthLink identity can support multiple professional roles.</p>
+          <p>Professional access starts after role-specific verification.</p>
+          <p>Each session uses one explicitly selected professional role.</p>
         </div>
       </footer>
     </div>

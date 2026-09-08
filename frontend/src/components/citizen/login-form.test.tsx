@@ -25,7 +25,7 @@ function fillLogin() {
   fireEvent.change(screen.getByLabelText(/Email address/i), {
     target: { value: " CITIZEN@EXAMPLE.COM " },
   });
-  fireEvent.change(screen.getByLabelText(/Password/i), {
+  fireEvent.change(screen.getByLabelText(/Password/i, { selector: "input" }), {
     target: { value: "secret-password" },
   });
 }
@@ -78,7 +78,7 @@ describe("CitizenLoginForm", () => {
   it("mirrors the documented password maximum", () => {
     const loginAction = vi.fn();
     render(<CitizenLoginForm loginAction={loginAction} />);
-    const passwordInput = screen.getByLabelText(/Password/i);
+    const passwordInput = screen.getByLabelText(/Password/i, { selector: "input" });
 
     expect(passwordInput).toHaveAttribute("maxlength", "128");
     fireEvent.change(screen.getByLabelText(/Email address/i), {

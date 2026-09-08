@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { PasswordInput } from "@/components/ui/password-input";
+import { safeReturnTo } from "@/lib/auth/return-to";
 
 import { citizenInputClassName, FormField } from "./form-field";
 import { StatusAlert } from "./status-alert";
@@ -65,7 +67,7 @@ export function CitizenLoginForm({
       if (onLoggedIn) {
         onLoggedIn(response);
       } else {
-        router.replace("/citizen/dashboard");
+        router.replace(safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"), "CITIZEN"));
       }
     } catch (error) {
       setApiError(
@@ -119,7 +121,7 @@ export function CitizenLoginForm({
         </FormField>
 
         <FormField error={errors.password} htmlFor="password" label="Password" required>
-          <input
+          <PasswordInput
             aria-describedby={errors.password ? "password-error" : undefined}
             aria-invalid={Boolean(errors.password)}
             autoComplete="current-password"
@@ -132,7 +134,6 @@ export function CitizenLoginForm({
               setApiError(null);
             }}
             required
-            type="password"
             value={password}
           />
         </FormField>

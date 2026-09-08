@@ -217,6 +217,21 @@ describe("ConsultationWorkspace", () => {
     ).toBeInTheDocument();
   });
 
+  it("blocks finish until edited clinical notes are saved", async () => {
+    const { deps } = buildDeps({
+      loadCurrentPatient: vi.fn().mockResolvedValue(baseCurrent({ visit: baseVisit({}) })),
+      updateVisit: vi.fn().mockResolvedValue(baseVisit({ clinical_notes: "New notes" })),
+    });
+    render(<ConsultationWorkspace visitsDeps={deps} />);
+    const finish = await screen.findByRole("button", { name: /finish appointment/i });
+    fireEvent.change(screen.getByLabelText(/clinical notes/i), { target: { value: "New notes" } });
+    await waitFor(() => expect(finish).toBeDisabled());
+    fireEvent.click(finish);
+    expect(deps.finishAppointment).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /save draft/i }));
+    await waitFor(() => expect(finish).toBeEnabled());
+  });
+
   it("disables editing when the visit is finalized", async () => {
     const { deps } = buildDeps({
       loadCurrentPatient: vi

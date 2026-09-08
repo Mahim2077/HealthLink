@@ -2,6 +2,8 @@
 
 import { useCallback, useState, type FormEvent } from "react";
 
+import type { DoctorProfile } from "@/lib/doctors/types";
+import { careDate } from "@/lib/care-date";
 import { citizenErrorMessage } from "@/lib/citizen/presentation";
 import { bookAppointment } from "@/lib/appointments/api";
 import type {
@@ -21,13 +23,7 @@ export type AppointmentBookFormValues = {
   reason: string;
 };
 
-function todayIsoDate(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
+const todayIsoDate = careDate;
 
 export function validateAppointmentBooking(
   values: AppointmentBookFormValues,
@@ -72,19 +68,17 @@ function buildRequest(
 }
 
 export function AppointmentBookForm({
-  initialDoctorUserId = "",
-  initialFacilityId = "",
+  doctor,
   bookAction = bookAppointment,
   onBooked,
 }: {
-  initialDoctorUserId?: string;
-  initialFacilityId?: string;
+  doctor: Pick<DoctorProfile, "id" | "name" | "facility_id" | "facility_name" | "practice_days">;
   bookAction?: (request: AppointmentBookingRequest) => Promise<AppointmentBookingResponse>;
   onBooked?: (response: AppointmentBookingResponse) => void;
 }) {
   const [values, setValues] = useState<AppointmentBookFormValues>({
-    doctorUserId: initialDoctorUserId,
-    facilityId: initialFacilityId,
+    doctorUserId: doctor.id,
+    facilityId: doctor.facility_id,
     appointmentDate: "",
     reason: "",
   });
@@ -117,6 +111,12 @@ export function AppointmentBookForm({
     setSubmitError(null);
 
     const nextErrors = validateAppointmentBooking(values);
+    if (!nextErrors.appointmentDate) {
+      const weekday = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(new Date(`${values.appointmentDate}T12:00:00Z`)).toUpperCase();
+      if (!doctor.practice_days.some(day => day.status === "ACTIVE" && day.facility_id === doctor.facility_id && day.weekday === weekday)) {
+        nextErrors.appointmentDate = "Choose a date matching the doctor’s available practice days.";
+      }
+    }
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
@@ -146,41 +146,17 @@ export function AppointmentBookForm({
       onSubmit={handleSubmit}
       noValidate
     >
-      <label className="text-sm font-bold text-slate-700">
-        Doctor identifier (UUID)
-        <input
-          aria-invalid={errors.doctorUserId ? "true" : "false"}
-          className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"
-          data-testid="doctor-user-id-input"
-          disabled={submitting}
-          onChange={(event) => updateField("doctorUserId", event.target.value)}
-          placeholder="00000000-0000-0000-0000-000000000000"
-          value={values.doctorUserId}
-        />
-      </label>
-      {errors.doctorUserId ? (
-        <p className="-mt-2 text-sm text-rose-700" data-testid="doctor-user-id-error">
-          {errors.doctorUserId}
-        </p>
-      ) : null}
-
-      <label className="text-sm font-bold text-slate-700">
-        Facility identifier (UUID)
-        <input
-          aria-invalid={errors.facilityId ? "true" : "false"}
-          className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"
-          data-testid="facility-id-input"
-          disabled={submitting}
-          onChange={(event) => updateField("facilityId", event.target.value)}
-          placeholder="00000000-0000-0000-0000-000000000000"
-          value={values.facilityId}
-        />
-      </label>
-      {errors.facilityId ? (
-        <p className="-mt-2 text-sm text-rose-700" data-testid="facility-id-error">
-          {errors.facilityId}
-        </p>
-      ) : null}
+      <div className="rounded-xl bg-teal-50 p-4 text-sm">
+        <p className="font-bold text-slate-950">{doctor.name}</p>
+        <p className="mt-1 text-slate-700">{doctor.facility_name}</p>
+        <p className="mt-3 text-slate-600">Available practice days (Bangladesh time):</p>
+        <ul className="mt-2 grid gap-1">
+          {doctor.practice_days.filter(day => day.status === "ACTIVE" && day.facility_id === doctor.facility_id).map(day => (
+            <li key={day.id}>{day.weekday.charAt(0) + day.weekday.slice(1).toLowerCase()} · {day.start_time.slice(0, 5)}–{day.end_time.slice(0, 5)}</li>
+          ))}
+        </ul>
+        <p className="mt-3 text-slate-600">Your booking receives a queue serial, not a fixed appointment time. Availability is confirmed when you book.</p>
+      </div>
 
       <label className="text-sm font-bold text-slate-700">
         Appointment date

@@ -1,4 +1,5 @@
 "use client";
+import { useUnsavedChanges } from "@/components/ui/use-unsaved-changes";
 
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
@@ -91,6 +92,7 @@ function ProfileEditor({
   onSaved: (profile: CitizenProfile) => void;
 }) {
   const [form, setForm] = useState(() => fromProfile(profile));
+  useUnsavedChanges(JSON.stringify(form) !== JSON.stringify(fromProfile(profile)));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: "error" | "success"; text: string } | null>(null);
 
@@ -162,7 +164,10 @@ function ProfileEditor({
           </select>
         </FormField>
         <FormField htmlFor="profile-blood-group" label="Blood group">
-          <input className={citizenInputClassName} disabled={saving} id="profile-blood-group" maxLength={8} onChange={(event) => setField("bloodGroup", event.target.value)} placeholder="For example, O+" value={form.bloodGroup} />
+          <select className={citizenInputClassName} disabled={saving} id="profile-blood-group" onChange={(event) => setField("bloodGroup", event.target.value)} value={form.bloodGroup}>
+            <option value="">Not recorded</option>
+            {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(group => <option key={group} value={group}>{group}</option>)}
+          </select>
         </FormField>
         <FormField className="sm:col-span-2" htmlFor="profile-address" label="Address">
           <textarea className={citizenInputClassName + " min-h-28 py-3"} disabled={saving} id="profile-address" onChange={(event) => setField("address", event.target.value)} value={form.address} />

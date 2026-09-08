@@ -41,6 +41,7 @@ function buildDeps(
 describe("PracticeScheduleEditor", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
   it("renders an empty state when no schedule rows exist", async () => {

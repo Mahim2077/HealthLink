@@ -22,7 +22,7 @@ function ProfessionalVerificationDetailContent({ registrationId }: { registratio
     try {
       const [detail, facilityRows] = await Promise.all([loadProfessionalRegistration(registrationId), loadFacilities()]);
       setError(null); setRegistration(detail); setFacilities(facilityRows);
-      setFacilityId(detail.facility?.id ?? facilityRows.find((item) => item.is_active)?.id ?? "");
+      setFacilityId(detail.facility?.id ?? "");
     } catch (cause) { setError(citizenErrorMessage(cause, "We could not load this application.")); }
   }, [registrationId]);
   useEffect(() => {
@@ -31,7 +31,7 @@ function ProfessionalVerificationDetailContent({ registrationId }: { registratio
       ([detail, facilityRows]) => {
         if (active) {
           setError(null); setRegistration(detail); setFacilities(facilityRows);
-          setFacilityId(detail.facility?.id ?? facilityRows.find((item) => item.is_active)?.id ?? "");
+          setFacilityId(detail.facility?.id ?? "");
         }
       },
       (cause: unknown) => { if (active) setError(citizenErrorMessage(cause, "We could not load this application.")); },

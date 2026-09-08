@@ -35,6 +35,8 @@ describe("Phase 6 admin interfaces", () => {
     mocks.verify.mockResolvedValue({ ...application, verification_status: "VERIFIED", facility });
     render(<ProfessionalVerificationDetail registrationId="r1" />);
     expect(await screen.findByText("BMDC-100")).toBeInTheDocument();
+    expect(screen.getByRole("combobox")).toHaveValue("");
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "f1" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify and link facility" }));
     await waitFor(() => expect(mocks.verify).toHaveBeenCalledWith("r1", "f1"));
 
