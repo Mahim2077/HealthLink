@@ -168,6 +168,7 @@ export default function Home() {
                 priority
                 sizes="(min-width: 1280px) 50vw, 100vw"
                 src="/images/healthlink-doctor-hero.png"
+                unoptimized
               />
             </div>
           </div>

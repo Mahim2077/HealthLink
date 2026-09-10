@@ -26,6 +26,11 @@ describe("HealthLink home page", () => {
         name: "Better context supports better conversations.",
       }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "A Bangladeshi doctor representing connected care",
+      }),
+    ).toHaveAttribute("src", "/images/healthlink-doctor-hero.png");
     expect(screen.queryByText(/admin/i)).not.toBeInTheDocument();
   });
 
