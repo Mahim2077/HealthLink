@@ -61,7 +61,7 @@ describe("CitizenIdentityDetail", () => {
     expect(screen.getByText("BCN-ORIG")).toBeInTheDocument();
     expect(screen.getByText("1234567890")).toBeInTheDocument();
     expect(screen.getByText("female")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "← Identity search" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Identity search" })).toHaveAttribute(
       "href",
       "/admin/citizen-identities",
     );

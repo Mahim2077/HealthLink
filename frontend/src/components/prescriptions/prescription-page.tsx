@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -83,10 +84,11 @@ export function PrescriptionPage({
       id="main-content"
     >
       <Link
-        className="text-sm font-bold text-teal-700 hover:text-teal-900"
+        className="inline-flex items-center gap-2 text-sm font-bold text-teal-700 hover:text-teal-900"
         href={backPath}
       >
-        ← Back
+        <ArrowLeftIcon aria-hidden="true" className="size-4" />
+        Back
       </Link>
       <div className="mt-6">
         <PrescriptionPanel

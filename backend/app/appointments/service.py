@@ -17,12 +17,14 @@ from app.appointments.models import (
     SessionStatus,
 )
 from app.appointments.repository import (
+    AppointmentCancellationContext,
     AppointmentFinishContext,
     AppointmentRepository,
 )
 from app.appointments.schemas import (
     AppointmentBookingRequest,
     AppointmentBookingResponse,
+    AppointmentCancellationResponse,
     AppointmentFinishResponse,
     AppointmentListEntry,
     AppointmentListResponse,
@@ -62,6 +64,11 @@ class AppointmentCapacityExceededError(HealthLinkError):
 
 
 class AppointmentBookingConflictError(HealthLinkError):
+    def __init__(self, detail: str) -> None:
+        super().__init__(detail, status_code=409)
+
+
+class AppointmentCancellationStateError(HealthLinkError):
     def __init__(self, detail: str) -> None:
         super().__init__(detail, status_code=409)
 
@@ -334,6 +341,89 @@ class AppointmentService:
                 )
             )
         return AppointmentListResponse(appointments=entries)
+
+    def _cancellation_response(
+        self,
+        context: AppointmentCancellationContext,
+    ) -> AppointmentCancellationResponse:
+        appointment = context.appointment
+        queue_entry = context.queue_entry
+        if appointment.cancelled_at is None or queue_entry.removed_at is None:
+            raise AppointmentCancellationStateError(
+                "Appointment cancellation timestamps are incomplete."
+            )
+        return AppointmentCancellationResponse(
+            appointment_id=appointment.id,
+            status=AppointmentStatus(appointment.status),
+            cancelled_at=appointment.cancelled_at,
+            queue_id=queue_entry.id,
+            queue_status=QueueStatus(queue_entry.queue_status),
+            removed_at=queue_entry.removed_at,
+        )
+
+    def cancel_appointment(
+        self,
+        citizen_user_id: uuid.UUID,
+        appointment_id: uuid.UUID,
+    ) -> AppointmentCancellationResponse:
+        """Cancel one owned WAITING appointment and free its daily capacity."""
+
+        citizen = self.repository.get_citizen_profile_by_user_id(citizen_user_id)
+        if citizen is None:
+            raise AppointmentValidationError("Citizen profile required.")
+
+        initial = self.repository.get_appointment_cancellation_context(
+            appointment_id=appointment_id,
+            citizen_id=citizen.id,
+        )
+        if initial is None:
+            raise AppointmentNotFoundError(
+                "Appointment not found for this citizen."
+            )
+
+        appointment = initial.appointment
+        self.repository._lock_for_booking(
+            doctor_role_registration_id=appointment.doctor_role_registration_id,
+            appointment_date=appointment.appointment_date,
+        )
+        self.repository._lock_for_queue(
+            doctor_role_registration_id=appointment.doctor_role_registration_id,
+            session_date=appointment.appointment_date,
+        )
+        locked = self.repository.get_appointment_cancellation_context(
+            appointment_id=appointment_id,
+            citizen_id=citizen.id,
+            for_update=True,
+        )
+        if locked is None:  # pragma: no cover - foreign keys use RESTRICT.
+            raise AppointmentNotFoundError(
+                "Appointment not found for this citizen."
+            )
+
+        if (
+            locked.appointment.status != AppointmentStatus.BOOKED.value
+            or locked.queue_entry.queue_status != QueueStatus.WAITING.value
+        ):
+            raise AppointmentCancellationStateError(
+                "Only a waiting appointment can be cancelled."
+            )
+
+        now = datetime.now(timezone.utc)
+        locked.appointment.status = AppointmentStatus.CANCELLED.value
+        locked.appointment.cancelled_at = now
+        locked.queue_entry.queue_status = QueueStatus.CANCELLED.value
+        locked.queue_entry.removed_at = now
+        try:
+            self.db.commit()
+        except IntegrityError as error:
+            self.db.rollback()
+            raise AppointmentCancellationStateError(
+                "Appointment could not be cancelled."
+            ) from error
+
+        self.db.refresh(locked.appointment)
+        self.db.refresh(locked.queue_entry)
+        return self._cancellation_response(locked)
 
     # ------------------------------------------------------------------
     # Phase 11 — chamber session + serial queue
@@ -981,6 +1071,7 @@ __all__ = [
     "AppointmentScheduleUnavailableError",
     "AppointmentCapacityExceededError",
     "AppointmentBookingConflictError",
+    "AppointmentCancellationStateError",
     "ChamberSessionNotFoundError",
     "ChamberQueueEntryNotFoundError",
     "ChamberSessionStateError",

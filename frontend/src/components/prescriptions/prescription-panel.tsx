@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useUnsavedChanges } from "@/components/ui/use-unsaved-changes";
@@ -103,6 +104,7 @@ export function PrescriptionPanel({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState(false);
+  const pdfUrlRef = useRef<string | null>(null);
   const pdfVersion = useRef(0);
 
   useEffect(() => {
@@ -129,11 +131,24 @@ export function PrescriptionPanel({
     };
   }, [deps, prescriptionId, version]);
 
-  useEffect(() => {
-    return () => {
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-    };
-  }, [pdfUrl]);
+  const replacePdfUrl = useCallback((nextUrl: string | null) => {
+    const previousUrl = pdfUrlRef.current;
+    if (previousUrl && previousUrl !== nextUrl) {
+      URL.revokeObjectURL(previousUrl);
+    }
+    pdfUrlRef.current = nextUrl;
+    setPdfUrl(nextUrl);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (pdfUrlRef.current) {
+        URL.revokeObjectURL(pdfUrlRef.current);
+        pdfUrlRef.current = null;
+      }
+    },
+    [],
+  );
 
   const openPdf = useCallback(
     async (prescription: PrescriptionView) => {
@@ -142,7 +157,9 @@ export function PrescriptionPanel({
       setPdfError(null);
       try {
         const blob = await deps.downloadPdf(prescription.id);
-        if (version === pdfVersion.current) setPdfUrl(URL.createObjectURL(blob));
+        if (version === pdfVersion.current) {
+          replacePdfUrl(URL.createObjectURL(blob));
+        }
       } catch (reason) {
         if (version === pdfVersion.current) setPdfError(
           reason instanceof Error
@@ -153,7 +170,7 @@ export function PrescriptionPanel({
         if (version === pdfVersion.current) setLoadingPdf(false);
       }
     },
-    [deps],
+    [deps, replacePdfUrl],
   );
 
   if (loadState.kind === "loading") {
@@ -192,14 +209,14 @@ export function PrescriptionPanel({
       ? await deps.update(prescription.id, payload)
       : await deps.create(visitId as string, payload);
     pdfVersion.current += 1;
-    setPdfUrl(null);
+    replacePdfUrl(null);
     setPdfError(null);
     setLoadingPdf(false);
     setLoadState({ kind: "ready", prescription: saved });
   };
 
   return (
-    <section className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+    <section className="hl-card p-6 sm:p-8">
       <header className="flex flex-col gap-3 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">
@@ -214,10 +231,11 @@ export function PrescriptionPanel({
         </div>
         {prescription && editable ? (
           <Link
-            className="text-sm font-bold text-sky-700 hover:text-sky-900"
+            className="inline-flex items-center gap-2 text-sm font-bold text-sky-700 hover:text-sky-900"
             href={`/professional/prescriptions/${prescription.id}`}
           >
-            Open prescription page →
+            Open prescription page
+            <ArrowRightIcon aria-hidden="true" className="size-4" />
           </Link>
         ) : null}
       </header>

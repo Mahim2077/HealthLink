@@ -36,13 +36,13 @@ export function AdminLoginForm({
   };
 
   return (
-    <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:px-10" id="main-content">
-      <section>
+    <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-8 px-5 py-10 sm:px-8 sm:py-14 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12 lg:px-10" id="main-content">
+      <section className="order-2 lg:order-1">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-700">Trusted operations</p>
         <h1 className="mt-4 max-w-lg font-display text-4xl font-bold tracking-[-0.045em] text-slate-950 sm:text-5xl">Administrative access with clear boundaries.</h1>
         <p className="mt-5 max-w-lg text-base leading-7 text-slate-600">Admin accounts are provisioned through a trusted operational process. There is no public admin registration.</p>
       </section>
-      <section className="rounded-[2rem] border border-white bg-white/95 p-6 shadow-xl shadow-slate-900/[0.07] sm:p-9">
+      <section className="order-1 rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_22px_60px_-42px_rgba(15,23,42,0.45)] sm:p-9 lg:order-2">
         <p className="text-xs font-bold uppercase tracking-[0.15em] text-indigo-700">Admin sign in</p>
         <h2 className="mt-2 text-2xl font-bold text-slate-950">Welcome back</h2>
         <form className="mt-7 space-y-5" onSubmit={submit}>

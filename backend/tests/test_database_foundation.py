@@ -2,8 +2,10 @@ from pathlib import Path
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
+from sqlalchemy import text
 
 from app.db.base import Base
+from app.db.session import create_database_engine
 
 
 BACKEND_DIRECTORY = Path(__file__).resolve().parents[1]
@@ -27,3 +29,16 @@ def test_alembic_loads_phase_one_shared_auth_migration() -> None:
     assert users_revision.down_revision is None
     assert sessions_revision is not None
     assert sessions_revision.down_revision == "0001_users"
+
+
+def test_sqlite_ignores_postgresql_prepared_statement_option() -> None:
+    engine = create_database_engine(
+        "sqlite+pysqlite:///:memory:",
+        disable_prepared_statements=True,
+    )
+
+    try:
+        with engine.connect() as connection:
+            assert connection.scalar(text("SELECT 1")) == 1
+    finally:
+        engine.dispose()

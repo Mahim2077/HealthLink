@@ -56,10 +56,10 @@ function FacilityManagerContent() {
 
   const visibleFacilities = facilities?.filter(facility => `${facility.name} ${facility.address} ${facility.registration_number ?? ""}`.toLowerCase().includes(query.trim().toLowerCase())) ?? null;
 
-  return <main className="mx-auto w-full max-w-7xl flex-1 px-5 py-10 sm:px-8 lg:px-10" id="main-content">
+  return <main className="hl-page" id="main-content">
     <AdminSectionHeader eyebrow="Facility registry" title="Healthcare facilities" description="Create and maintain the trusted facilities that professional applications can be matched to during verification." />
     <div className="mt-8 grid gap-7 lg:grid-cols-[0.9fr_1.1fr]">
-      <section className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+      <section className="hl-card p-5 sm:p-7">
         <h2 className="text-xl font-bold text-slate-950 outline-none" ref={formTitleRef} tabIndex={-1}>{editingId ? "Edit facility" : "Create facility"}</h2>
         <form className="mt-5 grid gap-4" onSubmit={submit}>
           <label className="text-sm font-bold text-slate-700">Name<input className={inputClass} maxLength={200} onChange={(event) => setField("name", event.target.value)} required value={form.name} /></label>

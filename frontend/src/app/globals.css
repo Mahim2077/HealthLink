@@ -1,13 +1,18 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: "Aptos", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Aptos Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Inter Variable", "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Inter Variable", "Inter", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
 }
 
 :root {
-  --background: #f7faf9;
-  --foreground: #0f172a;
+  --background: #f8fbfa;
+  --foreground: #0b1220;
+  --healthlink-teal: #00695f;
+  --healthlink-teal-hover: #005a52;
+  --healthlink-border: #dbe6e3;
+  --healthlink-muted: #5f6f6c;
+  --healthlink-surface: #ffffff;
 }
 
 * {
@@ -23,12 +28,36 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  font-variation-settings: "opsz" 24;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:not(:disabled),
+select:not(:disabled) {
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  accent-color: var(--healthlink-teal);
+}
+
+:focus-visible {
+  scroll-margin: 7rem;
 }
 
 ::selection {
@@ -55,6 +84,64 @@ a {
   box-shadow:
     0 40px 100px -52px rgb(15 23 42 / 0.38),
     0 12px 36px -24px rgb(13 148 136 / 0.28);
+}
+
+.hl-page {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 80rem;
+  flex: 1;
+  padding: 2.5rem 1.25rem 4rem;
+}
+
+.hl-page-header {
+  border-bottom: 1px solid var(--healthlink-border);
+  padding-bottom: 1.75rem;
+}
+
+.hl-card {
+  border: 1px solid var(--healthlink-border);
+  border-radius: 1.25rem;
+  background: rgb(255 255 255 / 0.96);
+  box-shadow: 0 16px 36px -32px rgb(15 23 42 / 0.35);
+}
+
+.hl-field {
+  min-height: 3rem;
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.75rem;
+  background: white;
+  padding-inline: 0.875rem;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+
+.hl-field:hover:not(:disabled) {
+  border-color: #94a3b8;
+}
+
+.hl-field:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 4px rgb(204 251 241 / 0.8);
+}
+
+.hl-field[aria-invalid="true"] {
+  border-color: #e11d48;
+}
+
+@media (min-width: 640px) {
+  .hl-page {
+    padding-inline: 2rem;
+    padding-top: 3rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .hl-page {
+    padding-inline: 2.5rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

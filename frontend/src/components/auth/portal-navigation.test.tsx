@@ -1,12 +1,12 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { accessTokenStore } from "@/lib/auth/token-store";
 
-const mocks = vi.hoisted(() => ({ replace: vi.fn() }));
+const mocks = vi.hoisted(() => ({ logout: vi.fn(), replace: vi.fn() }));
 vi.mock("@/lib/auth/actions", () => ({
-  logout: vi.fn(),
+  logout: mocks.logout,
   logoutAll: vi.fn(),
   refreshSession: vi.fn(),
 }));
@@ -26,6 +26,7 @@ function citizenToken() {
 describe("PortalNavigation", () => {
   beforeEach(() => {
     accessTokenStore.clear();
+    mocks.logout.mockReset();
     mocks.replace.mockReset();
   });
 
@@ -34,5 +35,17 @@ describe("PortalNavigation", () => {
     render(<AuthProvider><PortalNavigation portal="CITIZEN" /></AuthProvider>);
 
     expect(screen.getByRole("link", { name: "Find a doctor" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("signs out from the shared portal navigation", async () => {
+    act(() => accessTokenStore.set(citizenToken()));
+    mocks.logout.mockResolvedValue(undefined);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<AuthProvider><PortalNavigation portal="CITIZEN" /></AuthProvider>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+
+    await waitFor(() => expect(mocks.logout).toHaveBeenCalledOnce());
+    expect(mocks.replace).toHaveBeenCalledWith("/citizen/login");
   });
 });

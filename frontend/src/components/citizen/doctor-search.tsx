@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import {
   useCallback,
@@ -44,7 +45,7 @@ const WEEKDAY_LABEL: Record<PracticeWeekday, string> = WEEKDAY_OPTIONS.reduce(
 function DoctorRow({ doctor }: { doctor: DoctorSummary }) {
   return (
     <article
-      className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-sm"
+      className="hl-card p-5"
       data-testid="doctor-row"
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -273,15 +274,16 @@ function SearchContent({
 
   return (
     <main
-      className="mx-auto w-full max-w-7xl flex-1 px-5 py-10 sm:px-8 lg:px-10"
+      className="hl-page"
       id="main-content"
     >
       <div className="border-b border-slate-200 pb-7">
         <Link
-          className="text-sm font-bold text-teal-700 hover:text-teal-900"
+          className="inline-flex items-center gap-2 text-sm font-bold text-teal-700 hover:text-teal-900"
           href="/citizen/dashboard"
         >
-          ← Citizen Dashboard
+          <ArrowLeftIcon aria-hidden="true" className="size-4" />
+          Citizen Dashboard
         </Link>
         <p className="mt-6 text-xs font-bold uppercase tracking-[0.15em] text-teal-700">
           Doctor discovery
@@ -295,7 +297,7 @@ function SearchContent({
       </div>
 
       <div className="mt-8 grid gap-7 lg:grid-cols-[0.95fr_1.05fr]">
-        <section className="rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="hl-card p-6">
           <h2 className="text-xl font-bold text-slate-950">Search filters</h2>
           <p className="mt-2 text-sm text-slate-600">
             At least one filter is required.

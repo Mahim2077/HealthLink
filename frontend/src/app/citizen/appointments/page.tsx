@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -10,8 +11,12 @@ import {
   ErrorState,
   LoadingState,
 } from "@/components/ui/async-state";
-import { listMyAppointments } from "@/lib/appointments/api";
+import {
+  cancelAppointment,
+  listMyAppointments,
+} from "@/lib/appointments/api";
 import type {
+  AppointmentCancellationResponse,
   AppointmentListEntry,
   AppointmentListResponse,
   AppointmentStatus,
@@ -86,10 +91,18 @@ function groupByStatus(
   return grouped;
 }
 
-function AppointmentRow({ appointment }: { appointment: AppointmentListEntry }) {
+function AppointmentRow({
+  appointment,
+  cancelling,
+  onCancel,
+}: {
+  appointment: AppointmentListEntry;
+  cancelling: boolean;
+  onCancel: (appointment: AppointmentListEntry) => void;
+}) {
   return (
     <article
-      className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-sm"
+      className="hl-card p-5"
       data-testid="appointment-row"
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -137,6 +150,16 @@ function AppointmentRow({ appointment }: { appointment: AppointmentListEntry }) 
               View prescription
             </Link>
           ) : null}
+          {appointment.status === "BOOKED" ? (
+            <button
+              className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-rose-200 bg-white px-4 text-sm font-bold text-rose-700 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={cancelling}
+              onClick={() => onCancel(appointment)}
+              type="button"
+            >
+              {cancelling ? "Cancelling…" : "Cancel appointment"}
+            </button>
+          ) : null}
         </div>
       </div>
     </article>
@@ -144,8 +167,10 @@ function AppointmentRow({ appointment }: { appointment: AppointmentListEntry }) 
 }
 
 function AppointmentsContent({
+  cancelAction,
   loadAction,
 }: {
+  cancelAction: (appointmentId: string) => Promise<AppointmentCancellationResponse>;
   loadAction: () => Promise<AppointmentListResponse>;
 }) {
   const searchParams = useSearchParams();
@@ -154,6 +179,13 @@ function AppointmentsContent({
     null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [cancelledAppointmentId, setCancelledAppointmentId] = useState<
+    string | null
+  >(null);
+  const [cancellingAppointmentId, setCancellingAppointmentId] = useState<
+    string | null
+  >(null);
   const [version, setVersion] = useState(0);
 
   const reload = useCallback(() => {
@@ -185,6 +217,48 @@ function AppointmentsContent({
       active = false;
     };
   }, [loadAction, version]);
+
+  const handleCancel = useCallback(
+    (appointment: AppointmentListEntry) => {
+      const confirmed = window.confirm(
+        `Cancel your appointment with ${appointment.doctor_name} on ${formatDate(appointment.appointment_date)}?`,
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      setActionError(null);
+      setCancelledAppointmentId(null);
+      setCancellingAppointmentId(appointment.id);
+      void cancelAction(appointment.id).then(
+        (response) => {
+          setAppointments((current) =>
+            current?.map((entry) =>
+              entry.id === response.appointment_id
+                ? {
+                    ...entry,
+                    status: response.status,
+                    cancelled_at: response.cancelled_at,
+                  }
+                : entry,
+            ) ?? null,
+          );
+          setCancelledAppointmentId(response.appointment_id);
+          setCancellingAppointmentId(null);
+        },
+        (reason: unknown) => {
+          setActionError(
+            citizenErrorMessage(
+              reason,
+              "We could not cancel this appointment right now.",
+            ),
+          );
+          setCancellingAppointmentId(null);
+        },
+      );
+    },
+    [cancelAction],
+  );
 
   if (error) {
     return (
@@ -218,10 +292,11 @@ function AppointmentsContent({
     >
       <div className="border-b border-slate-200 pb-7">
         <Link
-          className="text-sm font-bold text-teal-700 hover:text-teal-900"
+          className="inline-flex items-center gap-2 text-sm font-bold text-teal-700 hover:text-teal-900"
           href="/citizen/dashboard"
         >
-          ← Citizen Dashboard
+          <ArrowLeftIcon aria-hidden="true" className="size-4" />
+          Citizen Dashboard
         </Link>
         <p className="mt-6 text-xs font-bold uppercase tracking-[0.15em] text-teal-700">
           Appointments
@@ -260,6 +335,24 @@ function AppointmentsContent({
         </Link>
       </div>
 
+      {actionError ? (
+        <p
+          className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800"
+          role="alert"
+        >
+          {actionError}
+        </p>
+      ) : null}
+      {cancelledAppointmentId ? (
+        <p
+          className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
+          role="status"
+        >
+          Appointment cancelled. Its serial remains in your history and the
+          daily capacity is now available again.
+        </p>
+      ) : null}
+
       {appointments.length === 0 ? (
         <div className="mt-8">
           <EmptyState
@@ -294,7 +387,9 @@ function AppointmentsContent({
                   {rows.map((appointment) => (
                     <AppointmentRow
                       appointment={appointment}
+                      cancelling={cancellingAppointmentId === appointment.id}
                       key={appointment.id}
+                      onCancel={handleCancel}
                     />
                   ))}
                 </div>
@@ -371,14 +466,16 @@ function CitizenGuard({ children }: { children: React.ReactNode }) {
 }
 
 export function AppointmentsView({
+  cancelAction = cancelAppointment,
   loadAction = listMyAppointments,
 }: {
+  cancelAction?: (appointmentId: string) => Promise<AppointmentCancellationResponse>;
   loadAction?: () => Promise<AppointmentListResponse>;
 } = {}) {
   return (
     <>
       <CitizenGuard>
-        <AppointmentsContent loadAction={loadAction} />
+        <AppointmentsContent cancelAction={cancelAction} loadAction={loadAction} />
       </CitizenGuard>
     </>
   );

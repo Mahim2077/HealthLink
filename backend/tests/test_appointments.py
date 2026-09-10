@@ -155,6 +155,14 @@ def test_booking_requires_authentication(client: TestClient) -> None:
     assert response.status_code == 401
 
 
+def test_cancellation_requires_authentication(client: TestClient) -> None:
+    response = client.post(
+        f"/api/v1/appointments/{uuid.uuid4()}/cancel",
+        json={},
+    )
+    assert response.status_code == 401
+
+
 def test_booking_rejects_unverified_doctor(
     client: TestClient, db_session
 ) -> None:
@@ -260,11 +268,9 @@ def test_booking_max_serial_jumps_after_cancellation(
     client: TestClient, db_session
 ) -> None:
     """Cancelled serials are never reused (V6 section 16 example)."""
-    from datetime import datetime, timezone
-
     from app.appointments.models import (
         Appointment,
-        AppointmentStatus,
+        AppointmentQueueEntry,
     )
 
     token, _ = _register_citizen(client)
@@ -284,7 +290,7 @@ def test_booking_max_serial_jumps_after_cancellation(
         max_patients=10,
     )
 
-    serials = []
+    bookings = []
     for _ in range(3):
         response = client.post(
             BOOK_PATH,
@@ -296,17 +302,28 @@ def test_booking_max_serial_jumps_after_cancellation(
             },
         )
         assert response.status_code == 201
-        serials.append(response.json()["serial_number"])
-    assert serials == [1, 2, 3]
+        bookings.append(response.json())
+    assert [booking["serial_number"] for booking in bookings] == [1, 2, 3]
 
-    # Cancel the middle serial directly via the model so the next booking
-    # must pick MAX(serial)+1, not the freed slot.
-    middle = db_session.execute(
-        select(Appointment).where(Appointment.serial_number == 2)
-    ).scalar_one()
-    middle.status = AppointmentStatus.CANCELLED.value
-    middle.cancelled_at = datetime.now(timezone.utc)
-    db_session.commit()
+    cancelled = client.post(
+        f"/api/v1/appointments/{bookings[1]['id']}/cancel",
+        headers=auth,
+        json={},
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["status"] == "CANCELLED"
+    assert cancelled.json()["queue_status"] == "CANCELLED"
+
+    middle = db_session.get(Appointment, uuid.UUID(bookings[1]["id"]))
+    assert middle is not None
+    queue_entry = db_session.scalar(
+        select(AppointmentQueueEntry).where(
+            AppointmentQueueEntry.appointment_id == middle.id
+        )
+    )
+    assert middle.cancelled_at is not None
+    assert queue_entry is not None
+    assert queue_entry.removed_at is not None
 
     response = client.post(
         BOOK_PATH,
@@ -319,6 +336,131 @@ def test_booking_max_serial_jumps_after_cancellation(
     )
     assert response.status_code == 201
     assert response.json()["serial_number"] == 4
+
+
+def test_cancellation_frees_capacity(client: TestClient, db_session) -> None:
+    token, _ = _register_citizen(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    facility = _make_facility(db_session, name="Booking Cancellation Capacity")
+    doctor_user_id = _make_doctor(
+        db_session,
+        first_name="Capacity",
+        last_name="Release",
+        facility=facility,
+    )
+    _add_schedule(
+        db_session,
+        doctor_user_id=doctor_user_id,
+        facility=facility,
+        weekday="MONDAY",
+        max_patients=1,
+    )
+    payload = {
+        "doctor_user_id": str(doctor_user_id),
+        "facility_id": str(facility.id),
+        "appointment_date": "2099-01-05",
+    }
+
+    first = client.post(BOOK_PATH, headers=auth, json=payload)
+    assert first.status_code == 201, first.text
+    assert client.post(BOOK_PATH, headers=auth, json=payload).status_code == 409
+
+    cancelled = client.post(
+        f"/api/v1/appointments/{first.json()['id']}/cancel",
+        headers=auth,
+        json={},
+    )
+    assert cancelled.status_code == 200, cancelled.text
+
+    replacement = client.post(BOOK_PATH, headers=auth, json=payload)
+    assert replacement.status_code == 201, replacement.text
+    assert replacement.json()["serial_number"] == 2
+
+
+def test_cancellation_hides_other_citizens_appointments(
+    client: TestClient,
+    db_session,
+) -> None:
+    owner_token, _ = _register_citizen(client)
+    other_token, _ = _register_citizen(client)
+    facility = _make_facility(db_session, name="Booking Ownership Clinic")
+    doctor_user_id = _make_doctor(
+        db_session,
+        first_name="Ownership",
+        last_name="Doctor",
+        facility=facility,
+    )
+    _add_schedule(
+        db_session,
+        doctor_user_id=doctor_user_id,
+        facility=facility,
+        weekday="MONDAY",
+    )
+    booked = client.post(
+        BOOK_PATH,
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={
+            "doctor_user_id": str(doctor_user_id),
+            "facility_id": str(facility.id),
+            "appointment_date": "2099-01-05",
+        },
+    )
+    assert booked.status_code == 201, booked.text
+
+    response = client.post(
+        f"/api/v1/appointments/{booked.json()['id']}/cancel",
+        headers={"Authorization": f"Bearer {other_token}"},
+        json={},
+    )
+    assert response.status_code == 404
+
+
+def test_cancellation_rejects_current_consultation(
+    client: TestClient,
+    db_session,
+) -> None:
+    from app.appointments.models import AppointmentQueueEntry, QueueStatus
+
+    token, _ = _register_citizen(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    facility = _make_facility(db_session, name="Booking Current Clinic")
+    doctor_user_id = _make_doctor(
+        db_session,
+        first_name="Current",
+        last_name="Doctor",
+        facility=facility,
+    )
+    _add_schedule(
+        db_session,
+        doctor_user_id=doctor_user_id,
+        facility=facility,
+        weekday="MONDAY",
+    )
+    booked = client.post(
+        BOOK_PATH,
+        headers=auth,
+        json={
+            "doctor_user_id": str(doctor_user_id),
+            "facility_id": str(facility.id),
+            "appointment_date": "2099-01-05",
+        },
+    )
+    assert booked.status_code == 201, booked.text
+    queue_entry = db_session.get(
+        AppointmentQueueEntry,
+        uuid.UUID(booked.json()["queue"]["id"]),
+    )
+    assert queue_entry is not None
+    queue_entry.queue_status = QueueStatus.CURRENT.value
+    db_session.commit()
+
+    response = client.post(
+        f"/api/v1/appointments/{booked.json()['id']}/cancel",
+        headers=auth,
+        json={},
+    )
+    assert response.status_code == 409
+    assert "waiting" in response.json()["detail"].lower()
 
 
 def test_booking_enforces_daily_capacity(

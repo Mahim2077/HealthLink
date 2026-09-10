@@ -1,4 +1,8 @@
-const DEFAULT_API_BASE_URL = "http://localhost:8000/api/v1";
+// Keep browser requests same-origin by default. Production routes `/api/v1`
+// through Vercel Services, while Next.js proxies the same path to FastAPI in
+// local development. This also keeps the HttpOnly refresh cookie first-party
+// when the UI is opened through either localhost or 127.0.0.1.
+const DEFAULT_API_BASE_URL = "/api/v1";
 
 export function normalizeApiBaseUrl(value: string): string {
   const trimmedValue = value.trim();

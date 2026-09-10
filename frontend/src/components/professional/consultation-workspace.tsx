@@ -211,7 +211,7 @@ export function ConsultationWorkspace({
   }
 
   return (
-    <section className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+    <section className="hl-card p-6 sm:p-8">
       <header className="flex flex-col gap-3 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-sky-700">
@@ -264,7 +264,7 @@ export function ConsultationWorkspace({
         </p>
       ) : null}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[260px,1fr]">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[260px_1fr]">
         <PatientPanel current={current} />
         <DraftForm
           visit={visit}

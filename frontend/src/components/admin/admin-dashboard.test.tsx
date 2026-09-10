@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
@@ -39,14 +39,15 @@ describe("AdminDashboard", () => {
     expect(load).not.toHaveBeenCalled();
   });
 
-  it("logs out and returns to separate admin login", async () => {
+  it("shows the focused operational routes", async () => {
     act(() => accessTokenStore.set(token("ADMIN")));
-    mocks.logout.mockImplementation(async () => accessTokenStore.clear());
     renderDashboard();
     await screen.findByText("Welcome, Trusted.");
-    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
-    await waitFor(() => expect(mocks.logout).toHaveBeenCalledOnce());
-    expect(mocks.replace).toHaveBeenCalledWith("/admin/login");
-    expect(mocks.refreshSession).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("link", { name: /Professional verification/ }),
+    ).toHaveAttribute("href", "/admin/professional-registrations");
+    expect(
+      screen.getByRole("link", { name: /Healthcare facilities/ }),
+    ).toHaveAttribute("href", "/admin/facilities");
   });
 });

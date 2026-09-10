@@ -77,6 +77,15 @@ export type AppointmentListResponse = {
   appointments: AppointmentListEntry[];
 };
 
+export type AppointmentCancellationResponse = {
+  appointment_id: string;
+  status: "CANCELLED";
+  cancelled_at: string;
+  queue_id: string;
+  queue_status: "CANCELLED";
+  removed_at: string;
+};
+
 export type AppointmentFinishResponse = {
   appointment_id: string;
   visit_id: string;

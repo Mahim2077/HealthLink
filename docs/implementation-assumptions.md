@@ -159,6 +159,17 @@ V6 remains authoritative if an assumption ever conflicts with it.
   all statuses when it is omitted. The interface opens on `PENDING` for the
   operational queue and offers explicit All, Verified, and Rejected views.
 
+## Phase 10
+
+- Citizen self-cancellation is limited to an appointment whose appointment
+  status is `BOOKED` and whose queue status is `WAITING`. A row that has become
+  `CURRENT`, was skipped or removed, or is otherwise terminal returns `409`
+  rather than rewriting its clinical or queue history.
+- Cancellation acquires the existing doctor/date booking and queue locks,
+  reloads the citizen-owned appointment and queue row with `FOR UPDATE`, then
+  commits the documented `CANCELLED` states and timestamps together. A missing
+  or differently owned appointment returns the same non-revealing `404`.
+
 ## Deployment infrastructure
 
 - Vercel deployment uses one `healthlink-sd` project with Vercel Services:
@@ -172,6 +183,9 @@ V6 remains authoritative if an assumption ever conflicts with it.
   to the backend service on the same origin, preserving the existing host-only
   HttpOnly refresh-cookie model without weakening `SameSite=Lax` or adding a
   broad preview-origin CORS rule.
+- In local development, Next.js proxies root-relative `/api/v1/*` and `/health`
+  requests to `HEALTHLINK_BACKEND_ORIGIN`, defaulting to
+  `http://127.0.0.1:8000`. Production keeps using the root Vercel rewrites.
 - `healthlink-sd` is the Vercel project slug and
   `healthlink-sd.vercel.app` is its deployed stable domain. A separately
   purchased custom domain can be attached later.

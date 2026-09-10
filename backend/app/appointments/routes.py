@@ -14,6 +14,7 @@ from app.appointments.dependencies import (
 from app.appointments.schemas import (
     AppointmentBookingRequest,
     AppointmentBookingResponse,
+    AppointmentCancellationResponse,
     AppointmentFinishResponse,
     AppointmentListResponse,
     ChamberQueueActionResponse,
@@ -76,6 +77,22 @@ def list_my_appointments(
     return AppointmentService(
         db, _settings(request)
     ).list_my_appointments(context.auth.user.id)
+
+
+@appointment_lifecycle_router.post(
+    "/{appointment_id}/cancel",
+    response_model=AppointmentCancellationResponse,
+    summary="Cancel a waiting appointment owned by the current citizen",
+)
+def cancel_appointment(
+    appointment_id: uuid.UUID,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[CitizenContext, Depends(get_current_citizen_for_booking)],
+) -> AppointmentCancellationResponse:
+    return AppointmentService(
+        db, _settings(request)
+    ).cancel_appointment(context.auth.user.id, appointment_id)
 
 
 # ---------------------------------------------------------------------------

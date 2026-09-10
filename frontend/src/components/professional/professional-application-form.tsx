@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
@@ -47,8 +48,10 @@ function PendingApplication({ result }: { result: ProfessionalApplicationRespons
   const roleName = PROFESSIONAL_ROLES.find((role) => role.code === result.role_code)?.name ?? result.role_code;
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 items-center px-5 py-14 sm:px-8" id="main-content">
-      <section className="w-full rounded-[2rem] border border-emerald-200 bg-white p-7 text-center shadow-xl shadow-slate-900/[0.06] sm:p-10">
-        <span className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-emerald-100 text-3xl text-emerald-700">✓</span>
+      <section className="w-full rounded-2xl border border-emerald-200 bg-white p-7 text-center shadow-[0_22px_60px_-42px_rgba(15,23,42,0.45)] sm:p-10">
+        <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+          <CheckCircleIcon aria-hidden="true" className="size-8" />
+        </span>
         <p className="mt-6 text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Application submitted</p>
         <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-slate-950">Your {roleName} application is pending.</h1>
         <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-slate-600">An administrator must verify this role and match your submitted facility before professional access becomes active. Registration does not grant clinical privileges.</p>
@@ -137,8 +140,8 @@ export function ProfessionalApplicationForm({
   if (result) return <PendingApplication result={result} />;
 
   return (
-    <main className="mx-auto grid w-full max-w-7xl flex-1 items-start gap-10 px-5 py-12 sm:px-8 sm:py-16 lg:grid-cols-[0.72fr_1.28fr] lg:px-10" id="main-content">
-      <section className="max-w-lg pt-2 lg:sticky lg:top-10 lg:pt-10">
+    <main className="mx-auto grid w-full max-w-7xl flex-1 items-start gap-8 px-5 py-10 sm:px-8 sm:py-14 lg:grid-cols-[0.72fr_1.28fr] lg:gap-12 lg:px-10" id="main-content">
+      <section className="order-2 max-w-lg pt-2 lg:order-1 lg:sticky lg:top-10 lg:pt-8">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Professional registration</p>
         <h1 className="mt-4 font-display text-4xl font-bold tracking-[-0.045em] text-slate-950 sm:text-5xl">Apply with one trusted identity.</h1>
         <p className="mt-5 text-base leading-7 text-slate-600">{mode === "new" ? "Professional registration requires an NID. If that NID already belongs to a HealthLink citizen, sign in and use onboarding instead." : "Your signed-in HealthLink identity and NID will be reused. No duplicate user account is created."}</p>
@@ -148,7 +151,7 @@ export function ProfessionalApplicationForm({
         {mode === "new" ? <p className="mt-5 text-sm text-slate-600">Already a citizen? <Link className="font-bold text-sky-700 underline-offset-4 hover:underline" href="/citizen/login">Sign in first</Link>, then choose professional onboarding.</p> : null}
       </section>
 
-      <section className="rounded-[2rem] border border-white bg-white/95 p-5 shadow-xl shadow-slate-900/[0.06] sm:p-8 lg:p-10">
+      <section className="order-1 rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_22px_60px_-42px_rgba(15,23,42,0.45)] sm:p-8 lg:order-2 lg:p-10">
         <form className="space-y-8" onSubmit={submit}>
           {mode === "new" ? (
             <fieldset className="grid gap-5 sm:grid-cols-2" disabled={submitting}>

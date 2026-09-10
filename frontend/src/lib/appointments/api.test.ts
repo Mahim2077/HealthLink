@@ -14,6 +14,7 @@ vi.mock("@/lib/api/client", () => ({
 
 import {
   bookAppointment,
+  cancelAppointment,
   finishAppointment,
   listMyAppointments,
 } from "./api";
@@ -98,6 +99,22 @@ describe("Appointments API", () => {
 
     await expect(listMyAppointments()).resolves.toEqual(response);
     expect(apiMocks.get).toHaveBeenCalledWith("citizens/appointments");
+  });
+
+  it("cancels an owned waiting appointment through the canonical route", async () => {
+    apiMocks.post.mockResolvedValue({
+      appointment_id: "appointment-1",
+      status: "CANCELLED",
+      queue_id: "queue-1",
+      queue_status: "CANCELLED",
+    });
+
+    await cancelAppointment("appointment-1");
+
+    expect(apiMocks.post).toHaveBeenCalledWith(
+      "appointments/appointment-1/cancel",
+      {},
+    );
   });
 
   it("finishes the current appointment through the canonical Phase 14 route", async () => {

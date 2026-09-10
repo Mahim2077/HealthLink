@@ -92,6 +92,17 @@ class AppointmentListResponse(BaseModel):
     appointments: list[AppointmentListEntry]
 
 
+class AppointmentCancellationResponse(BaseModel):
+    """Atomic result of a citizen-owned appointment cancellation."""
+
+    appointment_id: uuid.UUID
+    status: AppointmentStatus
+    cancelled_at: datetime
+    queue_id: uuid.UUID
+    queue_status: QueueStatus
+    removed_at: datetime
+
+
 # ---------------------------------------------------------------------------
 # Phase 11 — Chamber session and serial queue projections
 # ---------------------------------------------------------------------------

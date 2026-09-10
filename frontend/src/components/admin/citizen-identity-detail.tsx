@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
@@ -120,8 +121,9 @@ function CitizenIdentityDetailContent({ userId }: { userId: string }) {
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-10 sm:px-8 lg:px-10" id="main-content">
-      <Link className="text-sm font-bold text-indigo-700" href="/admin/citizen-identities">
-        ← Identity search
+      <Link className="inline-flex items-center gap-2 text-sm font-bold text-indigo-700" href="/admin/citizen-identities">
+        <ArrowLeftIcon aria-hidden="true" className="size-4" />
+        Identity search
       </Link>
       {!detail && !error ? (
         <div className="mt-8">
@@ -166,7 +168,7 @@ function CitizenIdentityDetailContent({ userId }: { userId: string }) {
             <p className="mt-2 break-words text-sm text-slate-600">{detail.email}</p>
           </header>
           <div className="mt-7 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-            <section className="rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-sm">
+            <section className="hl-card p-6">
               <h2 className="text-xl font-bold text-slate-950">Identity record</h2>
               <dl className="mt-5 grid gap-4">
                 <div>
@@ -221,7 +223,7 @@ function CitizenIdentityDetailContent({ userId }: { userId: string }) {
                 </div>
               </dl>
             </section>
-            <section className="rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-sm">
+            <section className="hl-card p-6">
               <h2 className="text-xl font-bold text-slate-950">Record a correction</h2>
               <p className="mt-2 text-sm text-slate-600">
                 Use this only when an existing NID or BCN is incorrect. Each correction is logged

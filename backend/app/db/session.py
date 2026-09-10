@@ -38,11 +38,9 @@ def create_database_engine(
     poolclass:
         Optional pool implementation (typically ``NullPool`` for tests).
     disable_prepared_statements:
-        When True, the engine is created with SQLAlchemy's
-        ``statement_cache_size=0`` flag. This is required for
-        PgBouncer-compatible transaction-mode poolers (e.g. Supabase's
-        session pooler on port 6543) which reject the named prepared
-        statements SQLAlchemy would otherwise cache per connection.
+        When True for a PostgreSQL URL, the engine disables SQLAlchemy's
+        compiled statement cache and psycopg's automatic PREPARE support.
+        Other database dialects ignore this PostgreSQL-specific option.
     """
 
     options: dict[str, Any] = {}
@@ -54,7 +52,7 @@ def create_database_engine(
     if poolclass is not None:
         options["poolclass"] = poolclass
     url = normalize_database_url(database_url)
-    if disable_prepared_statements:
+    if disable_prepared_statements and url.drivername.startswith("postgresql"):
         # PgBouncer transaction-mode poolers (e.g. Supabase session
         # pooler on port 6543) reject named prepared statements when the
         # same statement name lands on a different pooled backend. We

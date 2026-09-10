@@ -69,6 +69,10 @@ export async function loadCitizenDashboard(): Promise<CitizenDashboardData> {
   return { identity, profile };
 }
 
+export async function loadCitizenMe(): Promise<CitizenProfile> {
+  return apiClient.get<CitizenProfile>("citizens/me");
+}
+
 export async function updateCitizenProfile(
   request: CitizenProfileUpdateRequest,
 ): Promise<CitizenProfile> {

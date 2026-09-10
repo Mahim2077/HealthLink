@@ -139,7 +139,7 @@ function ProfileEditor({
   };
 
   return (
-    <section className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+    <section className="hl-card p-6 sm:p-8">
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">Profile details</p>
         <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Keep your information current</h2>
@@ -224,20 +224,20 @@ function IdentityManager({
   };
 
   return (
-    <section className="rounded-[1.75rem] border border-teal-100 bg-teal-950 p-6 text-white shadow-xl shadow-teal-950/10 sm:p-8">
-      <p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-300">Identity</p>
+    <section className="rounded-2xl border border-teal-200 bg-teal-50/70 p-6 text-slate-950 sm:p-8">
+      <p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">Identity</p>
       <h2 className="mt-2 text-2xl font-bold">Verified identifiers</h2>
       <dl className="mt-6 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-white/10 bg-white/[0.06] p-4">
-          <dt className="text-xs font-semibold text-teal-100">Birth Certificate Number</dt>
+        <div className="rounded-xl border border-teal-100 bg-white p-4">
+          <dt className="text-xs font-semibold text-slate-500">Birth Certificate Number</dt>
           <dd className="mt-2 font-mono text-sm font-bold tracking-wider">{maskIdentityValue(identity.birth_certificate_number)}</dd>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/[0.06] p-4">
-          <dt className="text-xs font-semibold text-teal-100">National ID</dt>
+        <div className="rounded-xl border border-teal-100 bg-white p-4">
+          <dt className="text-xs font-semibold text-slate-500">National ID</dt>
           <dd className="mt-2 font-mono text-sm font-bold tracking-wider">{maskIdentityValue(identity.nid_number)}</dd>
         </div>
       </dl>
-      {identity.nid_added_at ? <p className="mt-4 text-xs text-teal-100/75">NID added {formatCitizenDate(identity.nid_added_at)}</p> : null}
+      {identity.nid_added_at ? <p className="mt-4 text-xs text-slate-500">NID added {formatCitizenDate(identity.nid_added_at)}</p> : null}
 
       {canAdd ? (
         <form className="mt-7 rounded-2xl bg-white p-5 text-slate-900 sm:p-6" onSubmit={submit}>
@@ -257,7 +257,7 @@ function IdentityManager({
           </button>
         </form>
       ) : (
-        <div className="mt-7 rounded-xl border border-emerald-300/20 bg-emerald-300/10 p-4 text-sm leading-6 text-emerald-50">
+        <div className="mt-7 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800">
           {message ? message.text : "Your identity is locked against self-service replacement."}
         </div>
       )}
@@ -277,7 +277,7 @@ function ProfileContent({
   const [profile, setProfile] = useState(initial.profile);
   const [identity, setIdentity] = useState(initial.identity);
   return (
-    <main className="mx-auto w-full max-w-7xl flex-1 px-5 py-10 sm:px-8 sm:py-14 lg:px-10" id="main-content">
+    <main className="hl-page" id="main-content">
       <div className="flex flex-col gap-5 border-b border-slate-200 pb-8 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">Citizen account</p>

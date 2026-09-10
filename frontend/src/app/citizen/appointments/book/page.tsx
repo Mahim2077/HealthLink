@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -49,7 +50,7 @@ function BookContent() {
   if (confirmation) {
     return (
       <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-12 sm:px-8" id="main-content">
-        <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-6">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-emerald-700">
             Appointment booked
           </p>
@@ -78,10 +79,11 @@ function BookContent() {
     >
       <div className="border-b border-slate-200 pb-7">
         <Link
-          className="text-sm font-bold text-teal-700 hover:text-teal-900"
+          className="inline-flex items-center gap-2 text-sm font-bold text-teal-700 hover:text-teal-900"
           href="/citizen/appointments"
         >
-          ← My appointments
+          <ArrowLeftIcon aria-hidden="true" className="size-4" />
+          My appointments
         </Link>
         <p className="mt-6 text-xs font-bold uppercase tracking-[0.15em] text-teal-700">
           New appointment
@@ -94,7 +96,7 @@ function BookContent() {
         </p>
       </div>
 
-      <section className="mt-8 rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="hl-card mt-8 p-6">
         <h2 className="text-base font-bold uppercase tracking-[0.15em] text-teal-700">
           Appointment details
         </h2>

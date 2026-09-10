@@ -40,6 +40,14 @@ class AppointmentFinishContext:
     practice_session: DoctorPracticeSession
 
 
+@dataclass(frozen=True)
+class AppointmentCancellationContext:
+    """Appointment and queue rows changed by citizen cancellation."""
+
+    appointment: Appointment
+    queue_entry: AppointmentQueueEntry
+
+
 class AppointmentBookingConflictError(Exception):
     """Raised when the database uniquely guards a duplicate serial."""
 
@@ -245,6 +253,38 @@ class AppointmentRepository:
 
     def get_appointment_by_id(self, appointment_id: uuid.UUID) -> Appointment | None:
         return self.db.get(Appointment, appointment_id)
+
+    def get_appointment_cancellation_context(
+        self,
+        *,
+        appointment_id: uuid.UUID,
+        citizen_id: uuid.UUID,
+        for_update: bool = False,
+    ) -> AppointmentCancellationContext | None:
+        """Load a cancellable appointment without exposing another citizen's row."""
+
+        statement = (
+            select(Appointment, AppointmentQueueEntry)
+            .join(
+                AppointmentQueueEntry,
+                AppointmentQueueEntry.appointment_id == Appointment.id,
+            )
+            .where(
+                Appointment.id == appointment_id,
+                Appointment.citizen_id == citizen_id,
+            )
+        )
+        if for_update:
+            statement = statement.with_for_update().execution_options(
+                populate_existing=True
+            )
+        row = self.db.execute(statement).one_or_none()
+        if row is None:
+            return None
+        return AppointmentCancellationContext(
+            appointment=row[0],
+            queue_entry=row[1],
+        )
 
     def get_practice_session_by_id(
         self, session_id: uuid.UUID

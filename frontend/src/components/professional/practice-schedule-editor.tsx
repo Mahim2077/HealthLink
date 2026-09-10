@@ -278,7 +278,7 @@ export function PracticeScheduleEditor({ deps }: { deps?: Partial<ScheduleEditor
 
   return (
     <section className="space-y-8">
-      <header className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+      <header className="hl-card p-6 sm:p-8">
         <p className="text-xs font-bold uppercase tracking-[0.15em] text-sky-700">
           Verified doctor · practice windows
         </p>
@@ -344,7 +344,7 @@ export function PracticeScheduleEditor({ deps }: { deps?: Partial<ScheduleEditor
       )}
 
       <form
-        className="rounded-[1.75rem] border border-sky-200 bg-sky-50/40 p-6 shadow-sm sm:p-8"
+        className="rounded-2xl border border-sky-200 bg-sky-50/40 p-6 shadow-sm sm:p-8"
         onSubmit={handleSubmit}
       >
         <h3 className="text-lg font-bold text-slate-950">

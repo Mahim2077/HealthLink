@@ -21,7 +21,7 @@ apply to that phase have passed.
 | 11 | Doctor Daily Chamber Session and Serial Queue | Completed |
 | 12 | Current Patient Clinical Access and Consultation Workspace | Completed |
 | 13 | Chamber Prescription Form and Electronic PDF | Completed |
-| 14 | Finish Appointment and Automatic Next Serial | Not started |
+| 14 | Finish Appointment and Automatic Next Serial | Completed |
 
 Phase 15 and later are explicitly outside the current implementation boundary.
 
@@ -672,3 +672,28 @@ nid_number, birth_certificate_number, email, user_id,
   next CURRENT patient, and persisted both visits as FINALIZED, both
   appointments as COMPLETED, and both queue entries as DONE in Supabase. Every
   exact synthetic row and auth session was removed afterward.
+
+## Post-Phase 14 frontend/backend consistency verification (2026-09-10)
+
+- Audited the frontend API adapters and TypeScript response models against the
+  live FastAPI OpenAPI surface and backend Pydantic schemas. Existing route,
+  method, query, payload, enum, and response contracts align.
+- Restored the documented Phase 10 citizen cancellation slice at
+  `POST /api/v1/appointments/{id}/cancel`. Ownership is enforced without
+  leaking another citizen's appointment; only BOOKED/WAITING rows can cancel;
+  the appointment and queue timestamps/statuses commit atomically; cancelled
+  capacity is reusable while serial numbers remain monotonic.
+- Added the matching citizen appointment-history action with confirmation,
+  pending/error/success states, and immediate movement into the Cancelled
+  history group. Backend route/invariant tests, frontend adapter tests, and a
+  component interaction test cover the slice.
+- Standardized browser traffic on root-relative `/api/v1`. The development-only
+  Next.js proxy now mirrors the Vercel same-origin topology, preventing
+  localhost/127.0.0.1 CORS and host-only refresh-cookie drift. PostgreSQL-only
+  prepared-statement options are now ignored by SQLite, with a regression test.
+- Final local gates passed: 207 backend tests with 34 expected PostgreSQL-only
+  skips, 43 frontend files / 194 tests, ESLint, TypeScript, and the optimized
+  22-page Next.js build. An isolated browser flow passed registration, login,
+  hard-refresh session restoration, doctor discovery, booking, cancellation,
+  refreshed history, and a clean browser console. No production deployment was
+  performed by this consistency pass.

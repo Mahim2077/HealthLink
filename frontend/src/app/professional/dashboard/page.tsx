@@ -1,3 +1,8 @@
+import {
+  ArrowRightIcon,
+  ChatBubbleBottomCenterTextIcon,
+  QueueListIcon,
+} from "@heroicons/react/24/outline";
 import Link from "next/link";
 
 import { PracticeScheduleEditor } from "@/components/professional/practice-schedule-editor";
@@ -8,9 +13,8 @@ export default function ProfessionalDashboardPage() {
     <ProfessionalPortal
       mode="dashboard"
       verifiedDoctorSlot={
-        <div className="space-y-6">
-          <ChamberDashboardCard />
-          <ConsultationsDashboardCard />
+        <div className="space-y-8">
+          <ProfessionalActions />
           <PracticeScheduleEditor />
         </div>
       }
@@ -18,73 +22,38 @@ export default function ProfessionalDashboardPage() {
   );
 }
 
-function ChamberDashboardCard() {
-  // The dashboard surfaces a Chamber shortcut; the dedicated
-  // /professional/chamber page owns the live queue + actions.
+function ProfessionalActions() {
   return (
-    <section className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-      <header className="flex flex-col gap-3 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.15em] text-sky-700">
-            Chamber
-          </p>
-          <h2 className="mt-2 text-2xl font-bold text-slate-950">
-            Today&rsquo;s chamber queue
-          </h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Open today&rsquo;s chamber, call the next serial, or handle queue
-            exceptions before consultation.
-          </p>
-        </div>
-        <Link
-          className="inline-flex min-h-11 items-center rounded-xl bg-sky-700 px-5 text-sm font-bold text-white"
-          href="/professional/chamber"
-        >
-          Open chamber
-        </Link>
-      </header>
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
-        <p>
-          The chamber page calls today&rsquo;s session, lists waiting serials,
-          and links the current patient to the consultation workspace.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function ConsultationsDashboardCard() {
-  // The dashboard surfaces a Consultations shortcut; the dedicated
-  // /professional/visits page owns the live consultation workspace for
-  // the doctor with the current serial.
-  return (
-    <section className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-      <header className="flex flex-col gap-3 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.15em] text-sky-700">
-            Visits
-          </p>
-          <h2 className="mt-2 text-2xl font-bold text-slate-950">
-            Today&rsquo;s consultations
-          </h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Open the chart for the current serial, draft notes, and finalize
-            the visit.
-          </p>
-        </div>
-        <Link
-          className="inline-flex min-h-11 items-center rounded-xl bg-sky-700 px-5 text-sm font-bold text-white"
-          href="/professional/visits"
-        >
-          Open consultations
-        </Link>
-      </header>
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
-        <p>
-          The visits page loads the current patient, lets you open the visit
-          draft, save clinical progress, optionally prescribe, and finish the
-          appointment.
-        </p>
+    <section aria-labelledby="today-actions-title">
+      <h2 className="text-2xl font-bold tracking-[-0.04em] text-slate-950" id="today-actions-title">
+        Today&rsquo;s clinical work
+      </h2>
+      <div className="mt-4 divide-y divide-slate-200 border-y border-slate-200">
+        {[
+          {
+            description: "Start or resume today’s session, call the next serial, and handle queue exceptions.",
+            href: "/professional/chamber",
+            icon: QueueListIcon,
+            title: "Chamber queue",
+          },
+          {
+            description: "Open the current patient chart, draft clinical notes, prescribe, and finish the visit.",
+            href: "/professional/visits",
+            icon: ChatBubbleBottomCenterTextIcon,
+            title: "Consultation workspace",
+          },
+        ].map(({ description, href, icon: Icon, title }) => (
+          <Link className="group flex items-center gap-4 py-5 sm:px-2" href={href} key={href}>
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-100">
+              <Icon aria-hidden="true" className="size-6" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-base font-semibold text-slate-950">{title}</span>
+              <span className="mt-1 block text-sm leading-6 text-slate-600">{description}</span>
+            </span>
+            <ArrowRightIcon aria-hidden="true" className="size-5 text-sky-700 transition group-hover:translate-x-1" />
+          </Link>
+        ))}
       </div>
     </section>
   );

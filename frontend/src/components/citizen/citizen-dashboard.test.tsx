@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
@@ -99,7 +99,7 @@ describe("CitizenDashboard", () => {
     vi.useRealTimers();
   });
 
-  it("restores a Citizen session after reload, loads both dashboard resources, and masks identity", async () => {
+  it("restores a Citizen session and keeps identity details off the overview", async () => {
     const citizenToken = createToken("CITIZEN");
     let resolveRefresh!: () => void;
     testMocks.refreshSession.mockImplementation(
@@ -120,7 +120,8 @@ describe("CitizenDashboard", () => {
     expect(await screen.findByText("Welcome, Amina.")).toBeInTheDocument();
     expect(testMocks.refreshSession).toHaveBeenCalledOnce();
     expect(loadAction).toHaveBeenCalledOnce();
-    expect(screen.getByTestId("masked-identity")).toHaveTextContent("2345");
+    expect(screen.queryByTestId("masked-identity")).not.toBeInTheDocument();
+    expect(screen.queryByText("Registered identity")).not.toBeInTheDocument();
     expect(screen.queryByText("00123456789012345")).not.toBeInTheDocument();
   });
 
@@ -200,19 +201,18 @@ describe("CitizenDashboard", () => {
     expect(loadAction).toHaveBeenCalledTimes(2);
   });
 
-  it("logs out, clears the dashboard, and never bootstraps a new session", async () => {
+  it("surfaces primary care actions without identity content", async () => {
     act(() => accessTokenStore.set(createToken("CITIZEN")));
-    testMocks.logout.mockImplementation(async () => {
-      accessTokenStore.clear();
-    });
     renderDashboard();
     await screen.findByText("Welcome, Amina.");
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
-
-    await waitFor(() => expect(testMocks.logout).toHaveBeenCalledOnce());
-    expect(testMocks.replace).toHaveBeenCalledWith("/citizen/login");
-    expect(testMocks.refreshSession).not.toHaveBeenCalled();
-    expect(screen.getByText("Sign in to continue")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Find a verified doctor" }),
+    ).toHaveAttribute("href", "/citizen/doctors/search");
+    expect(screen.getByRole("link", { name: /Appointments/ })).toHaveAttribute(
+      "href",
+      "/citizen/appointments",
+    );
+    expect(screen.queryByText(/National ID/i)).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,9 @@
-import type { ReactNode } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 
 export const citizenInputClassName =
   "min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500";
@@ -20,6 +25,24 @@ export function FormField({
   label: string;
   required?: boolean;
 }) {
+  const descriptionId = error
+    ? htmlFor + "-error"
+    : hint
+      ? htmlFor + "-hint"
+      : undefined;
+  const control = isValidElement(children)
+    ? cloneElement(
+        children as ReactElement<{
+          "aria-describedby"?: string;
+          "aria-invalid"?: boolean | "false" | "true";
+        }>,
+        {
+          "aria-describedby": descriptionId,
+          "aria-invalid": error ? true : undefined,
+        },
+      )
+    : children;
+
   return (
     <div className={className}>
       <label className="text-sm font-semibold text-slate-800" htmlFor={htmlFor}>
@@ -31,7 +54,7 @@ export function FormField({
           </>
         ) : null}
       </label>
-      <div className="mt-2">{children}</div>
+      <div className="mt-2">{control}</div>
       {error ? (
         <p className="mt-1.5 text-xs font-medium text-rose-700" id={htmlFor + "-error"}>
           {error}

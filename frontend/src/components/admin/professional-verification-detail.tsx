@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
@@ -56,7 +57,7 @@ function ProfessionalVerificationDetailContent({ registrationId }: { registratio
   };
 
   return <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-10 sm:px-8 lg:px-10" id="main-content">
-    <Link className="text-sm font-bold text-indigo-700" href="/admin/professional-registrations">← Verification queue</Link>
+    <Link className="inline-flex items-center gap-2 text-sm font-bold text-indigo-700" href="/admin/professional-registrations"><ArrowLeftIcon aria-hidden="true" className="size-4" />Verification queue</Link>
     {!registration && !error ? <div className="mt-8"><LoadingState description="Loading role-specific application evidence." label="Loading application" /></div> : null}
     {error ? <div className="mt-8"><ErrorState message={error} onAction={() => { setError(null); void load(); }} title="Application unavailable" /></div> : null}
     {registration ? <>

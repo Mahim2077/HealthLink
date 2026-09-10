@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -168,10 +169,11 @@ function ProfileContent({
     >
       <div className="border-b border-slate-200 pb-7">
         <Link
-          className="text-sm font-bold text-teal-700 hover:text-teal-900"
+          className="inline-flex items-center gap-2 text-sm font-bold text-teal-700 hover:text-teal-900"
           href="/citizen/doctors/search"
         >
-          ← Doctor search
+          <ArrowLeftIcon aria-hidden="true" className="size-4" />
+          Doctor search
         </Link>
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">
@@ -218,7 +220,7 @@ function ProfileContent({
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-        <section className="rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="hl-card p-6">
           <h2 className="text-base font-bold uppercase tracking-[0.15em] text-teal-700">
             Contact
           </h2>
@@ -228,7 +230,7 @@ function ProfileContent({
           <p className="mt-6 text-sm leading-6 text-slate-600">Appointments follow a serial queue during the published practice window. Your serial does not guarantee an exact consultation time.</p>
         </section>
 
-        <section className="rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="hl-card p-6">
           <h2 className="text-base font-bold uppercase tracking-[0.15em] text-teal-700">
             Weekly practice windows
           </h2>

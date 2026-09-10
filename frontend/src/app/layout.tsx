@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
 
+import "@fontsource-variable/inter";
 import "./globals.css";
 
 export const metadata: Metadata = {

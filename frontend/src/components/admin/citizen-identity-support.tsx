@@ -82,14 +82,14 @@ function CitizenIdentitySupportContent() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-7xl flex-1 px-5 py-10 sm:px-8 lg:px-10" id="main-content">
+    <main className="hl-page" id="main-content">
       <AdminSectionHeader
         description="Search by NID, Birth Certificate Number, email, or User ID. Corrections are recorded with the acting administrator's identity and are not auto-merged."
         eyebrow="Citizen identity support"
         title="Find a citizen identity"
       />
       <div className="mt-8 grid gap-7 lg:grid-cols-[0.95fr_1.05fr]">
-        <section className="rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="hl-card p-6">
           <h2 className="text-xl font-bold text-slate-950">Search filters</h2>
           <p className="mt-2 text-sm text-slate-600">At least one filter is required.</p>
           <form className="mt-5 grid gap-4" onSubmit={submit}>
@@ -169,7 +169,7 @@ function CitizenIdentitySupportContent() {
               title="Identity search unavailable"
             />
           ) : null}
-          {submitted && rows && rows.length === 0 ? (
+          {submitted && !error && rows && rows.length === 0 ? (
             <EmptyState
               message="No citizen identity matched these filters."
               title="No matches found"
@@ -178,7 +178,7 @@ function CitizenIdentitySupportContent() {
           <div className="grid gap-4">
             {rows?.map((row) => (
               <article
-                className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-sm"
+                className="hl-card p-5"
                 key={row.user_id}
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

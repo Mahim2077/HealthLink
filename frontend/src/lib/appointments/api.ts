@@ -5,6 +5,7 @@ import { apiClient } from "@/lib/api/client";
 import type {
   AppointmentBookingRequest,
   AppointmentBookingResponse,
+  AppointmentCancellationResponse,
   AppointmentFinishResponse,
   AppointmentListResponse,
 } from "./types";
@@ -20,6 +21,15 @@ export async function bookAppointment(
 
 export async function listMyAppointments(): Promise<AppointmentListResponse> {
   return apiClient.get<AppointmentListResponse>("citizens/appointments");
+}
+
+export async function cancelAppointment(
+  appointmentId: string,
+): Promise<AppointmentCancellationResponse> {
+  return apiClient.post<AppointmentCancellationResponse, Record<string, never>>(
+    `appointments/${appointmentId}/cancel`,
+    {},
+  );
 }
 
 export async function finishAppointment(
