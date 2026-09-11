@@ -99,8 +99,11 @@ SQLite-compatible backend suite, 43 frontend files / 196 tests passed, ESLint
 passed, TypeScript passed, and the optimized Next.js build generated 22 routes.
 An isolated local citizen session confirmed the action is absent from Overview,
 present in Profile, and still opens `/professional/onboard`; the browser console
-reported no warnings or errors. The GitHub Actions and production-deployment
-evidence for the tagged commit is recorded in `docs/implementation-progress.md`.
+reported no warnings or errors. GitHub Actions run 18 (`34585853211`) then passed
+all four production jobs for tagged commit `3054c24`; Vercel deployment
+`dpl_EwkVtdWMbykKRyPx8AaBzvH6vzRJ` reached READY and the stable root and health
+endpoint returned HTTP 200. The complete release evidence is recorded in
+`docs/implementation-progress.md`.
 
 ## Final Phase 14 behavior
 

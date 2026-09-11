@@ -730,3 +730,19 @@ nid_number, birth_certificate_number, email, user_id,
 - The `phase-14-final` tag marks this final Phase 0–14 development boundary.
   Phase 15 and later work remains intentionally unimplemented and requires a
   new explicit instruction after rereading all three governing documents.
+- Commit `3054c24` was pushed to `main` and tagged `phase-14-final`. GitHub
+  Actions HealthLink CI/CD run 18 (`34585853211`) completed successfully in
+  3 minutes 41 seconds: frontend quality gates, backend/PostgreSQL quality
+  gates, production migration, and the Vercel deployment job all passed.
+- Production deployment `dpl_EwkVtdWMbykKRyPx8AaBzvH6vzRJ` reached READY as
+  the Vercel Services build for the tagged commit. Its generated deployment is
+  `healthlink-6aw1ffgea-mahim2077s-projects.vercel.app`; the stable
+  `healthlink-sd.vercel.app` alias resolves to it. Vercel build readiness took
+  approximately 21 seconds from creation.
+- Post-deploy smoke checks returned HTTP 200 for `/` and `/health`; the health
+  payload reported the production environment. The public landing page rendered
+  its doctor artwork and expected content, browser console warnings/errors were
+  empty, and a 15-minute Vercel error-log scan returned no entries.
+- This release-evidence ledger is a documentation-only follow-up to the tagged
+  and deployed product commit; it does not change the application artifact or
+  widen the Phase 14 scope.
