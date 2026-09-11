@@ -21,7 +21,10 @@ import {
 } from "react";
 
 import { usePortalAuth } from "@/components/auth/auth-provider";
-import { PortalNavigation } from "@/components/auth/portal-navigation";
+import {
+  PortalNavigation,
+  PortalTextNavigation,
+} from "@/components/auth/portal-navigation";
 import { HealthLinkMark } from "@/components/brand/healthlink-mark";
 import { loadAdminMe } from "@/lib/admin/api";
 import type { Portal } from "@/lib/auth/types";
@@ -301,7 +304,7 @@ export function PortalShell({ children, portal }: { children: ReactNode; portal:
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/94 backdrop-blur-xl">
-            <div className="flex min-h-24 items-center justify-between gap-4 px-5 sm:px-8 lg:px-10">
+            <div className="flex min-h-20 items-center justify-between gap-4 px-5 sm:px-8 lg:px-10">
               <div className="flex min-w-0 items-center gap-3">
                 <button
                   aria-expanded={mobileOpen}
@@ -318,6 +321,7 @@ export function PortalShell({ children, portal }: { children: ReactNode; portal:
               </div>
               <PortalAccount portal={portal} />
             </div>
+            <PortalTextNavigation portal={portal} />
           </header>
 
           <div className="flex min-h-0 flex-1 flex-col">{children}</div>

@@ -76,6 +76,9 @@ describe("PortalShell", () => {
 
   it("starts collapsed and expands into a keyboard-resizable navigation", async () => {
     renderShell();
+    expect(
+      screen.getByRole("navigation", { name: "citizen page navigation" }),
+    ).toBeInTheDocument();
     const sidebar = screen.getByLabelText("Citizen portal sidebar");
     expect(sidebar).toHaveStyle({ width: "84px" });
 

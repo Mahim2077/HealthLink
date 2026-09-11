@@ -52,6 +52,37 @@ function isActivePath(pathname: string, href: string): boolean {
   return href === "/citizen/doctors/search" && pathname.startsWith("/citizen/doctors/");
 }
 
+export function PortalTextNavigation({ portal }: { portal: Portal }) {
+  const pathname = usePathname();
+
+  return (
+    <nav
+      aria-label={`${portal.toLowerCase()} page navigation`}
+      className="hidden min-h-14 items-stretch overflow-x-auto border-t border-slate-100 px-5 sm:px-8 lg:flex lg:px-10"
+    >
+      <div className="flex min-w-max items-stretch gap-7">
+        {links[portal].map(({ href, label }) => {
+          const active = isActivePath(pathname, href);
+          return (
+            <Link
+              aria-current={active ? "page" : undefined}
+              className={`relative inline-flex min-h-14 items-center whitespace-nowrap text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-teal-700 ${
+                active
+                  ? "text-teal-800 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-teal-700"
+                  : "text-slate-600 hover:text-teal-800"
+              }`}
+              href={href}
+              key={href}
+            >
+              {label}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
 export function PortalNavigation({
   collapsed = false,
   onNavigate,

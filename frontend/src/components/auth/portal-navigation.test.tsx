@@ -15,7 +15,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: mocks.replace }),
 }));
 
-import { PortalNavigation } from "./portal-navigation";
+import { PortalNavigation, PortalTextNavigation } from "./portal-navigation";
 
 function citizenToken() {
   const encode = (value: object) => btoa(JSON.stringify(value)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
@@ -35,6 +35,31 @@ describe("PortalNavigation", () => {
     render(<AuthProvider><PortalNavigation portal="CITIZEN" /></AuthProvider>);
 
     expect(screen.getByRole("link", { name: "Find a doctor" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("renders the same citizen destinations as accessible text links", () => {
+    render(<PortalTextNavigation portal="CITIZEN" />);
+
+    const navigation = screen.getByRole("navigation", {
+      name: "citizen page navigation",
+    });
+    expect(navigation).toHaveClass("overflow-x-auto");
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
+      "href",
+      "/citizen/dashboard",
+    );
+    expect(screen.getByRole("link", { name: "Find a doctor" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.getByRole("link", { name: "Appointments" })).toHaveAttribute(
+      "href",
+      "/citizen/appointments",
+    );
+    expect(screen.getByRole("link", { name: "My profile" })).toHaveAttribute(
+      "href",
+      "/citizen/profile",
+    );
   });
 
   it("signs out from the shared portal navigation", async () => {
