@@ -115,6 +115,17 @@ remaining cross-portal accent leaks from Citizen Overview and the Professional
 chamber. It changes no schema, migration, endpoint, authorization rule,
 dependency manifest, or workflow.
 
+Release evidence for that presentation-only pass: commit `90c74e3` was pushed
+to `main`; GitHub Actions HealthLink CI/CD run 19 (`34613133371`) passed all
+four jobs in 3 minutes 40 seconds, including PostgreSQL backend gates,
+frontend gates, the production migration check, Vercel Services deployment,
+and root/health smoke tests. Vercel deployment
+`dpl_3EGKZBcSM2GGS7TammCQqWUsN3Vf` reached READY in 20 seconds at
+`healthlink-fhty05yor-mahim2077s-projects.vercel.app`; the stable
+`healthlink-sd.vercel.app` alias resolves to it. Stable `/` and `/health`
+returned HTTP 200, the health payload reported production, and the 15-minute
+post-deploy error-log query returned no entries.
+
 ## Final Phase 14 behavior
 
 The canonical endpoint is:
