@@ -122,6 +122,26 @@ missing primary action, or moderate-or-higher fidelity mismatch.
   An authenticated local browser flow verified Overview → Profile →
   Professional onboarding with no console warnings or errors.
 
+## Portal-theme consistency closeout (2026-09-11)
+
+- The selected design and all existing interactions remain unchanged. The
+  shared public/authenticated shell and second-row navigation now inherit
+  portal-scoped tokens: Citizen teal/green, Professional sky/blue, and Admin
+  indigo/purple.
+- The account avatar/action, desktop rail, collapse and resize controls, mobile
+  drawer, active navigation, focus rings, and form accents follow the current
+  portal without duplicating shell components.
+- The remaining indigo accents were removed from Citizen Overview, and the
+  remaining teal current-patient surface was changed to sky in the Professional
+  chamber.
+- Emerald success, amber warning, rose error, and slate neutral treatments are
+  intentionally unchanged because they communicate status rather than portal
+  identity.
+- ESLint, TypeScript, 43 Vitest files / 199 tests, and the optimized 22-route
+  build passed. Local visual checks confirmed all three login palettes.
+- No route, feature, workflow, API, authorization rule, schema, migration, or
+  dependency changed, and no Phase 15 behavior was introduced.
+
 ## Implementation checklist
 
 - [x] Selected visual target resolved and preserved in project documentation.
@@ -130,5 +150,6 @@ missing primary action, or moderate-or-higher fidelity mismatch.
 - [x] Desktop and mobile navigation interactions verified.
 - [x] Source and implementation reviewed in combined comparison images.
 - [x] All P0/P1/P2 visual findings fixed and re-captured.
+- [x] Citizen, Professional, and Admin portal identity colors are consistent.
 
 final result: passed

@@ -113,4 +113,20 @@ describe("PortalShell", () => {
       screen.getAllByRole("navigation", { name: "citizen navigation" }),
     ).toHaveLength(1);
   });
+
+  it.each([
+    ["CITIZEN", "citizen"],
+    ["PROFESSIONAL", "professional"],
+    ["ADMIN", "admin"],
+  ] as const)("scopes the %s shell to its portal color theme", (portal, theme) => {
+    const { container } = render(
+      <AuthProvider>
+        <PortalShell portal={portal}>
+          <main>Portal content</main>
+        </PortalShell>
+      </AuthProvider>,
+    );
+
+    expect(container.firstElementChild).toHaveAttribute("data-portal", theme);
+  });
 });

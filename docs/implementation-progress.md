@@ -746,3 +746,25 @@ nid_number, birth_certificate_number, email, user_id,
 - This release-evidence ledger is a documentation-only follow-up to the tagged
   and deployed product commit; it does not change the application artifact or
   widen the Phase 14 scope.
+
+## Phase 14 portal-theme consistency closeout (2026-09-11)
+
+- Preserved the approved layouts and existing portal palettes while making
+  their scope consistent: Citizen teal/green, Professional sky/blue, and Admin
+  indigo/purple.
+- Added portal theme variables in `frontend/src/app/globals.css`; public and
+  authenticated `PortalShell` roots now expose `data-portal`, allowing the
+  shared account header, text-navigation row, desktop rail, mobile drawer,
+  collapse/resize controls, focus states, and form accents to inherit the
+  correct portal identity without duplicating components.
+- Corrected the remaining indigo supporting copy/arrows on Citizen Overview and
+  the remaining teal current-patient surface in the Professional chamber.
+  Semantic emerald success, amber warning, rose error, and slate neutral
+  treatments remain unchanged because they convey state rather than portal.
+- Added parameterized shell coverage for Citizen, Professional, and Admin theme
+  scopes. Local frontend gates passed: ESLint, TypeScript, 43 Vitest files / 199
+  tests, and the optimized 22-route Next.js production build.
+- Local visual checks confirmed the Citizen login in teal/green, Professional
+  login in sky/blue, and Admin login in indigo/purple. No layout, content,
+  feature, route, workflow, API contract, authorization rule, dependency,
+  schema, migration, or Phase 15 behavior changed.

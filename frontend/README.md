@@ -24,6 +24,10 @@ root-relative `/api/v1`; local Next.js rewrites forward them to
   collapsible/resizable icon sidebar.
 - Below the desktop breakpoint, the text row and sidebar give way to the
   existing modal navigation drawer.
+- Shared shell and navigation components scope the established identity palette
+  by portal: Citizen teal/green, Professional sky/blue, and Admin
+  indigo/purple. Semantic success, warning, error, and neutral colors remain
+  shared state signals.
 - Citizen Overview focuses on finding care and managing appointments. The
   account-level `Add a professional role` action is intentionally placed in
   Citizen Profile beside profile and identity controls.
@@ -74,6 +78,6 @@ npm test -- --run
 npm run build
 ```
 
-Vitest and Testing Library cover components and API adapters. The production
-build currently generates 22 application routes without introducing Phase 15
-features.
+Vitest and Testing Library cover components and API adapters. The current
+verified baseline is 43 test files / 199 tests, and the production build
+generates 22 application routes without introducing Phase 15 features.

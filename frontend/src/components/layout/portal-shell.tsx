@@ -43,7 +43,6 @@ const portalConfig: Record<
     background: string;
     eyebrow: string;
     footer: [string, string];
-    publicAccent: string;
   }
 > = {
   CITIZEN: {
@@ -55,7 +54,6 @@ const portalConfig: Record<
       "HealthLink keeps care connected around one trusted identity.",
       "Access follows the portal and role selected at sign in.",
     ],
-    publicAccent: "text-teal-700",
   },
   PROFESSIONAL: {
     accountHref: "/professional/status",
@@ -66,7 +64,6 @@ const portalConfig: Record<
       "Professional access starts after role-specific verification.",
       "Each session uses one explicitly selected professional role.",
     ],
-    publicAccent: "text-sky-700",
   },
   ADMIN: {
     accountHref: "/admin/dashboard",
@@ -77,7 +74,6 @@ const portalConfig: Record<
       "Trusted operational access only.",
       "Administrative actions are designed for accountable review.",
     ],
-    publicAccent: "text-indigo-700",
   },
 };
 
@@ -117,17 +113,17 @@ function PortalAccount({ portal }: { portal: Portal }) {
 
   return (
     <Link
-      className="group flex min-h-12 items-center gap-3 rounded-xl px-1.5 py-1 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:px-2"
+      className="group flex min-h-12 items-center gap-3 rounded-xl px-1.5 py-1 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--portal-accent)] sm:px-2"
       href={config.accountHref}
     >
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-teal-50 text-sm font-bold text-teal-900 ring-1 ring-inset ring-teal-100">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--portal-soft)] text-sm font-bold text-[var(--portal-strongest)] ring-1 ring-inset ring-[var(--portal-border)]">
         {initials(displayName || config.eyebrow)}
       </span>
       <span className="hidden min-w-0 items-center text-left sm:flex">
         <span className="block max-w-44 truncate text-sm font-semibold text-slate-950">
           {displayName || "Your account"}
         </span>
-        <span className="ml-4 block border-l border-slate-200 pl-4 text-xs font-semibold text-teal-700">
+        <span className="ml-4 block border-l border-slate-200 pl-4 text-xs font-semibold text-[var(--portal-accent)]">
           {config.accountLabel}
         </span>
       </span>
@@ -142,20 +138,23 @@ function PortalAccount({ portal }: { portal: Portal }) {
 function PublicShell({ children, portal }: { children: ReactNode; portal: Portal }) {
   const config = portalConfig[portal];
   return (
-    <div className={"relative isolate flex min-h-screen flex-col overflow-hidden " + config.background}>
+    <div
+      className={"relative isolate flex min-h-screen flex-col overflow-hidden " + config.background}
+      data-portal={portal.toLowerCase()}
+    >
       <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
           <Link
             aria-label="HealthLink home"
-            className="inline-flex items-center gap-3 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-700"
+            className="inline-flex items-center gap-3 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--portal-accent)]"
             href="/"
           >
-            <HealthLinkMark className={"size-9 shadow-sm " + config.publicAccent} />
+            <HealthLinkMark className="size-9 text-[var(--portal-accent)] shadow-sm" />
             <span className="text-base font-bold tracking-[-0.025em] text-slate-950">
-              Health<span className={config.publicAccent}>Link</span>
+              Health<span className="text-[var(--portal-accent)]">Link</span>
             </span>
           </Link>
-          <span className={"text-sm font-semibold " + config.publicAccent}>{config.eyebrow}</span>
+          <span className="text-sm font-semibold text-[var(--portal-accent)]">{config.eyebrow}</span>
         </div>
       </header>
       {children}
@@ -234,11 +233,11 @@ export function PortalShell({ children, portal }: { children: ReactNode; portal:
   };
 
   return (
-    <div className={"min-h-screen " + config.background}>
+    <div className={"min-h-screen " + config.background} data-portal={portal.toLowerCase()}>
       <div className="flex min-h-screen">
         <aside
           aria-label={config.eyebrow + " sidebar"}
-          className="relative z-40 hidden h-screen shrink-0 flex-col overflow-visible bg-[#00695f] text-white shadow-[14px_0_40px_-32px_rgba(2,44,40,0.75)] transition-[width] duration-200 lg:sticky lg:top-0 lg:flex"
+          className="relative z-40 hidden h-screen shrink-0 flex-col overflow-visible bg-[var(--portal-sidebar)] text-white shadow-[14px_0_40px_-32px_rgba(15,23,42,0.7)] transition-[width] duration-200 lg:sticky lg:top-0 lg:flex"
           style={{ width: renderedWidth } as CSSProperties}
         >
           <div
@@ -249,7 +248,7 @@ export function PortalShell({ children, portal }: { children: ReactNode; portal:
           >
             <Link
               aria-label="HealthLink home"
-              className="flex size-11 items-center justify-center rounded-xl bg-white text-[#00695f] shadow-lg shadow-teal-950/30 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+              className="flex size-11 items-center justify-center rounded-xl bg-white text-[var(--portal-sidebar)] shadow-lg shadow-slate-950/25 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
               href="/"
             >
               <PlusIcon aria-hidden="true" className="size-8 stroke-[2.25]" />
@@ -264,7 +263,7 @@ export function PortalShell({ children, portal }: { children: ReactNode; portal:
           <button
             aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
             aria-expanded={!collapsed}
-            className="absolute -right-4 top-8 z-20 flex size-9 items-center justify-center rounded-full border border-white/15 bg-[#087a70] text-white shadow-lg shadow-teal-950/20 transition hover:bg-[#0b8a7e] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-200"
+            className="absolute -right-4 top-8 z-20 flex size-9 items-center justify-center rounded-full border border-white/15 bg-[var(--portal-control)] text-white shadow-lg shadow-slate-950/20 transition hover:bg-[var(--portal-control-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--portal-soft)]"
             onClick={() => setCollapsed((value) => !value)}
             title={collapsed ? "Expand navigation" : "Collapse navigation"}
             type="button"
@@ -296,7 +295,7 @@ export function PortalShell({ children, portal }: { children: ReactNode; portal:
             role="separator"
             tabIndex={collapsed ? -1 : 0}
           >
-            <span className="pointer-events-none absolute left-1/2 top-1/2 flex h-12 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-[#087a70] text-white/85 shadow-sm">
+            <span className="pointer-events-none absolute left-1/2 top-1/2 flex h-12 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-[var(--portal-control)] text-white/85 shadow-sm">
               <EllipsisVerticalIcon aria-hidden="true" className="size-4" />
             </span>
           </div>
@@ -315,7 +314,7 @@ export function PortalShell({ children, portal }: { children: ReactNode; portal:
                 >
                   <Bars3Icon aria-hidden="true" className="size-6" />
                 </button>
-                <span className="truncate text-base font-bold tracking-[-0.025em] text-teal-800 sm:text-lg">
+                <span className="truncate text-base font-bold tracking-[-0.025em] text-[var(--portal-strong)] sm:text-lg">
                   {config.eyebrow}
                 </span>
               </div>
@@ -340,7 +339,7 @@ export function PortalShell({ children, portal }: { children: ReactNode; portal:
           <aside
             aria-label={config.eyebrow + " navigation"}
             aria-modal="true"
-            className="relative flex h-full w-[min(20rem,calc(100vw-2rem))] flex-col bg-[#00695f] text-white shadow-2xl"
+            className="relative flex h-full w-[min(20rem,calc(100vw-2rem))] flex-col bg-[var(--portal-sidebar)] text-white shadow-2xl"
             role="dialog"
           >
             <div className="flex min-h-20 items-center justify-between gap-3 px-5">
@@ -349,7 +348,7 @@ export function PortalShell({ children, portal }: { children: ReactNode; portal:
                 href="/"
                 onClick={() => setMobileOpen(false)}
               >
-                <span className="flex size-10 items-center justify-center rounded-xl bg-white text-[#00695f] shadow-sm">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-white text-[var(--portal-sidebar)] shadow-sm">
                   <PlusIcon aria-hidden="true" className="size-7 stroke-[2.25]" />
                 </span>
                 <span className="text-lg font-bold">HealthLink</span>

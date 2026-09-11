@@ -66,10 +66,10 @@ export function PortalTextNavigation({ portal }: { portal: Portal }) {
           return (
             <Link
               aria-current={active ? "page" : undefined}
-              className={`relative inline-flex min-h-14 items-center whitespace-nowrap text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-teal-700 ${
+              className={`relative inline-flex min-h-14 items-center whitespace-nowrap text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-[var(--portal-accent)] ${
                 active
-                  ? "text-teal-800 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-teal-700"
-                  : "text-slate-600 hover:text-teal-800"
+                  ? "text-[var(--portal-strong)] after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-[var(--portal-accent)]"
+                  : "text-slate-600 hover:text-[var(--portal-strong)]"
               }`}
               href={href}
               key={href}

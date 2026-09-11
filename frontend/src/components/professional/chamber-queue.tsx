@@ -425,7 +425,7 @@ function CurrentColumn({
   onRemove: (id: string) => Promise<void>;
 }) {
   return (
-    <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-5">
+    <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-5">
       <p className="text-xs font-bold uppercase tracking-[0.15em] text-sky-700">
         With doctor
       </p>

@@ -15,6 +15,39 @@
   --healthlink-surface: #ffffff;
 }
 
+[data-portal="citizen"] {
+  --portal-accent: #0f766e;
+  --portal-strong: #115e59;
+  --portal-strongest: #134e4a;
+  --portal-sidebar: #00695f;
+  --portal-control: #087a70;
+  --portal-control-hover: #0b8a7e;
+  --portal-soft: #f0fdfa;
+  --portal-border: #ccfbf1;
+}
+
+[data-portal="professional"] {
+  --portal-accent: #0369a1;
+  --portal-strong: #075985;
+  --portal-strongest: #0c4a6e;
+  --portal-sidebar: #075985;
+  --portal-control: #0369a1;
+  --portal-control-hover: #0284c7;
+  --portal-soft: #f0f9ff;
+  --portal-border: #e0f2fe;
+}
+
+[data-portal="admin"] {
+  --portal-accent: #4338ca;
+  --portal-strong: #3730a3;
+  --portal-strongest: #312e81;
+  --portal-sidebar: #3730a3;
+  --portal-control: #4338ca;
+  --portal-control-hover: #4f46e5;
+  --portal-soft: #eef2ff;
+  --portal-border: #e0e7ff;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -53,7 +86,7 @@ select:not(:disabled) {
 input,
 select,
 textarea {
-  accent-color: var(--healthlink-teal);
+  accent-color: var(--portal-accent, var(--healthlink-teal));
 }
 
 :focus-visible {

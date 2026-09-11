@@ -83,8 +83,10 @@ interaction baseline for later work:
   not an Overview action. Its protected `/professional/onboard` destination and
   existing citizen-session handoff are unchanged.
 - The public and authenticated layouts remain responsive across wide desktop,
-  tablet, and mobile breakpoints, with the approved HealthLink teal, ink, pale
-  clinical surfaces, typography, and Heroicons treatment.
+  tablet, and mobile breakpoints. Portal identity colors are now consistently
+  scoped across the shared shell and navigation: Citizen teal/green,
+  Professional sky/blue, and Admin indigo/purple. Semantic success, warning,
+  error, and neutral colors remain status signals and are intentionally shared.
 
 The final refinement did not add a migration, table, endpoint, authorization
 rule, dependency, or Phase 15 behavior. It moved one existing link, added
@@ -95,7 +97,7 @@ repository and should never be recreated or disclosed without an explicit
 operational need.
 
 Final local closeout evidence on 2026-09-11: `207 passed, 34 skipped` in the
-SQLite-compatible backend suite, 43 frontend files / 196 tests passed, ESLint
+SQLite-compatible backend suite, 43 frontend files / 199 tests passed, ESLint
 passed, TypeScript passed, and the optimized Next.js build generated 22 routes.
 An isolated local citizen session confirmed the action is absent from Overview,
 present in Profile, and still opens `/professional/onboard`; the browser console
@@ -104,6 +106,14 @@ all four production jobs for tagged commit `3054c24`; Vercel deployment
 `dpl_EwkVtdWMbykKRyPx8AaBzvH6vzRJ` reached READY and the stable root and health
 endpoint returned HTTP 200. The complete release evidence is recorded in
 `docs/implementation-progress.md`.
+
+The final portal-theme consistency pass is presentation-only. It adds
+`data-portal` theme scoping to public and authenticated shared shells, applies
+the matching portal tokens to the account header, second-row navigation,
+desktop rail, mobile drawer, focus states, and form accents, and removes the
+remaining cross-portal accent leaks from Citizen Overview and the Professional
+chamber. It changes no schema, migration, endpoint, authorization rule,
+dependency manifest, or workflow.
 
 ## Final Phase 14 behavior
 
@@ -205,6 +215,19 @@ diagnostically instead of hanging. Runs 11 and 12 then passed end to end.
 
 ### Frontend
 
+- `frontend/src/app/globals.css`: Citizen, Professional, and Admin portal theme
+  variables using the established teal/green, sky/blue, and indigo/purple
+  palettes.
+- `frontend/src/components/layout/portal-shell.tsx`: public/authenticated portal
+  theme scoping across the shared header, account control, desktop rail, mobile
+  drawer, resize/collapse controls, and focus states.
+- `frontend/src/components/auth/portal-navigation.tsx`: portal-aware active,
+  hover, and focus treatment for the shared second-row navigation.
+- `frontend/src/components/citizen/citizen-dashboard.tsx` and
+  `frontend/src/components/professional/chamber-queue.tsx`: removal of isolated
+  cross-portal accent colors without changing content or behavior.
+- `frontend/src/components/layout/portal-shell.test.tsx`: regression coverage
+  proving all three portal theme scopes are rendered.
 - `frontend/src/lib/appointments/{api,types}.ts`: finish call and response.
 - `frontend/src/lib/chamber/{api,types}.ts`: exact backend enums and queue-only
   action surface.

@@ -125,7 +125,7 @@ function DashboardContent({
         <h1 className="font-display text-4xl font-bold leading-[1.05] tracking-[-0.055em] text-slate-950 sm:text-5xl">
           Welcome, {profile.first_name}.
         </h1>
-        <p className="mt-3 text-lg leading-7 text-indigo-800/80 sm:text-xl">
+        <p className="mt-3 text-lg leading-7 text-teal-900/75 sm:text-xl">
           Your health information, when you need it.
         </p>
       </header>
@@ -140,7 +140,7 @@ function DashboardContent({
               <h2 className="text-2xl font-bold tracking-[-0.035em] text-slate-950 sm:text-3xl">
                 Find a verified doctor
               </h2>
-              <p className="mt-2 max-w-md text-base leading-6 text-indigo-800/80 sm:text-lg">
+              <p className="mt-2 max-w-md text-base leading-6 text-teal-900/75 sm:text-lg">
                 Search for doctors and healthcare providers in your area.
               </p>
             </div>
@@ -171,13 +171,13 @@ function DashboardContent({
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-lg font-semibold text-slate-950">Appointments</span>
-            <span className="mt-1 block text-sm text-indigo-800/80">
+            <span className="mt-1 block text-sm text-teal-900/75">
               View and manage your appointments and prescriptions
             </span>
           </span>
           <ArrowRightIcon
             aria-hidden="true"
-            className="size-5 shrink-0 text-indigo-800 transition group-hover:translate-x-1"
+            className="size-5 shrink-0 text-teal-800 transition group-hover:translate-x-1"
           />
         </Link>
       </section>

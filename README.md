@@ -40,6 +40,10 @@ documents and are preserved under their attached filenames.
 - Authenticated portals share a compact account header, a dedicated text-link
   navigation row, and a collapsible/resizable icon sidebar. Mobile layouts use the
   existing navigation drawer instead of duplicating the desktop row.
+- Portal identity colors are consistent across the shared shell and page
+  accents: Citizen uses teal/green, Professional uses sky/blue, and Admin uses
+  indigo/purple. Emerald success, amber warning, rose error, and slate neutral
+  treatments remain semantic status indicators rather than portal branding.
 - Citizen Overview is reserved for care discovery and appointments. The
   `Add a professional role` account action lives in Citizen Profile alongside
   profile and identity management.

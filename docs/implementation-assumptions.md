@@ -240,6 +240,11 @@ V6 remains authoritative if an assumption ever conflicts with it.
 
 ## Post-Phase 14 interface closeout
 
+- Portal identity colors are presentation-only context: Citizen uses the
+  existing teal/green palette, Professional uses the existing sky/blue palette,
+  and Admin uses the existing indigo/purple palette. Shared emerald success,
+  amber warning, rose error, and slate neutral treatments retain their semantic
+  meaning and must not be recolored merely to match a portal.
 - Professional-role onboarding is treated as an account-lifecycle action, so
   its entry point belongs in Citizen Profile beside profile and identity
   management rather than in the care-focused Citizen Overview. The existing

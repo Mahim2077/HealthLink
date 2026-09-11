@@ -83,3 +83,20 @@ The browser verification did not create a real appointment because the UI check 
   207 backend tests with 34 PostgreSQL-only skips, and a clean authenticated
   local browser flow.
 - No feature from Phase 15 or later was introduced.
+
+## Portal-theme consistency closeout (2026-09-11)
+
+- Preserved the approved interface and corrected color scope only: Citizen
+  teal/green, Professional sky/blue, and Admin indigo/purple.
+- Shared `PortalShell` and second-row navigation now use one portal-aware token
+  system for the header identity control, desktop rail, mobile drawer,
+  collapse/resize controls, active links, focus rings, and form accents.
+- Removed isolated indigo accents from Citizen Overview and an isolated teal
+  surface from the Professional chamber. Semantic success, warning, error, and
+  neutral colors remain intentionally shared.
+- Local quality gates passed: ESLint, TypeScript, 43 frontend test files / 199
+  tests, and the optimized 22-route build. Visual checks confirmed each portal
+  login uses its intended existing palette.
+- This was a presentation-only Phase 14 closeout. No database, migration,
+  backend, API, authorization, dependency, workflow, or Phase 15 behavior
+  changed.

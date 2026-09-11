@@ -91,6 +91,45 @@ final result: passed
 
 ---
 
+# HealthLink portal-theme consistency — final Phase 14 design QA
+
+## Scope
+
+This pass preserved the approved layouts, typography, content, interactions,
+routes, and semantic status treatments. It corrected portal identity colors
+only: Citizen teal/green, Professional sky/blue, and Admin indigo/purple.
+
+## Findings and verification
+
+No actionable P0, P1, or P2 finding remains.
+
+- Public and authenticated shared shells declare an explicit `data-portal`
+  theme scope.
+- The compact account header, second-row text navigation, desktop icon rail,
+  collapse/resize controls, mobile drawer, focus rings, and form accents inherit
+  the active portal palette.
+- Citizen Overview no longer carries indigo/purple supporting copy or arrows.
+- The Professional chamber current-patient surface no longer carries a teal
+  border/background while its professional blue label is active.
+- Emerald success, amber warning, rose error, and slate neutral treatments were
+  deliberately retained because they communicate state rather than identity.
+- Full frontend verification passed: ESLint, TypeScript, 43 Vitest files / 199
+  tests, and the optimized 22-route Next.js build.
+- Local browser checks confirmed the Citizen login in teal/green, Professional
+  login in sky/blue, and Admin login in indigo/purple with no feature changes.
+
+## Implementation checklist
+
+- [x] Previous portal palettes preserved.
+- [x] Shared shell and navigation use one portal-aware token system.
+- [x] Cross-portal accent remnants corrected.
+- [x] Semantic state colors preserved.
+- [x] No database, API, authorization, dependency, or Phase 15 change.
+
+final result: passed
+
+---
+
 # HealthLink authenticated portals — second-row navigation design QA
 
 ## Comparison target
