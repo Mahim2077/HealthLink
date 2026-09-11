@@ -697,3 +697,36 @@ nid_number, birth_certificate_number, email, user_id,
   hard-refresh session restoration, doctor discovery, booking, cancellation,
   refreshed history, and a clean browser console. No production deployment was
   performed by this consistency pass.
+
+## Final Phase 14 product and design closeout (2026-09-11)
+
+- Preserved the approved citizen-first landing page and shared authenticated
+  portal system: compact account header, dedicated second-row text navigation,
+  collapsible/resizable desktop icon rail, and modal mobile drawer. The shared
+  second-row navigation was established in commit `dcab98a` and continues to
+  reuse the role-specific sidebar route definitions as its single source of
+  truth.
+- Moved the existing `Add a professional role` link from Citizen Overview to
+  the Citizen Profile header. Overview now contains only care discovery and
+  appointment/prescription entry points; Profile groups editable account data,
+  protected identity, and professional-role onboarding. The destination remains
+  `/professional/onboard`, so its citizen-session reuse and backend
+  authorization behavior are unchanged.
+- Added component regression coverage proving Overview no longer renders the
+  action and Profile renders the exact onboarding link. No schema, migration,
+  API contract, authorization rule, or dependency manifest changed for this
+  interface refinement.
+- Corrected the trusted `backend/scripts/create_admin.py` provisioning command
+  to register the facility and professional relationship targets before
+  SQLAlchemy mapper configuration. This is a Phase 5 operational reliability
+  correction only; it does not add a public administrator-registration route.
+- Local gates passed: backend `207 passed, 34 skipped` (the skipped tests require
+  the dedicated PostgreSQL test URL), frontend 43 files / 196 tests, ESLint,
+  TypeScript, and the optimized 22-route Next.js production build.
+- An isolated SQLite-backed browser flow passed citizen sign-in, confirmed the
+  action was absent from `/citizen/dashboard`, reached `/citizen/profile` from
+  the shared text navigation, found the action there, and opened
+  `/professional/onboard`. Browser warnings/errors: none.
+- The `phase-14-final` tag marks this final Phase 0–14 development boundary.
+  Phase 15 and later work remains intentionally unimplemented and requires a
+  new explicit instruction after rereading all three governing documents.

@@ -4,7 +4,6 @@ import {
   ArrowRightIcon,
   CalendarDaysIcon,
   MagnifyingGlassIcon,
-  PlusIcon,
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -183,15 +182,6 @@ function DashboardContent({
         </Link>
       </section>
 
-      <Link
-        className="group mt-7 inline-flex min-h-11 items-center gap-3 rounded-lg text-sm font-semibold text-sky-700 transition hover:text-sky-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-700"
-        href="/professional/onboard"
-      >
-        <span className="flex size-8 items-center justify-center rounded-full bg-sky-50 ring-1 ring-inset ring-sky-100">
-          <PlusIcon aria-hidden="true" className="size-5" />
-        </span>
-        Add a professional role
-      </Link>
     </main>
   );
 }

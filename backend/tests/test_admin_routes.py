@@ -179,3 +179,5 @@ def test_no_public_admin_registration_route_and_script_has_no_password_argument(
     ).read_text(encoding="utf-8")
     assert 'add_argument("--password"' not in script
     assert "getpass(" in script
+    assert "from app.facilities import models as facility_models" in script
+    assert "from app.professionals import models as professional_models" in script

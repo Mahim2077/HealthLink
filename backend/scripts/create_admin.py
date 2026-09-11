@@ -12,6 +12,10 @@ BACKEND_DIRECTORY = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIRECTORY))
 
+# Register the relationship targets referenced by the shared authentication
+# models before the provisioning query asks SQLAlchemy to configure mappers.
+from app.facilities import models as facility_models  # noqa: E402, F401
+from app.professionals import models as professional_models  # noqa: E402, F401
 from app.admins.provisioning import AdminProvisioningError, create_trusted_admin
 from app.core.config import get_settings
 from app.db.session import create_database_engine

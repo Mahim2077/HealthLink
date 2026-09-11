@@ -25,7 +25,7 @@ No database schema or API contract changed, so no Alembic migration or dependenc
 | F09 | Admin verification no longer silently chooses the first active facility; the reviewer must select one. |
 | F10 | Booking no longer exposes editable doctor or facility UUIDs. It loads the chosen verified doctor and derives both identifiers from that record. A generic booking entry sends the citizen to doctor search. |
 | F11 | Booking displays active practice weekdays, hours, facility, Bangladesh-time guidance, serial-queue expectations, and rejects dates outside the published practice schedule before submission. Backend availability remains authoritative. |
-| F12 | Citizen care actions now appear before identity/profile reference data. |
+| F12 | Citizen Overview is now care-only. Identity remains in Profile, and the account-level `Add a professional role` action was moved there as well. |
 | F13 | Doctor profiles emphasize availability and serial-queue expectations, remove submission/verification timestamps, use readable verification/availability labels, and suppress booking when no active practice day exists. |
 | F17 | Homepage primary actions now lead to finding a verified doctor or managing citizen care. |
 | F18 | Authenticated citizen, professional, and admin layouts provide persistent role-appropriate navigation with active-page state and sign-out. Professional navigation includes chamber and consultations. |
@@ -68,3 +68,18 @@ No database schema or API contract changed, so no Alembic migration or dependenc
 - Browser/API path verified locally with synthetic data: citizen login with validated return destination → filtered doctor search → verified doctor profile → booking screen. The page showed one citizen shell, persistent navigation, readable schedule data, and no UUID inputs. Browser console errors: none. API responses for login, search, and doctor profile: HTTP 200.
 
 The browser verification did not create a real appointment because the UI check used disposable synthetic data and the booking mutation was already covered by automated API/component tests.
+
+## Final Phase 14 design closeout (2026-09-11)
+
+- The shared authenticated shell now carries scalable role-specific text links
+  in a dedicated second header row while retaining the resizable/collapsible
+  desktop sidebar and existing mobile drawer.
+- Citizen Overview contains only doctor discovery and appointment/prescription
+  navigation. `Add a professional role` now appears in Citizen Profile beside
+  the account and identity controls and continues to open the existing
+  `/professional/onboard` flow.
+- Focused regression tests cover the new placement. The full closeout passed
+  43 frontend files / 196 tests, lint, typecheck, the 22-route production build,
+  207 backend tests with 34 PostgreSQL-only skips, and a clean authenticated
+  local browser flow.
+- No feature from Phase 15 or later was introduced.

@@ -237,3 +237,19 @@ V6 remains authoritative if an assumption ever conflicts with it.
 - Prescription creation remains optional and verified-author editing remains
   available after appointment completion. Offline payment has no database or
   application representation through Phase 14.
+
+## Post-Phase 14 interface closeout
+
+- Professional-role onboarding is treated as an account-lifecycle action, so
+  its entry point belongs in Citizen Profile beside profile and identity
+  management rather than in the care-focused Citizen Overview. The existing
+  `/professional/onboard` route, citizen identity reuse, and authorization
+  rules remain unchanged.
+- Desktop portal text navigation uses a dedicated second header row backed by
+  the same role-specific route definitions as the sidebar. It stays on one line
+  and permits horizontal overflow as future in-scope links are added. Below the
+  desktop breakpoint, the existing modal drawer remains the sole navigation
+  surface.
+- These placement and navigation decisions define the final Phase 14 interface
+  baseline. They do not authorize new longitudinal-record, payment, recovery,
+  notification, or other Phase 15-and-later behavior.

@@ -1,6 +1,6 @@
 # HealthLink Phase 0–14 implementation handoff
 
-Last updated: 2026-09-04 (Asia/Dhaka)
+Last updated: 2026-09-11 (Asia/Dhaka)
 
 Repository: `D:\HealthLink_V_1`
 
@@ -44,10 +44,13 @@ Phase 14 code is represented by these commits:
 170e952  test(phase-14): bound concurrent finish checks
 ```
 
-The `phase-14-complete` tag identifies the final documentation checkpoint.
+The immutable `phase-14-complete` tag identifies the original transaction and
+documentation checkpoint. The newer `phase-14-final` tag identifies the final
+polished and deployed Phase 14 product baseline; do not move either tag.
 GitHub Actions HealthLink CI/CD run 12 passed for `170e952`, including the
 PostgreSQL test suite, frontend gates, production migration, prebuilt Vercel
-deployment, and root/health smoke tests.
+deployment, and root/health smoke tests. Subsequent product-quality releases
+through `phase-14-final` preserve the same Phase 14 business boundary.
 
 Production is served by the single Vercel Services project at
 `https://healthlink-sd.vercel.app/`:
@@ -61,6 +64,43 @@ Production is served by the single Vercel Services project at
 Credentials and environment values remain only in ignored local files, GitHub
 secrets, and Vercel environment configuration. Never place them in source,
 logs, documentation, commits, or chat output.
+
+## Final Phase 14 product and interface checkpoint
+
+The interface at the `phase-14-final` checkpoint is the approved visual and
+interaction baseline for later work:
+
+- The public landing page is citizen-first, excludes administrator access, and
+  keeps citizen registration, doctor discovery, and citizen/professional sign-in
+  paths distinct.
+- Every authenticated portal uses the shared compact account header, dedicated
+  second-row text navigation, and collapsible/resizable desktop icon sidebar.
+  The second row reuses the sidebar route map and scrolls horizontally as its
+  link count grows; mobile continues to use the modal navigation drawer.
+- Citizen Overview is care-focused: doctor discovery and appointments appear
+  there, while identity data remains confined to Citizen Profile.
+- `Add a professional role` is an account-lifecycle action in Citizen Profile,
+  not an Overview action. Its protected `/professional/onboard` destination and
+  existing citizen-session handoff are unchanged.
+- The public and authenticated layouts remain responsive across wide desktop,
+  tablet, and mobile breakpoints, with the approved HealthLink teal, ink, pale
+  clinical surfaces, typography, and Heroicons treatment.
+
+The final refinement did not add a migration, table, endpoint, authorization
+rule, dependency, or Phase 15 behavior. It moved one existing link, added
+focused component coverage, and made trusted administrator provisioning load
+all SQLAlchemy relationship targets before mapper configuration. A production
+administrator may already exist; credentials are deliberately absent from this
+repository and should never be recreated or disclosed without an explicit
+operational need.
+
+Final local closeout evidence on 2026-09-11: `207 passed, 34 skipped` in the
+SQLite-compatible backend suite, 43 frontend files / 196 tests passed, ESLint
+passed, TypeScript passed, and the optimized Next.js build generated 22 routes.
+An isolated local citizen session confirmed the action is absent from Overview,
+present in Profile, and still opens `/professional/onboard`; the browser console
+reported no warnings or errors. The GitHub Actions and production-deployment
+evidence for the tagged commit is recorded in `docs/implementation-progress.md`.
 
 ## Final Phase 14 behavior
 

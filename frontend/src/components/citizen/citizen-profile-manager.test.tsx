@@ -103,6 +103,16 @@ describe("CitizenProfileManager", () => {
     expect(await screen.findByText("Your profile has been updated.")).toBeInTheDocument();
   });
 
+  it("keeps professional-role onboarding with the citizen profile", async () => {
+    act(() => accessTokenStore.set(token()));
+    renderManager();
+
+    await screen.findByRole("heading", { name: "Profile and identity" });
+    expect(
+      screen.getByRole("link", { name: "Add a professional role" }),
+    ).toHaveAttribute("href", "/professional/onboard");
+  });
+
   it("requires exact CONFIRM before adding NID and locks replacement after success", async () => {
     act(() => accessTokenStore.set(token()));
     const addAction = vi.fn().mockResolvedValue({

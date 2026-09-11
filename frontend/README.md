@@ -1,40 +1,79 @@
 # HealthLink frontend
 
-The shared Next.js frontend includes the authentication foundation and the Phase 2 Citizen Portal account flow. Professional and admin portal workflows are intentionally not implemented yet.
+The Next.js App Router frontend implements the complete authorized HealthLink
+surface through Phase 14. Citizen, Professional, and Admin portals share one
+responsive design system while retaining isolated authentication contexts and
+role-specific navigation.
 
 ## Local setup
 
-1. Copy .env.example to .env.local if the backend API uses a different address.
-2. Install dependencies with npm install.
-3. Start development with npm run dev.
+1. Copy `.env.example` to `.env.local` only when an override is needed.
+2. Install dependencies with `npm install`.
+3. Start development with `npm run dev`.
 
-The default frontend address is http://localhost:3000. The default API base URL is http://localhost:8000/api/v1.
+The default frontend address is `http://localhost:3000`. Browser API calls use
+root-relative `/api/v1`; local Next.js rewrites forward them to
+`HEALTHLINK_BACKEND_ORIGIN`, which defaults to `http://127.0.0.1:8000`.
 
-## Quality commands
+## Current design system
 
-    npm run lint
-    npm run typecheck
-    npm test
-    npm run build
+- The public landing page is citizen-first, with separate citizen and
+  professional sign-in destinations and no public administrator prompt.
+- Authenticated pages share `PortalShell`: a compact identity header, a
+  dedicated horizontally scrollable text-navigation row, and a
+  collapsible/resizable icon sidebar.
+- Below the desktop breakpoint, the text row and sidebar give way to the
+  existing modal navigation drawer.
+- Citizen Overview focuses on finding care and managing appointments. The
+  account-level `Add a professional role` action is intentionally placed in
+  Citizen Profile beside profile and identity controls.
+- Identity values are excluded from Citizen Overview and masked within the
+  authorized Profile and identity workflow.
+
+## Portal routes
+
+### Citizen
+
+- `/citizen/register` and `/citizen/login`
+- `/citizen/dashboard` for the care-focused overview
+- `/citizen/doctors/search` and `/citizen/doctors/[doctor_user_id]`
+- `/citizen/appointments` and `/citizen/appointments/book`
+- `/citizen/profile`, including professional-role onboarding entry
+- `/citizen/prescriptions/[prescription_id]`
+
+### Professional
+
+- `/professional/register`, `/professional/onboard`, and `/professional/login`
+- `/professional/dashboard` and `/professional/status`
+- `/professional/chamber` and `/professional/visits`
+- `/professional/prescriptions/[prescription_id]`
+
+### Admin
+
+- `/admin/login` and `/admin/dashboard`
+- `/admin/professional-registrations` and its detail route
+- `/admin/facilities`
+- `/admin/citizen-identities` and its controlled detail/correction route
 
 ## Authentication foundation
 
 - Access tokens exist only in the in-memory access-token store.
-- Refresh tokens are expected in backend-issued HttpOnly cookies and every refresh request includes credentials.
-- The API client retries one unauthorized request after a single-flight refresh, preventing concurrent requests from rotating the same refresh session more than once.
-- Logout and logout-all close the refresh gate, await any in-flight refresh response, use the latest bearer for termination, and clear memory before releasing the gate.
-- Session replacement is serialized through the same barrier for later login flows, preventing login, logout, and refresh cookie responses from racing each other.
-- JWT payload decoding supports portal-aware presentation only; backend checks remain authoritative.
+- Refresh tokens remain in backend-issued HttpOnly cookies, and refresh,
+  logout, logout-all, and session replacement share one serialization barrier.
+- JWT decoding supports portal-aware presentation only; backend portal,
+  session, role, ownership, and record-access checks remain authoritative.
+- Direct-route guards prevent private data requests before the correct portal
+  session has been restored.
 
-## Citizen Portal
+## Quality commands
 
-- `/citizen/register` creates a citizen account using exactly one NID or Birth Certificate Number, then sends the citizen to sign in. Registration does not create a browser session.
-- `/citizen/login` replaces any existing session through the serialized auth barrier and opens the citizen dashboard.
-- `/citizen/dashboard` restores a session through the backend refresh cookie after reload, requires a Citizen portal token for presentation, and loads the authorized citizen profile and self-identity endpoints.
-- Identity values are masked in the dashboard. Raw identity data is used only in the authorized response and never persisted in browser storage.
+```powershell
+npm run lint
+npm run typecheck
+npm test -- --run
+npm run build
+```
 
-## Foundation assumptions
-
-- System fonts are used so builds remain deterministic without downloading font files.
-- Vitest and Testing Library provide lightweight component and configuration tests.
-- NID and Birth Certificate Numbers are treated as opaque strings. The UI enforces only the documented nonblank and maximum-length rules; government-specific formats remain outside this phase.
+Vitest and Testing Library cover components and API adapters. The production
+build currently generates 22 application routes without introducing Phase 15
+features.

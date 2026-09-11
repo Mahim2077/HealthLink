@@ -213,6 +213,9 @@ describe("CitizenDashboard", () => {
       "href",
       "/citizen/appointments",
     );
+    expect(
+      screen.queryByRole("link", { name: "Add a professional role" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/National ID/i)).not.toBeInTheDocument();
   });
 });

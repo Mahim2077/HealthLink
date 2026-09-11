@@ -166,3 +166,42 @@ No actionable P0, P1, or P2 differences remain.
 - [x] Accessibility, tests, lint, typecheck, build, and live browser flows verified.
 
 final result: passed
+
+---
+
+# HealthLink citizen role-onboarding placement — final Phase 14 design QA
+
+## Comparison target
+
+- Source visual truth remains the approved citizen Overview/Profile system
+  recorded in `docs/ui-design-audit-2026-09-08/`, together with the approved
+  second-row navigation concept documented above.
+- This was a placement refinement, not a redesign: the existing typography,
+  spacing, colors, icon style, sidebar, header, and route behavior were kept.
+
+## Findings and verification
+
+No actionable P0, P1, or P2 differences remain.
+
+- Citizen Overview now contains only doctor discovery and
+  appointment/prescription navigation; it does not render `Add a professional
+  role` or national-identity content.
+- Citizen Profile displays `Add a professional role` as an account-level action
+  beside `Back to dashboard`, retaining the exact `/professional/onboard`
+  destination.
+- The action group stacks on compact widths and aligns horizontally when space
+  permits, using existing responsive tokens and accessible focus styles.
+- Focused component tests passed, followed by the full 43-file / 196-test
+  frontend suite, lint, typecheck, and the 22-route optimized build.
+- An isolated authenticated local browser flow verified Dashboard → Profile →
+  Professional onboarding. Browser console warnings/errors: none.
+
+## Implementation checklist
+
+- [x] Approved visual system preserved.
+- [x] Care and account actions separated without duplicating links.
+- [x] Existing route and authorization behavior preserved.
+- [x] Automated and real-browser coverage passed.
+- [x] No Phase 15 feature introduced.
+
+final result: passed

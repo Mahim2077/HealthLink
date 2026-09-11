@@ -91,9 +91,11 @@ missing primary action, or moderate-or-higher fidelity mismatch.
   raster illustration. The implementation uses the installed Heroicons library
   for interface icons and the existing HealthLink brand component on public
   screens; there are no placeholder images or raster-scaling artifacts.
-- Copy and content: the approved welcome, doctor-discovery, appointments, and
-  professional-role copy is preserved. National ID information is absent from
-  the overview and remains available only in the protected profile workflow.
+- Copy and content: the approved welcome, doctor-discovery, and appointments
+  copy is preserved. National ID information is absent from the overview and
+  remains available only in the protected profile workflow. Professional-role
+  onboarding moved to Profile as an account action without changing its copy or
+  destination.
 
 ## Functional and responsive checks
 
@@ -106,6 +108,19 @@ missing primary action, or moderate-or-higher fidelity mismatch.
 - Browser console inspection returned no warnings or errors.
 - Automated typecheck, lint, 192 unit/component tests, and the production build
   all passed after the final changes.
+
+## Final Phase 14 refinement
+
+- Citizen Overview no longer displays `Add a professional role`, leaving the
+  page focused on care discovery and appointments.
+- Citizen Profile presents the same action in its responsive header action
+  group beside `Back to dashboard`, using the established pale-sky account
+  accent and 44-pixel minimum control height.
+- The route remains `/professional/onboard`; no workflow, authorization, form,
+  or backend behavior changed.
+- Focused component tests and the full 43-file / 196-test frontend suite passed.
+  An authenticated local browser flow verified Overview → Profile →
+  Professional onboarding with no console warnings or errors.
 
 ## Implementation checklist
 

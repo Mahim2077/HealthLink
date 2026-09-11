@@ -1,6 +1,6 @@
 "use client";
-import { useUnsavedChanges } from "@/components/ui/use-unsaved-changes";
 
+import { PlusIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 
@@ -15,6 +15,7 @@ import {
   ErrorState,
   LoadingState,
 } from "@/components/ui/async-state";
+import { useUnsavedChanges } from "@/components/ui/use-unsaved-changes";
 import {
   addCitizenNid,
   loadCitizenDashboard,
@@ -284,7 +285,21 @@ function ProfileContent({
           <h1 className="mt-3 font-display text-3xl font-bold tracking-[-0.04em] text-slate-950 sm:text-4xl">Profile and identity</h1>
           <p className="mt-2 text-sm leading-6 text-slate-600">Manage editable profile details and review your protected identity.</p>
         </div>
-        <Link className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-bold text-slate-700" href="/citizen/dashboard">Back to dashboard</Link>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Link
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-5 text-sm font-bold text-sky-800 transition hover:border-sky-300 hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
+            href="/professional/onboard"
+          >
+            <PlusIcon aria-hidden="true" className="size-5" />
+            Add a professional role
+          </Link>
+          <Link
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-slate-400 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+            href="/citizen/dashboard"
+          >
+            Back to dashboard
+          </Link>
+        </div>
       </div>
       <div className="mt-8 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <ProfileEditor onSaved={setProfile} profile={profile} saveAction={saveAction} />
