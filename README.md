@@ -2,10 +2,10 @@
 
 HealthLink is a modular healthcare information platform with separate Citizen,
 Professional, and Admin portal contexts. This repository implements the
-documented roadmap sequentially through Phase 17. The Phase 15–17 changes have
-passed local acceptance and are being prepared for the production release.
+documented roadmap sequentially through Phase 17. The Phase 15–17 release is
+live in production.
 
-The current Phase 14 production release remains available at
+The current Phase 17 production release is available at
 [healthlink-sd.vercel.app](https://healthlink-sd.vercel.app/). It is deployed as
 one Vercel Services project: Next.js serves the web interface, FastAPI serves
 `/api/v1/*` and `/health`, Supabase PostgreSQL stores application data, and

@@ -899,5 +899,21 @@ nid_number, birth_certificate_number, email, user_id,
   this acceptance test. Citizen ownership, wrong-technician/wrong-role denial,
   and authorized current-doctor read remain covered by automated API tests.
 
-Phase 17 is complete locally. Production migration, commit, push, deployment,
-and post-deploy verification are the remaining release steps for this turn.
+### Production release
+
+- Release commit `fa07edf` (`feat(clinical): complete phases 15 through 17`)
+  was pushed to `Mahim2077/HealthLink` `main`.
+- GitHub Actions run `34694965029` completed successfully in 3m 51s. Backend
+  quality gates passed in 1m 45s, frontend quality gates in 1m 1s, production
+  migration in 34s, and the Vercel build/deploy/smoke-test job in 1m 24s.
+- Vercel deployment `dpl_6eox2KAX5MUWKtfBCwMrcSMqejEF` is READY at
+  `healthlink-rfkrlk66y-mahim2077s-projects.vercel.app`; the stable
+  `healthlink-sd.vercel.app` alias points to it.
+- Independent stable-domain checks returned HTTP 200 for `/`, `/health`, and
+  all Phase 15–17 entry routes. `/health` reported `environment: production`.
+- Production browser verification passed the unauthenticated report guard and
+  authenticated citizen report/trend empty states using the provided test
+  account. There was no Next.js error overlay. The Vercel runtime error query
+  for the release window returned no entries.
+
+Phase 17 is complete, committed, pushed, migrated, and live in production.
