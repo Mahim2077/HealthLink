@@ -22,6 +22,7 @@ import {
 import { loadProfessionalMe } from "@/lib/professional/api";
 import type { ProfessionalMe } from "@/lib/professional/types";
 import { citizenErrorMessage } from "@/lib/citizen/presentation";
+import { listCurrentPatientMedicalHistory } from "@/lib/medical-records/api";
 
 const defaultDeps: VisitsDeps = {
   finishAppointment,
@@ -203,7 +204,10 @@ export default function VisitsPage() {
         </p>
       </header>
       <div className="mt-8">
-        <ConsultationWorkspace visitsDeps={defaultDeps} />
+        <ConsultationWorkspace
+          historyLoadAction={listCurrentPatientMedicalHistory}
+          visitsDeps={defaultDeps}
+        />
       </div>
     </main>
   );

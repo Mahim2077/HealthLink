@@ -38,7 +38,7 @@ describe("PortalNavigation", () => {
   });
 
   it("renders the same citizen destinations as accessible text links", () => {
-    render(<PortalTextNavigation portal="CITIZEN" />);
+    render(<AuthProvider><PortalTextNavigation portal="CITIZEN" /></AuthProvider>);
 
     const navigation = screen.getByRole("navigation", {
       name: "citizen page navigation",
@@ -55,6 +55,10 @@ describe("PortalNavigation", () => {
     expect(screen.getByRole("link", { name: "Appointments" })).toHaveAttribute(
       "href",
       "/citizen/appointments",
+    );
+    expect(screen.getByRole("link", { name: "Medical history" })).toHaveAttribute(
+      "href",
+      "/citizen/medical-history",
     );
     expect(screen.getByRole("link", { name: "My profile" })).toHaveAttribute(
       "href",

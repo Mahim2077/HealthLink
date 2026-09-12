@@ -6,6 +6,12 @@ import uuid
 # non-boolean DEBUG variable for unrelated tooling.
 os.environ["APP_ENV"] = "test"
 os.environ["DEBUG"] = "false"
+# Some integration tests construct a real app without overriding get_db.
+# Route those sessions to the dedicated test database too; never inherit a
+# developer's production DATABASE_URL or the backend .env fallback.
+os.environ["DATABASE_URL"] = os.environ.get(
+    "HEALTHLINK_TEST_DATABASE_URL", "sqlite+pysqlite://"
+)
 
 import pytest
 from fastapi.testclient import TestClient

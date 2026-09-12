@@ -258,3 +258,77 @@ V6 remains authoritative if an assumption ever conflicts with it.
 - These placement and navigation decisions define the final Phase 14 interface
   baseline. They do not authorize new longitudinal-record, payment, recovery,
   notification, or other Phase 15-and-later behavior.
+
+## Phase 15
+
+- Medical history is a query projection, not a persisted aggregate. Visits and
+  prescriptions remain the only clinical sources of truth, and Phase 15 adds
+  no migration.
+- A timeline visit occurs at `medical_visits.finalized_at`. A prescription
+  occurs at `prescriptions.created_at` and is visible only when its parent
+  visit is FINALIZED. These timestamps also drive inclusive calendar-date
+  filtering and deterministic newest-first pagination.
+- Phase 15 professional access means only the verified doctor whose owned
+  chamber queue row is CURRENT. A waiting patient, another doctor, a
+  non-doctor professional role, and a professional with no current patient do
+  not gain longitudinal access. The existing manual-grant table is not wired
+  into this phase.
+- The professional timeline intentionally does not link to visit or
+  prescription detail routes. Existing detail authorization is author-based,
+  while the current-patient timeline may contain records authored by other
+  doctors; exposing links that commonly lead to a denied route would imply a
+  broader authorization grant than Phase 15 defines.
+- Citizen prescription events link to the existing protected citizen detail
+  route. Visit events remain timeline summaries because no new citizen
+  longitudinal visit-detail contract is required for this phase.
+- Page size defaults to 20 at the API and is capped at 50. The current frontend
+  requests 10 records per page to keep the consultation and citizen views
+  readable without changing the API's general contract.
+
+## Phase 16
+
+- A diagnostic request may be created only after the current doctor has opened
+  the matching consultation visit. This makes `visit_id` non-null for the
+  current HealthLink workflow even though the documented schema keeps it
+  nullable for future external/referral workflows.
+- Technician compatibility is conservatively defined as a VERIFIED active
+  LAB_TECHNICIAN role registration linked to the same active facility as the
+  current consultation. Phase 16 does not infer regional networks or allow
+  cross-facility assignment.
+- An unassigned request remains visible to its requesting doctor and owning
+  citizen but to no technician. Technicians see only rows assigned to their
+  active role-registration ID, never rows assigned to another role held by the
+  same user.
+- Assignment and reassignment are requester-only and REQUESTED-only. The
+  transition matrix is intentionally narrow: assigned technician
+  REQUESTED→IN_PROGRESS; requester REQUESTED→CANCELLED. Phase 17 exclusively
+  owns IN_PROGRESS→COMPLETED through atomic lab-report finalization. Terminal
+  states are immutable and no transition is silently inferred.
+- Phase 16 records structured request workflow only. Result values, specimen
+  metadata, reports/files, and medical-history integration belong to later
+  phases and are not invented here.
+
+## Phase 17
+
+- Reports are structured database records; no PDF upload, file storage, or
+  second source of clinical truth is introduced. There is one report per test.
+- Draft save and finalization lock the diagnostic test first, then its report.
+  Finalization commits report FINALIZED and test COMPLETED together. Reports
+  are editable only while DRAFT and the assigned test is IN_PROGRESS.
+- Citizens see only their finalized reports. Assigned verified lab technicians
+  may read drafts. Verified doctors may read finalized results only for their
+  CURRENT patient in an ACTIVE session with a BOOKED appointment and matching
+  active role. A stale token role does not grant access.
+- Numeric values use decimal precision (18, 6), serialized as strings to avoid
+  JavaScript rounding. Trends include only finalized numeric observations,
+  ordered oldest first and grouped by exact parameter/unit identity. No unit
+  conversion, diagnosis, or automated interpretation is inferred.
+- Citizen reports paginate at 20 records; trend observations at 100. Trend
+  tables describe each page, not the citizen's complete longitudinal series.
+- New drafts stay in component memory only. Failed saves retain edits;
+  pending actions disable editing and duplicate submissions. Finalization
+  requires a saved draft and explicit confirmation.
+- Real-browser acceptance uses synthetic records in the isolated loopback
+  PostgreSQL database. The flow covers assigned lab login, draft save/reload,
+  confirmed finalization, immutable display, citizen list/detail/trends, and a
+  375×812 viewport without horizontal overflow.

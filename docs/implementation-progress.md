@@ -22,8 +22,11 @@ apply to that phase have passed.
 | 12 | Current Patient Clinical Access and Consultation Workspace | Completed |
 | 13 | Chamber Prescription Form and Electronic PDF | Completed |
 | 14 | Finish Appointment and Automatic Next Serial | Completed |
+| 15 | Unified Derived Medical History | Completed locally |
+| 16 | Structured Diagnostic Test Requests | Completed locally |
 
-Phase 15 and later are explicitly outside the current implementation boundary.
+Phase 17 and later are explicitly outside the current implementation boundary.
+Phases 15–16 have passed local verification but are not yet committed or deployed.
 
 ## Phase 0 verification evidence
 
@@ -778,3 +781,123 @@ nid_number, birth_certificate_number, email, user_id,
   `/health` checks returned HTTP 200, the health payload reported the
   production environment, and the 15-minute post-deploy error-log query
   returned no entries.
+
+## Phase 15 — Unified derived medical history (2026-09-11)
+
+- Added one normalized, read-only timeline derived from authoritative
+  `medical_visits`, `prescriptions`, appointment, facility, and professional
+  identity rows. No `medical_history` table, migration, denormalized clinical
+  copy, or new dependency was introduced.
+- Added bounded `resource_type`, `date_from`, `date_to`, `page`, and
+  `page_size` filters with deterministic newest-first ordering and stable UUID
+  tie-breaking. Only FINALIZED visits and prescriptions attached to FINALIZED
+  visits appear; draft clinical work remains excluded.
+- Added `GET /api/v1/citizens/me/medical-history` for the authenticated
+  citizen's own record and
+  `GET /api/v1/professionals/current-patient/medical-history` for the verified
+  doctor who owns the live CURRENT queue row. Unauthenticated, wrong-role,
+  non-current, and cross-citizen contexts are denied by the existing portal,
+  role-registration, and current-patient dependencies.
+- Added the Citizen Portal `/citizen/medical-history` page and shared
+  navigation entry. The timeline exposes filtering, empty/loading/error
+  states, pagination, and citizen-owned prescription links. The same timeline
+  is embedded read-only in the doctor consultation workspace without granting
+  cross-author visit or prescription detail navigation.
+- The consultation integration is state-isolated from the draft editor. A
+  regression test proves filtering current-patient history does not remount or
+  discard unsaved clinical notes.
+- Local verification passed: focused Phase 15 backend tests `5 passed`; full
+  backend suite `212 passed, 34 PostgreSQL-only skipped`; frontend `45 files /`
+  `205 tests`; ESLint; TypeScript; and the optimized Next.js production build,
+  which generated the new citizen route among 23 pages.
+- Read-only local browser verification against the configured Supabase data
+  passed citizen login, shared navigation, two-record derived history loading,
+  citizen prescription navigation, and the Visits filter reducing the result
+  set from two to one. No production deployment or clinical/admin mutation was
+  performed by this Phase 15 implementation.
+
+## Phase 16 — Structured diagnostic test requests (2026-09-11)
+
+- Added Alembic revision `0024_diagnostic_tests` and the matching ORM model
+  with citizen, visit, requesting role-registration, optional assigned
+  role-registration, facility, structured request text, timestamps, and the
+  explicit REQUESTED / IN_PROGRESS / COMPLETED / CANCELLED status constraint.
+- Current-patient creation requires the existing verified active DOCTOR and
+  owned CURRENT queue context plus a matching opened visit. Assignment accepts
+  only a VERIFIED LAB_TECHNICIAN role registration at the request facility;
+  unverified, wrong-role, and cross-facility registrations are rejected.
+- Added a bounded human-readable technician selector. Unassigned requests stay
+  unassigned; there is no self-claim marketplace. Only REQUESTED tests may be
+  assigned or reassigned.
+- Enforced an explicit transition matrix: the assigned active lab technician
+  may move REQUESTED to IN_PROGRESS; Phase 17 finalization owns completion. The requesting
+  doctor may move REQUESTED to CANCELLED. All skips, terminal rewrites,
+  cross-assignee actions, and reassignment after work begins return conflicts.
+- Added citizen-owned and active-role professional list routes, the doctor
+  consultation request panel, `/citizen/diagnostic-tests`, and
+  `/professional/diagnostics`. Professional navigation now resolves the active
+  role: chamber and consultations are Doctor-only, while Diagnostics is shown
+  only to Doctor and Lab Technician roles.
+- Authorization coverage includes current-doctor creation, waiting and wrong
+  doctor denial, citizen and wrong-role denial, unverified/cross-facility
+  assignment rejection, transition-matrix enforcement, reassignment lockout,
+  and citizen ownership isolation.
+- Local verification passed: Phase 15–16 focused backend tests `8 passed`;
+  complete backend suite `215 passed, 34 PostgreSQL-only skipped`; frontend
+  `45 files / 205 tests`; ESLint; TypeScript; and the optimized 25-route Next.js
+  build. Migration `0024` was not applied to production and no production
+  deployment or diagnostic mutation was performed.
+
+## Phase 16 hardening and Phase 17 — 2026-09-12, local only
+
+### Implemented
+
+- Diagnostic creation now requires the displayed visit ID and revalidates the
+  live queue, appointment, practice session and DRAFT visit under locks. Stale
+  consultation submissions cannot create a request for a different patient.
+- Technician assignment/search uses the actual request/visit facility, excludes
+  inactive users, and remains searchable and requester-owned. Failed requests
+  retain form data; unsaved diagnostic requests block finishing consultations.
+- Professional navigation resolves roles per authenticated session. Diagnostic
+  screens handle wrong portals, role-loading errors and retries explicitly.
+- Added migration `0025_lab_reports`, structured report/items models, draft
+  save/read/finalize endpoints, citizen-owned lists and numeric trends. Atomic
+  finalization is now the only path to diagnostic COMPLETED.
+- Added lab editor with confirmation, immutable result display, citizen list,
+  detail and unit-separated trend tables, plus diagnostic/navigation links.
+- Isolated the global test database configuration from developer `.env` values.
+  An earlier integration test attempted the production fallback; sandboxing
+  blocked connection before any write. Its error traceback included credential
+  details; the user was notified to rotate the affected database password.
+  No credential is recorded in source or this report.
+
+### Evidence
+
+- Full backend suite against a dedicated loopback PostgreSQL test database:
+  **263 passed**, including concurrent begin/finalize one-winner tests. One
+  existing Starlette/httpx deprecation warning remains.
+- Frontend: **47 files / 216 tests passed**; TypeScript, ESLint and optimized
+  Next.js production build passed with the new routes.
+- Migration `0025` applied to the isolated local database successfully;
+  `alembic check` reported no new upgrade operations. Production migration and
+  deployment were not performed. No commit or push was made.
+- `git diff --check` passed (existing CRLF normalization warning only).
+
+### Browser acceptance
+
+- Real Chromium acceptance passed against synthetic records in the isolated
+  loopback PostgreSQL database: verified assigned LAB_TECHNICIAN login, queue
+  visibility, REQUESTED→IN_PROGRESS, report entry, draft save, reload from the
+  database, explicit finalization confirmation, and finalized read-only table.
+- Citizen login then showed the report in the protected list and detail routes;
+  the numeric trend table rendered the finalized decimal and exact `g/dL` unit.
+  No Next.js error overlay was present.
+- At a 375×812 viewport, the responsive portal navigation and trend table were
+  accessible and the document reported no horizontal overflow. Screenshots
+  were captured in the browser runner's temporary evidence directory.
+- Browser records were synthetic and local only. Production was not mutated by
+  this acceptance test. Citizen ownership, wrong-technician/wrong-role denial,
+  and authorized current-doctor read remain covered by automated API tests.
+
+Phase 17 is complete locally. Production migration, commit, push, deployment,
+and post-deploy verification are the remaining release steps for this turn.

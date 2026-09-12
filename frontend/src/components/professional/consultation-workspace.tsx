@@ -9,6 +9,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useUnsavedChanges } from "@/components/ui/use-unsaved-changes";
+import { MedicalHistoryTimeline } from "@/components/medical-records/medical-history-timeline";
+import { DiagnosticRequestPanel } from "@/components/diagnostics/diagnostic-request-panel";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import {
@@ -16,6 +18,7 @@ import {
   type PrescriptionDeps,
 } from "@/components/prescriptions/prescription-panel";
 import type { AppointmentFinishResponse } from "@/lib/appointments/types";
+import type { MedicalHistoryLoadAction } from "@/lib/medical-records/types";
 import {
   badgeClassForVisit,
   describeVisitStatus,
@@ -49,9 +52,11 @@ type ActionKey = "start" | "save" | "finish";
 export function ConsultationWorkspace({
   visitsDeps,
   prescriptionDeps,
+  historyLoadAction,
 }: {
   visitsDeps: VisitsDeps;
   prescriptionDeps?: PrescriptionDeps;
+  historyLoadAction?: MedicalHistoryLoadAction;
 }) {
   const [state, setState] = useState<CurrentPatientState>({ kind: "idle" });
   const [pending, setPending] = useState<ActionKey | null>(null);
@@ -60,7 +65,8 @@ export function ConsultationWorkspace({
   const [finishNotice, setFinishNotice] = useState<string | null>(null);
   const [notesDirty, setNotesDirty] = useState(false);
   const [prescriptionState, setPrescriptionState] = useState({ dirty: false, saving: false });
-  const unsafeToFinish = notesDirty || prescriptionState.dirty || prescriptionState.saving;
+  const [diagnosticState, setDiagnosticState] = useState({ dirty: false, saving: false });
+  const unsafeToFinish = notesDirty || prescriptionState.dirty || prescriptionState.saving || diagnosticState.dirty || diagnosticState.saving;
   useUnsavedChanges(notesDirty || pending !== null);
 
   const refresh = useCallback(async () => {
@@ -148,6 +154,7 @@ export function ConsultationWorkspace({
       const next = await visitsDeps.loadCurrentPatient();
       setNotesDirty(false);
       setPrescriptionState({ dirty: false, saving: false });
+      setDiagnosticState({ dirty: false, saving: false });
       setState({ kind: "ready", current: next });
       setFinishNotice(
         result.next_current
@@ -274,8 +281,18 @@ export function ConsultationWorkspace({
           onDirtyChange={setNotesDirty}
         />
       </div>
+      {historyLoadAction ? (
+        <div className="mt-8 border-t border-slate-200 pt-8">
+          <MedicalHistoryTimeline
+            key={current.citizen_id}
+            loadAction={historyLoadAction}
+            portal="professional"
+          />
+        </div>
+      ) : null}
       {visit ? (
         <div className="mt-6 space-y-6">
+          {!finalized ? <DiagnosticRequestPanel key={visit.id} visitId={visit.id} disabled={pending !== null} onEditStateChange={setDiagnosticState} /> : null}
           <PrescriptionPanel
             deps={prescriptionDeps}
             editable
@@ -295,7 +312,7 @@ export function ConsultationWorkspace({
                   Finishing finalizes this visit and calls the next waiting
                   serial. A prescription is optional.
                 </p>
-                {unsafeToFinish ? <p role="status" className="mt-2 font-semibold text-amber-900">Save your clinical notes and prescription changes before finishing. Wait for all saves to complete.</p> : null}
+                {unsafeToFinish ? <p role="status" className="mt-2 font-semibold text-amber-900">Save your clinical notes and prescription changes, and submit or clear diagnostic requests before finishing. Wait for all saves to complete.</p> : null}
               </div>
               <button
                 type="button"

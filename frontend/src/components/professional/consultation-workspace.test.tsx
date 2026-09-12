@@ -255,6 +255,18 @@ describe("ConsultationWorkspace", () => {
     ).toBe(true);
   });
 
+  it("blocks finish while a diagnostic request is unsaved", async () => {
+    const { deps } = buildDeps({ loadCurrentPatient: vi.fn().mockResolvedValue(baseCurrent({ visit: baseVisit({}) })) });
+    render(<ConsultationWorkspace visitsDeps={deps} />);
+    const finish = await screen.findByRole("button", { name: /finish appointment/i });
+    fireEvent.change(screen.getByLabelText("Test name"), { target: { value: "CBC" } });
+    await waitFor(() => expect(finish).toBeDisabled());
+    fireEvent.click(finish);
+    expect(deps.finishAppointment).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Clear request" }));
+    await waitFor(() => expect(finish).toBeEnabled());
+  });
+
   it("shows an error banner when starting a visit fails", async () => {
     const { deps } = buildDeps({
       loadCurrentPatient: vi.fn().mockResolvedValue(baseCurrent({ visit: null })),
@@ -273,5 +285,37 @@ describe("ConsultationWorkspace", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /conflict: queue raced/i,
     );
+  });
+
+  it("keeps unsaved clinical notes while current-patient history is filtered", async () => {
+    const historyLoadAction = vi.fn().mockResolvedValue({
+      has_next: false,
+      items: [],
+      page: 1,
+      page_size: 10,
+      total: 0,
+    });
+    const { deps } = buildDeps({
+      loadCurrentPatient: vi
+        .fn()
+        .mockResolvedValue(baseCurrent({ visit: baseVisit({}) })),
+    });
+
+    render(
+      <ConsultationWorkspace
+        historyLoadAction={historyLoadAction}
+        visitsDeps={deps}
+      />,
+    );
+    const notes = await screen.findByLabelText(/clinical notes/i);
+    fireEvent.change(notes, { target: { value: "Unsaved observation" } });
+    await screen.findByRole("heading", { name: /^medical history$/i });
+    fireEvent.change(screen.getByLabelText("Record type"), {
+      target: { value: "VISIT" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => expect(historyLoadAction).toHaveBeenCalledTimes(2));
+    expect(notes).toHaveValue("Unsaved observation");
   });
 });

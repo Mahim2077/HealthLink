@@ -1,0 +1,1 @@
+"""Structured diagnostic-test workflow."""

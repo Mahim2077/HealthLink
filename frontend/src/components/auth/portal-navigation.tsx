@@ -3,9 +3,11 @@
 import {
   ArrowRightStartOnRectangleIcon,
   BuildingOffice2Icon,
+  BeakerIcon,
   CalendarDaysIcon,
   ChatBubbleBottomCenterTextIcon,
   ClipboardDocumentCheckIcon,
+  ClipboardDocumentListIcon,
   HomeIcon,
   IdentificationIcon,
   MagnifyingGlassIcon,
@@ -15,15 +17,18 @@ import {
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, type ComponentType, type SVGProps } from "react";
+import { useEffect, useState, type ComponentType, type SVGProps } from "react";
 
 import { usePortalAuth } from "./auth-provider";
 import type { Portal } from "@/lib/auth/types";
+import { loadProfessionalMe } from "@/lib/professional/api";
+import type { ProfessionalRoleCode } from "@/lib/professional/types";
 
 type NavigationItem = {
   href: string;
   label: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
+  roles?: ProfessionalRoleCode[];
 };
 
 const links: Record<Portal, NavigationItem[]> = {
@@ -31,12 +36,16 @@ const links: Record<Portal, NavigationItem[]> = {
     { href: "/citizen/dashboard", icon: HomeIcon, label: "Overview" },
     { href: "/citizen/doctors/search", icon: MagnifyingGlassIcon, label: "Find a doctor" },
     { href: "/citizen/appointments", icon: CalendarDaysIcon, label: "Appointments" },
+    { href: "/citizen/medical-history", icon: ClipboardDocumentListIcon, label: "Medical history" },
+    { href: "/citizen/diagnostic-tests", icon: BeakerIcon, label: "Diagnostic tests" },
+    { href: "/citizen/lab-reports", icon: ClipboardDocumentCheckIcon, label: "Lab reports" },
     { href: "/citizen/profile", icon: UserCircleIcon, label: "My profile" },
   ],
   PROFESSIONAL: [
     { href: "/professional/dashboard", icon: HomeIcon, label: "My workspace" },
-    { href: "/professional/chamber", icon: QueueListIcon, label: "Chamber" },
-    { href: "/professional/visits", icon: ChatBubbleBottomCenterTextIcon, label: "Consultations" },
+    { href: "/professional/chamber", icon: QueueListIcon, label: "Chamber", roles: ["DOCTOR"] },
+    { href: "/professional/visits", icon: ChatBubbleBottomCenterTextIcon, label: "Consultations", roles: ["DOCTOR"] },
+    { href: "/professional/diagnostics", icon: BeakerIcon, label: "Diagnostics", roles: ["DOCTOR", "LAB_TECHNICIAN"] },
     { href: "/professional/status", icon: ClipboardDocumentCheckIcon, label: "Role status" },
   ],
   ADMIN: [
@@ -47,6 +56,22 @@ const links: Record<Portal, NavigationItem[]> = {
   ],
 };
 
+function useNavigationItems(portal: Portal): NavigationItem[] {
+  const auth = usePortalAuth(portal);
+  const sessionId = auth.status === "authenticated" && auth.isRequiredPortal ? auth.claims?.sid : undefined;
+  const [resolved, setResolved] = useState<{ sessionId: string; role: ProfessionalRoleCode } | null>(null);
+  useEffect(() => {
+    if (portal !== "PROFESSIONAL" || !sessionId) return;
+    let active = true;
+    void loadProfessionalMe().then((record) => {
+      if (active) setResolved({ sessionId, role: record.role_code });
+    }, () => undefined);
+    return () => { active = false; };
+  }, [portal, sessionId]);
+  const role = resolved?.sessionId === sessionId ? resolved?.role : null;
+  return links[portal].filter((item) => !item.roles || (role != null && item.roles.includes(role)));
+}
+
 function isActivePath(pathname: string, href: string): boolean {
   if (pathname === href || pathname.startsWith(`${href}/`)) return true;
   return href === "/citizen/doctors/search" && pathname.startsWith("/citizen/doctors/");
@@ -54,6 +79,7 @@ function isActivePath(pathname: string, href: string): boolean {
 
 export function PortalTextNavigation({ portal }: { portal: Portal }) {
   const pathname = usePathname();
+  const navigationItems = useNavigationItems(portal);
 
   return (
     <nav
@@ -61,7 +87,7 @@ export function PortalTextNavigation({ portal }: { portal: Portal }) {
       className="hidden min-h-14 items-stretch overflow-x-auto border-t border-slate-100 px-5 sm:px-8 lg:flex lg:px-10"
     >
       <div className="flex min-w-max items-stretch gap-7">
-        {links[portal].map(({ href, label }) => {
+        {navigationItems.map(({ href, label }) => {
           const active = isActivePath(pathname, href);
           return (
             <Link
@@ -97,6 +123,7 @@ export function PortalNavigation({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
+  const navigationItems = useNavigationItems(portal);
 
   if (auth.status !== "authenticated" || !auth.isRequiredPortal) return null;
 
@@ -120,7 +147,7 @@ export function PortalNavigation({
       className="flex min-h-0 flex-1 flex-col px-3 pb-5"
     >
       <div className="space-y-1.5">
-        {links[portal].map(({ href, icon: Icon, label }) => {
+        {navigationItems.map(({ href, icon: Icon, label }) => {
           const active = isActivePath(pathname, href);
           return (
             <Link
