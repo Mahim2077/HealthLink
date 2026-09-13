@@ -918,7 +918,7 @@ nid_number, birth_certificate_number, email, user_id,
 
 Phase 17 is complete, committed, pushed, migrated, and live in production.
 
-## Phases 18–21 — 2026-09-13, local only
+## Phases 18–21 — 2026-09-13, released
 
 ### Implemented
 
@@ -975,5 +975,30 @@ Phase 17 is complete, committed, pushed, migrated, and live in production.
   audit card, and paging controls remained usable. The captured screenshot was
   visually inspected. The browser error log was empty; only development HMR
   and React DevTools informational messages appeared.
-- No production database, GitHub repository, Vercel environment, or live site
-  was changed. No commit or push was made.
+- The synthetic browser acceptance remained local and did not mutate production
+  data. Production verification used only the supplied non-destructive test
+  accounts and read-only navigation.
+
+### Production release
+
+- Release commit `6ca19f6` (`feat(clinical): complete phases 18 through 21`)
+  was pushed to `Mahim2077/HealthLink` `main`.
+- GitHub Actions run `34753230221` completed successfully in 3m 52s. Backend
+  quality gates passed in 1m 50s, frontend quality gates in 1m 12s, production
+  migration in 34s, and the Vercel build/deploy/smoke-test job in 1m 20s.
+- The production database reached Alembic head `0029_access_grant_scopes`; the
+  Vercel deployment is live through the stable `healthlink-sd.vercel.app`
+  domain.
+- Independent stable-domain checks returned HTTP 200 for `/`, `/health`, and
+  every Phase 18–21 citizen and professional entry route.
+- Production browser verification passed Citizen, Doctor, and Admin login and
+  role routing. Phase 15–21 citizen and Doctor pages reached their expected
+  loaded or safe empty states, and the Admin dashboard, professional review
+  queue, and citizen identity search loaded without browser errors. Some first
+  requests required up to 15 seconds while serverless functions were cold.
+- Scheduled reminder delivery remains fail-closed until the documented
+  `CRON_SECRET` is configured in both environments and the GitHub repository
+  variable `REMINDERS_ENABLED` is explicitly set to `true`; the deployed
+  reminder UI, API, and protected worker are otherwise live.
+
+Phases 15–21 are verified, committed, migrated, and live in production.
