@@ -15,6 +15,7 @@ from app.diagnostics.service import DiagnosticsService
 from app.professionals.constants import ProfessionalRoleCode
 from app.professionals.dependencies import ProfessionalAuthContext, require_verified_professional_role
 from app.visits.dependencies import CurrentPatientAccess, get_current_patient_access_for_doctor
+from app.clinical_audit.service import AuditService
 
 
 router = APIRouter(tags=["diagnostic-tests"])
@@ -24,6 +25,8 @@ router = APIRouter(tags=["diagnostic-tests"])
 def create_diagnostic_test(payload: DiagnosticTestCreateRequest, db: Annotated[Session, Depends(get_db)], access: Annotated[CurrentPatientAccess | None, Depends(get_current_patient_access_for_doctor)], doctor: Annotated[ProfessionalAuthContext, Depends(require_verified_professional_role(ProfessionalRoleCode.DOCTOR))]) -> DiagnosticTestView:
     if access is None:
         raise HealthLinkError("No current chamber patient for the verified doctor.", status_code=404)
+    AuditService(db).record(auth=doctor.auth, citizen_id=access.context.citizen.id,
+        resource_type="DIAGNOSTIC_TEST", action="CREATE", access_source="CURRENT_PATIENT", commit=False)
     return DiagnosticsService(db).create(access, doctor.role_registration, payload)
 
 
@@ -54,14 +57,28 @@ def list_citizen_diagnostic_tests(db: Annotated[Session, Depends(get_db)], citiz
 
 @router.get("/professionals/me/diagnostic-tests", response_model=DiagnosticTestListResponse)
 def list_professional_diagnostic_tests(db: Annotated[Session, Depends(get_db)], professional: Annotated[ProfessionalAuthContext, Depends(require_verified_professional_role(ProfessionalRoleCode.DOCTOR, ProfessionalRoleCode.LAB_TECHNICIAN))]) -> DiagnosticTestListResponse:
-    return DiagnosticTestListResponse(tests=DiagnosticsService(db).list_professional(professional.role_registration))
+    result = DiagnosticTestListResponse(tests=DiagnosticsService(db).list_professional(professional.role_registration))
+    for item in result.tests:
+        AuditService(db).record(auth=professional.auth, citizen_id=item.citizen_id,
+            resource_type="DIAGNOSTIC_TEST", resource_id=item.id, access_source="ASSIGNMENT" if professional.role_registration.role.code == "LAB_TECHNICIAN" else "AUTHOR", commit=False)
+    db.commit()
+    return result
 
 
 @router.put("/professionals/me/diagnostic-tests/{test_id}/assignment", response_model=DiagnosticTestView)
 def assign_diagnostic_test(test_id: uuid.UUID, payload: DiagnosticAssignmentRequest, db: Annotated[Session, Depends(get_db)], doctor: Annotated[ProfessionalAuthContext, Depends(require_verified_professional_role(ProfessionalRoleCode.DOCTOR))]) -> DiagnosticTestView:
+    test = DiagnosticsService(db).repository.get(test_id)
+    if test is not None:
+        AuditService(db).record(auth=doctor.auth, citizen_id=test.citizen_id,
+            resource_type="DIAGNOSTIC_TEST", resource_id=test.id, action="ASSIGN", access_source="AUTHOR", commit=False)
     return DiagnosticsService(db).assign(test_id, doctor.role_registration, payload.assigned_to_role_registration_id)
 
 
 @router.post("/professionals/me/diagnostic-tests/{test_id}/transitions/{target_status}", response_model=DiagnosticTestView)
 def transition_diagnostic_test(test_id: uuid.UUID, target_status: DiagnosticTestStatus, db: Annotated[Session, Depends(get_db)], professional: Annotated[ProfessionalAuthContext, Depends(require_verified_professional_role(ProfessionalRoleCode.DOCTOR, ProfessionalRoleCode.LAB_TECHNICIAN))]) -> DiagnosticTestView:
+    test = DiagnosticsService(db).repository.get(test_id)
+    if test is not None:
+        AuditService(db).record(auth=professional.auth, citizen_id=test.citizen_id,
+            resource_type="DIAGNOSTIC_TEST", resource_id=test.id, action=f"TRANSITION_{target_status.value}",
+            access_source="ASSIGNMENT" if professional.role_registration.role.code == "LAB_TECHNICIAN" else "AUTHOR", commit=False)
     return DiagnosticsService(db).transition(test_id, professional.role_registration, target_status)

@@ -27,7 +27,7 @@ describe("Diagnostic safety and assignment", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Consultation changed");
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ visit_id: "visit-1", test_name: "CBC" }));
     expect(screen.getByLabelText("Test name")).toHaveValue("CBC");
-    expect(onEditStateChange).toHaveBeenLastCalledWith({ dirty: true, saving: false });
+    await waitFor(() => expect(onEditStateChange).toHaveBeenLastCalledWith({ dirty: true, saving: false }));
   });
 
   it("disables edits and duplicate submission during a request", async () => {

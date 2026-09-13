@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from app.auth.constants import Portal
 from app.appointments.models import AppointmentStatus, DoctorPracticeSession, SessionStatus
 from app.auth.dependencies import AuthContext
+from app.access.policy import ClinicalReadPolicy
+from app.clinical_audit.service import AuditService
 from app.citizens.models import CitizenProfile
 from app.core.exceptions import HealthLinkError
 from app.diagnostics.models import DiagnosticTest
@@ -47,7 +49,7 @@ class LabReportService:
         if not facility or not facility.is_active:
             raise HealthLinkError("The diagnostic facility is inactive.", status_code=403)
 
-    def save(self, test_id: uuid.UUID, actor: ProfessionalRoleRegistration, payload: LabReportInput):
+    def save(self, test_id: uuid.UUID, actor: ProfessionalRoleRegistration, payload: LabReportInput, auth: AuthContext | None = None):
         test = self._test(test_id, lock=True)
         self._assigned(test, actor)
         report = self._report(test_id, lock=True)
@@ -60,6 +62,8 @@ class LabReportService:
         report.report_date, report.summary = payload.report_date, payload.summary
         self.db.execute(delete(LabReportItem).where(LabReportItem.lab_report_id == report.id))
         self.db.add_all(LabReportItem(lab_report_id=report.id, **item.model_dump()) for item in payload.items)
+        if auth:
+            AuditService(self.db).record(auth=auth, citizen_id=test.citizen_id, resource_type="LAB_REPORT", resource_id=report.id, action="UPDATE", commit=False)
         try:
             self.db.commit()
         except Exception:
@@ -67,7 +71,7 @@ class LabReportService:
             raise
         return self.view(report, test)
 
-    def finalize(self, test_id, actor):
+    def finalize(self, test_id, actor, auth: AuthContext | None = None):
         # Both save and finalize lock the test before the report, consistently.
         test = self._test(test_id, lock=True)
         self._assigned(test, actor)
@@ -79,6 +83,8 @@ class LabReportService:
         report.status = "FINALIZED"
         report.finalized_at = datetime.now(timezone.utc)
         test.status = "COMPLETED"
+        if auth:
+            AuditService(self.db).record(auth=auth, citizen_id=test.citizen_id, resource_type="LAB_REPORT", resource_id=report.id, action="FINALIZE", commit=False)
         try:
             self.db.commit()
         except Exception:
@@ -90,6 +96,7 @@ class LabReportService:
         test = self._test(test_id)
         report = self._report(test_id)
         allowed = False
+        source = None
         if auth.session.portal == Portal.CITIZEN.value:
             citizen = self.db.scalar(select(CitizenProfile).where(CitizenProfile.user_id == auth.user.id))
             allowed = citizen is not None and citizen.id == test.citizen_id and report is not None and report.status == "FINALIZED"
@@ -100,13 +107,17 @@ class LabReportService:
                 if role.role.code == ProfessionalRoleCode.LAB_TECHNICIAN.value:
                     self._assigned(test, role)
                     allowed = True
+                    source = "ASSIGNMENT"
                 elif role.role.code == ProfessionalRoleCode.DOCTOR.value and report and report.status == "FINALIZED":
-                    current = VisitsRepository(self.db).load_current_patient_for_doctor(auth.user.id)
-                    session = self.db.get(DoctorPracticeSession, current.queue_entry.practice_session_id) if current else None
-                    allowed = bool(current and session and current.citizen.id == test.citizen_id and current.appointment.doctor_role_registration_id == role.id and current.appointment.status == AppointmentStatus.BOOKED.value and session.status == SessionStatus.ACTIVE.value)
+                    decision = ClinicalReadPolicy(self.db).authorize(auth, test.citizen_id, "LAB_REPORT", resource_id=report.id)
+                    allowed = True
+                    source = decision.source
         if not allowed:
             raise HealthLinkError("Lab report not found.", status_code=404)
-        return self.view(report, test) if report else None
+        result = self.view(report, test) if report else None
+        if source:
+            AuditService(self.db).record(auth=auth, citizen_id=test.citizen_id, resource_type="LAB_REPORT", resource_id=report.id if report else None, access_source=source)
+        return result
 
     def list_citizen(self, citizen_id, page: int):
         rows = self.db.execute(select(LabReport, DiagnosticTest).join(DiagnosticTest, DiagnosticTest.id == LabReport.diagnostic_test_id).where(LabReport.citizen_id == citizen_id, LabReport.status == "FINALIZED").order_by(LabReport.report_date.desc(), LabReport.id.desc()).offset((page - 1) * 20).limit(20)).all()

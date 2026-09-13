@@ -1,11 +1,4 @@
-"""Phase 12 visits & prescriptions routes.
-
-Implements the doctor's consultation workspace and the citizen read
-path described in V6 sections 22-25. Doctor endpoints derive access
-exclusively from the chamber queue (Phase 11's CURRENT queue row);
-the manual ``patient_access_grants`` table is left untouched here
-because Phase 14+ grants need their own wiring.
-"""
+"""Consultations: centralized scoped reads, author-only clinical mutations."""
 from __future__ import annotations
 
 import uuid
@@ -16,6 +9,10 @@ from fastapi import APIRouter, Depends, Path, status
 from sqlalchemy.orm import Session
 
 from app.citizens.dependencies import CitizenContext, get_current_citizen
+from app.auth.dependencies import AuthContext, get_current_auth_context
+from app.access.policy import ClinicalReadPolicy
+from app.clinical_audit.service import AuditService
+from app.visits.models import MedicalVisit
 from app.core.exceptions import HealthLinkError
 from app.db.session import get_db
 from app.visits.dependencies import (
@@ -52,6 +49,7 @@ citizen_visits_router = APIRouter(
     summary="Verified doctor's current chamber patient (with optional draft visit)",
 )
 def get_current_patient(
+    auth: Annotated[AuthContext, Depends(get_current_auth_context)],
     db: Annotated[Session, Depends(get_db)],
     access: Annotated[
         CurrentPatientAccess | None,
@@ -60,9 +58,12 @@ def get_current_patient(
 ) -> DoctorCurrentPatientView | None:
     if access is None:
         return None
-    return _current_patient_view(
+    decision = ClinicalReadPolicy(db).authorize(auth, access.context.citizen.id, "MEDICAL_HISTORY")
+    result = _current_patient_view(
         access.context, access_source=access.source
     )
+    AuditService(db).record(auth=auth, citizen_id=access.context.citizen.id, resource_type="MEDICAL_HISTORY", access_source=decision.source)
+    return result
 
 
 @doctor_visits_router.post(
@@ -72,6 +73,7 @@ def get_current_patient(
     summary="Open (or re-open) the draft visit for the given CURRENT chamber queue row",
 )
 def start_visit_for_current(
+    auth: Annotated[AuthContext, Depends(get_current_auth_context)],
     queue_id: Annotated[uuid.UUID, Path(...)],
     db: Annotated[Session, Depends(get_db)],
     access: Annotated[
@@ -79,9 +81,12 @@ def start_visit_for_current(
         Depends(get_current_patient_access_for_queue_entry),
     ],
 ) -> VisitDraftView:
-    return VisitsService(db).start_visit_for_queue_entry(
+    AuditService(db).record(auth=auth, citizen_id=access.context.citizen.id, resource_type="VISIT", action="OPEN", commit=False)
+    result = VisitsService(db).start_visit_for_queue_entry(
         access.context.doctor_user.id, queue_id
     )
+    db.commit()  # Reopening an existing visit still persists the OPEN audit event.
+    return result
 
 
 @doctor_visits_router.get(
@@ -92,20 +97,16 @@ def start_visit_for_current(
 def read_visit_as_doctor(
     visit_id: Annotated[uuid.UUID, Path(...)],
     db: Annotated[Session, Depends(get_db)],
-    access: Annotated[
-        CurrentPatientAccess | None,
-        Depends(get_current_patient_access_for_doctor),
-    ],
+    auth: Annotated[AuthContext, Depends(get_current_auth_context)],
 ) -> VisitDraftView:
-    if access is None:
-        raise HealthLinkError(
-            "No current chamber patient for the verified doctor.",
-            status_code=404,
-        )
-    return VisitsService(db).read_visit_for_doctor(
-        access.context.appointment.doctor_role_registration_id,
-        visit_id,
-    )
+    ClinicalReadPolicy(db).doctor(auth)
+    visit = db.get(MedicalVisit, visit_id)
+    if visit is None:
+        raise HealthLinkError("Visit not found.", status_code=404)
+    decision = ClinicalReadPolicy(db).authorize(auth, visit.citizen_id, "VISIT", resource_id=visit.id, author_role_id=visit.doctor_role_registration_id, finalized=visit.status == "FINALIZED")
+    result = VisitsService(db).read_visit_for_citizen(visit.citizen_id, visit_id)
+    AuditService(db).record(auth=auth, citizen_id=visit.citizen_id, resource_type="VISIT", resource_id=visit.id, access_source=decision.source)
+    return result
 
 
 @doctor_visits_router.put(
@@ -114,6 +115,7 @@ def read_visit_as_doctor(
     summary="Update the clinical notes / diagnosis / follow-up for a DRAFT visit",
 )
 def update_visit(
+    auth: Annotated[AuthContext, Depends(get_current_auth_context)],
     visit_id: Annotated[uuid.UUID, Path(...)],
     payload: VisitDraftUpdateRequest,
     db: Annotated[Session, Depends(get_db)],
@@ -127,6 +129,9 @@ def update_visit(
             "No current chamber patient for the verified doctor.",
             status_code=404,
         )
+    visit = db.get(MedicalVisit, visit_id)
+    if visit and visit.doctor_role_registration_id == access.context.appointment.doctor_role_registration_id:
+        AuditService(db).record(auth=auth, citizen_id=visit.citizen_id, resource_type="VISIT", resource_id=visit.id, action="UPDATE", commit=False)
     return VisitsService(db).update_visit(
         visit_id=visit_id,
         payload=payload,

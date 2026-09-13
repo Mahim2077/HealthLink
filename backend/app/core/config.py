@@ -28,6 +28,7 @@ class Settings(BaseSettings):
         validation_alias="APP_ENV",
     )
     debug: bool = Field(default=False, validation_alias="DEBUG")
+    cron_secret: str = Field(default="", validation_alias="CRON_SECRET", repr=False)
     database_url: str = Field(
         default="",
         validation_alias="DATABASE_URL",

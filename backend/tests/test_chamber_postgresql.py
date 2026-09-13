@@ -241,6 +241,10 @@ def _cleanup(
             citizen_profile_ids = select(CitizenProfile.id).where(
                 CitizenProfile.user_id.in_(user_ids)
             )
+            from app.clinical_audit.models import MedicalRecordAccessLog
+            connection.execute(delete(MedicalRecordAccessLog).where(
+                MedicalRecordAccessLog.citizen_id.in_(citizen_profile_ids.scalar_subquery())
+            ))
             connection.execute(
                 delete(AuthSession).where(AuthSession.user_id.in_(user_ids))
             )

@@ -16,6 +16,10 @@ import type {
 const baseQueueId = "queue-1";
 const baseVisitId = "visit-1";
 
+vi.mock("@/lib/emergency/api", () => ({
+  loadCurrentEmergencyProfile: vi.fn().mockResolvedValue({ citizen_id: "citizen-1", blood_group: "O+", updated_at: null, allergies: "Consultation allergy", chronic_conditions: null, current_medications: null, emergency_contact_name: null, emergency_contact_phone: null, special_notes: null }),
+}));
+
 const baseCurrent = (
   overrides: Partial<DoctorCurrentPatientView>,
 ): DoctorCurrentPatientView => ({
@@ -77,6 +81,14 @@ describe("ConsultationWorkspace", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("shows read-only emergency information for the current patient", async () => {
+    const { deps } = buildDeps({ loadCurrentPatient: vi.fn().mockResolvedValue(baseCurrent({})) });
+    render(<ConsultationWorkspace visitsDeps={deps} />);
+    expect(await screen.findByText("Consultation allergy")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Emergency information" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save emergency profile" })).toBeNull();
   });
 
   it("renders the empty state when there is no current patient", async () => {
@@ -188,9 +200,7 @@ describe("ConsultationWorkspace", () => {
     expect(
       await screen.findByRole("heading", { name: /serial #2/i }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent(
-      /serial #2 is now with the doctor/i,
-    );
+    expect(screen.getByText(/serial #2 is now with the doctor/i)).toHaveAttribute("role", "status");
   });
 
   it("shows finish failures without replacing the current consultation", async () => {

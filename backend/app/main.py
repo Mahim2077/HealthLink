@@ -16,6 +16,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     application.state.settings = application_settings
 
+    @application.middleware("http")
+    async def private_authenticated_responses(request, call_next):
+        response = await call_next(request)
+        if request.headers.get("authorization"):
+            response.headers["Cache-Control"] = "private, no-store"
+        return response
+
     application.add_middleware(
         CORSMiddleware,
         allow_origins=application_settings.cors_origins,

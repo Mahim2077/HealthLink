@@ -23,6 +23,8 @@ from app.prescriptions.schemas import (
 from app.prescriptions.service import PrescriptionsService
 from app.professionals.dependencies import ProfessionalAuthContext
 from app.visits.models import MedicalVisit
+from app.clinical_audit.service import AuditService
+from app.prescriptions.models import Prescription
 
 
 visits_prescription_router = APIRouter(
@@ -60,6 +62,8 @@ def create_prescription_for_visit(
             "prescription.",
             status_code=403,
         )
+    AuditService(db).record(auth=context.auth, citizen_id=visit.citizen_id,
+        resource_type="PRESCRIPTION", action="CREATE", commit=False)
     return PrescriptionsService(db).create_for_visit(
         doctor_role_registration_id=context.role_registration.id,
         visit_id=visit_id,
@@ -86,11 +90,14 @@ def get_prescription(
             access.citizen_profile_id,
             access.prescription_id,
         )
-    assert access.doctor_role_registration_id is not None
-    return service.read_for_doctor(
-        access.doctor_role_registration_id,
-        access.prescription_id,
-    )
+    prescription = db.get(Prescription, access.prescription_id)
+    assert prescription is not None
+    # The canonical dependency has already resolved the centralized read policy.
+    result = service.read_for_citizen(prescription.citizen_id, access.prescription_id)
+    AuditService(db).record(auth=access.auth, citizen_id=prescription.citizen_id,
+        resource_type="PRESCRIPTION", resource_id=access.prescription_id,
+        access_source=access.access_source)
+    return result
 
 
 @prescriptions_router.put(
@@ -113,6 +120,10 @@ def update_prescription(
         raise HealthLinkError(
             "Citizens cannot edit prescriptions.", status_code=403
         )
+    prescription = db.get(Prescription, access.prescription_id)
+    assert prescription is not None
+    AuditService(db).record(auth=access.auth, citizen_id=prescription.citizen_id,
+        resource_type="PRESCRIPTION", resource_id=prescription.id, action="UPDATE", commit=False)
     return PrescriptionsService(db).update(
         doctor_role_registration_id=access.doctor_role_registration_id,
         prescription_id=access.prescription_id,
@@ -135,6 +146,12 @@ def stream_prescription_pdf(
     payload, file_name = PrescriptionsService(db).stream_pdf(
         access.prescription_id
     )
+    if access.actor_kind != "citizen":
+        prescription = db.get(Prescription, access.prescription_id)
+        assert prescription is not None
+        AuditService(db).record(auth=access.auth, citizen_id=prescription.citizen_id,
+            resource_type="PRESCRIPTION", resource_id=prescription.id, action="PDF_READ",
+            access_source=access.access_source)
     return Response(
         content=payload,
         media_type="application/pdf",

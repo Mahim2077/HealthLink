@@ -19,12 +19,12 @@ Database = Annotated[Session, Depends(get_db)]
 
 @router.put("/diagnostic-tests/{test_id}/lab-report", response_model=LabReportView)
 def save_report(test_id: uuid.UUID, payload: LabReportInput, actor: LabActor, db: Database):
-    return LabReportService(db).save(test_id, actor.role_registration, payload)
+    return LabReportService(db).save(test_id, actor.role_registration, payload, auth=actor.auth)
 
 
 @router.post("/diagnostic-tests/{test_id}/lab-report/finalize", response_model=LabReportView)
 def finalize_report(test_id: uuid.UUID, actor: LabActor, db: Database):
-    return LabReportService(db).finalize(test_id, actor.role_registration)
+    return LabReportService(db).finalize(test_id, actor.role_registration, auth=actor.auth)
 
 
 @router.get("/diagnostic-tests/{test_id}/lab-report", response_model=LabReportView | None)

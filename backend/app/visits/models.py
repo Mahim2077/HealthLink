@@ -32,18 +32,13 @@ class VisitStatus(StrEnum):
 
 
 class PatientAccessScope(StrEnum):
-    """Allowed values for ``patient_access_grants.access_scope``.
+    """Explicit, read-only citizen consent scopes."""
 
-    V6 section 24 leaves the explicit values for the premium
-    manual-grant feature, so Phase 12 ships a conservative pair:
-    ``FULL_RECORD`` and ``LIMITED``. Both grant the doctor full
-    read access to the citizen's Phase 12 workspace because manual
-    grants are the documented alternative to the current-queue
-    relationship; Phase 14+ can narrow this.
-    """
-
-    FULL_RECORD = "FULL_RECORD"
-    LIMITED = "LIMITED"
+    FULL_MEDICAL_HISTORY = "FULL_MEDICAL_HISTORY"
+    VISITS_ONLY = "VISITS_ONLY"
+    PRESCRIPTIONS_ONLY = "PRESCRIPTIONS_ONLY"
+    LAB_REPORTS_ONLY = "LAB_REPORTS_ONLY"
+    EMERGENCY_PROFILE_ONLY = "EMERGENCY_PROFILE_ONLY"
 
 
 class PatientAccessGrant(Base):
@@ -57,7 +52,7 @@ class PatientAccessGrant(Base):
     __tablename__ = "patient_access_grants"
     __table_args__ = (
         CheckConstraint(
-            "access_scope IN ('FULL_RECORD','LIMITED')",
+            "access_scope IN ('FULL_MEDICAL_HISTORY','VISITS_ONLY','PRESCRIPTIONS_ONLY','LAB_REPORTS_ONLY','EMERGENCY_PROFILE_ONLY')",
             name="valid_scope",
         ),
         Index("ix_patient_access_grants_citizen_id", "citizen_id"),
@@ -85,7 +80,7 @@ class PatientAccessGrant(Base):
     access_scope: Mapped[str] = mapped_column(
         String(length=50),
         nullable=False,
-        default=PatientAccessScope.FULL_RECORD.value,
+        default=PatientAccessScope.FULL_MEDICAL_HISTORY.value,
     )
     granted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

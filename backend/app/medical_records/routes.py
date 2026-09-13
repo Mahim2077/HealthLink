@@ -14,6 +14,9 @@ from app.visits.dependencies import (
     CurrentPatientAccess,
     get_current_patient_access_for_doctor,
 )
+from app.auth.dependencies import AuthContext, get_current_auth_context
+from app.access.policy import ClinicalReadPolicy
+from app.clinical_audit.service import AuditService
 
 
 citizen_medical_history_router = APIRouter(
@@ -39,6 +42,7 @@ def list_my_medical_history(
 
 @professional_medical_history_router.get("", response_model=MedicalHistoryPage)
 def list_current_patient_medical_history(
+    auth: Annotated[AuthContext, Depends(get_current_auth_context)],
     query: Annotated[MedicalHistoryQuery, Depends()],
     access: Annotated[
         CurrentPatientAccess | None,
@@ -52,10 +56,14 @@ def list_current_patient_medical_history(
             "No current chamber patient for the verified doctor.",
             status_code=404,
         )
-    return MedicalHistoryService(db).list_history(
+    decision = ClinicalReadPolicy(db).authorize(auth, access.context.citizen.id, "MEDICAL_HISTORY")
+    result = MedicalHistoryService(db).list_history(
         access.context.citizen.id,
         query,
     )
+    AuditService(db).record(auth=auth, citizen_id=access.context.citizen.id,
+        resource_type="MEDICAL_HISTORY", access_source=decision.source)
+    return result
 
 
 def _validate_date_range(query: MedicalHistoryQuery) -> None:

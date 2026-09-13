@@ -761,6 +761,8 @@ class AppointmentService:
         now = datetime.now(timezone.utc)
         try:
             visit.status = VisitStatus.FINALIZED.value
+            from app.clinical_audit.service import AuditService
+            AuditService(self.db).record(auth=context.auth, citizen_id=visit.citizen_id, resource_type="VISIT", resource_id=visit.id, action="FINALIZE", commit=False)
             visit.finalized_at = now
             appointment.status = AppointmentStatus.COMPLETED.value
             appointment.completed_at = now

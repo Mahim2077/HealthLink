@@ -651,7 +651,7 @@ def test_foreign_doctor_cannot_read_or_edit_prescription(
         DOCTOR_PRESCRIPTION_PATH.format(prescription_id=prescription_id),
         headers={"Authorization": f"Bearer {bob_token}"},
     )
-    assert forbidden_read.status_code == 403, forbidden_read.text
+    assert forbidden_read.status_code == 404, forbidden_read.text
 
     forbidden_edit = client.put(
         DOCTOR_PRESCRIPTION_PATH.format(prescription_id=prescription_id),
@@ -883,7 +883,7 @@ def test_pdf_stream_rejects_non_author_doctor(
         PDF_PATH.format(prescription_id=prescription_id),
         headers={"Authorization": f"Bearer {bob_token}"},
     )
-    assert response.status_code == 403, response.text
+    assert response.status_code == 404, response.text
 
 
 def test_pdf_stream_allows_owning_citizen(

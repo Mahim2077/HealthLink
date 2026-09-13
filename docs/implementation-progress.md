@@ -917,3 +917,63 @@ nid_number, birth_certificate_number, email, user_id,
   for the release window returned no entries.
 
 Phase 17 is complete, committed, pushed, migrated, and live in production.
+
+## Phases 18–21 — 2026-09-13, local only
+
+### Implemented
+
+- Phase 18 adds a citizen-owned emergency profile with serialized first-write
+  upserts, citizen-profile blood-group projection, strict editable fields, and
+  a stale-patient-safe read-only panel in the active doctor consultation.
+- Phase 19 adds citizen medicine schedules with multiple daily Dhaka times,
+  optional finalized-prescription linkage, activation controls, retry-safe
+  notification generation, and separate read/acknowledge actions. Appointment
+  notices describe the serial as a queue position rather than a precise time.
+  The protected worker is callable through the API or CLI. A GitHub Actions
+  schedule is present but remains disabled until `REMINDERS_ENABLED=true` and
+  a matching `CRON_SECRET` are configured during a later release.
+- Phase 20 adds a dedicated clinical-access audit table and central service.
+  Professional reads and meaningful clinical mutations record metadata only;
+  medical payload text and NID values are not copied. Citizens can view their
+  own paginated, human-readable history at `/citizen/privacy`. Authenticated
+  API responses now carry `Cache-Control: private, no-store`.
+- Phase 21 extends the existing grant table without recreating it. Legacy
+  `FULL_RECORD` maps to `FULL_MEDICAL_HISTORY`; ambiguous `LIMITED` rows are
+  conservatively revoked and retained as `EMERGENCY_PROFILE_ONLY` for audit.
+  Citizens explicitly confirm and can revoke read-only grants. Verified
+  doctors can browse only finalized records covered by an active, unexpired
+  scope. Grants never authorize clinical writes.
+- The centralized read policy combines self access, an exact ACTIVE/BOOKED/
+  CURRENT chamber relationship, specific finalized authorship, and manual
+  grants. Unauthorized cross-patient reads return not-found responses, and
+  navigation exposes the new citizen and Doctor-only entry points.
+
+### Evidence
+
+- Full backend suite against a dedicated loopback PostgreSQL database:
+  **320 passed**. This includes the complete scope/resource matrix, citizen
+  isolation, expiry/revocation, protected scheduler, concurrent reminder
+  deduplication, concurrent emergency-profile creation, and existing chamber/
+  diagnostics concurrency coverage. One existing Starlette/httpx deprecation
+  warning remains.
+- Frontend: **51 files / 233 tests passed**; TypeScript and ESLint passed. The
+  optimized Next.js production build passed and generated all 32 static pages,
+  including the five new Phase 18–21 routes.
+- Migrations `0026` through `0029` upgraded on a fresh local PostgreSQL
+  database. The `0029` downgrade/re-upgrade path passed with a synthetic
+  revoked legacy row, and `alembic check` reported no schema drift.
+- `git diff --check` passed; only existing CRLF normalization warnings were
+  reported.
+
+### Browser acceptance
+
+- Real Chromium acceptance against synthetic local data passed citizen login,
+  emergency-profile save and full reload, reminder creation, explicit visits-
+  only grant confirmation, revocation confirmation, and citizen-visible grant
+  audit entries.
+- At 375×812, the privacy page had no horizontal overflow and the navigation,
+  audit card, and paging controls remained usable. The captured screenshot was
+  visually inspected. The browser error log was empty; only development HMR
+  and React DevTools informational messages appeared.
+- No production database, GitHub repository, Vercel environment, or live site
+  was changed. No commit or push was made.

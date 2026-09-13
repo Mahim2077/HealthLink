@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
-from fastapi import Depends, Path
+from fastapi import Depends, Path, Request
 from sqlalchemy.orm import Session
 
 from app.auth.constants import Portal
@@ -23,6 +23,8 @@ from app.professionals.constants import (
     VerificationStatus,
 )
 from app.professionals.repository import ProfessionalRepository
+from app.access.policy import ClinicalReadPolicy
+from app.visits.models import MedicalVisit
 
 
 @dataclass(frozen=True)
@@ -31,17 +33,19 @@ class PrescriptionAccess:
 
     auth: AuthContext
     prescription_id: uuid.UUID
-    actor_kind: Literal["citizen", "author_doctor"]
+    actor_kind: Literal["citizen", "author_doctor", "professional_reader"]
     citizen_profile_id: uuid.UUID | None = None
     doctor_role_registration_id: uuid.UUID | None = None
+    access_source: str | None = None
 
 
 def get_prescription_access(
+    request: Request,
     prescription_id: Annotated[uuid.UUID, Path(...)],
     auth: Annotated[AuthContext, Depends(get_current_auth_context)],
     db: Annotated[Session, Depends(get_db)],
 ) -> PrescriptionAccess:
-    """Allow only the owning citizen or the verified author doctor."""
+    """Resolve scoped reads; clinical mutations still require the author."""
 
     prescription = PrescriptionsRepository(db).get_prescription_by_id(
         prescription_id
@@ -87,15 +91,20 @@ def get_prescription_access(
             or registration.role.code != ProfessionalRoleCode.DOCTOR.value
         ):
             raise AuthorizationError("Verified doctor role required.")
-        if prescription.author_doctor_role_registration_id != registration.id:
-            raise AuthorizationError(
-                "Only the author doctor may access this prescription."
-            )
+        is_author = prescription.author_doctor_role_registration_id == registration.id
+        if not is_author and request.method != "GET":
+            raise AuthorizationError("Only the author doctor may edit this prescription.")
+        visit = db.get(MedicalVisit, prescription.visit_id)
+        decision = ClinicalReadPolicy(db).authorize(auth, prescription.citizen_id, "PRESCRIPTION",
+            resource_id=prescription.id, author_role_id=prescription.author_doctor_role_registration_id,
+            finalized=bool(visit and visit.status == "FINALIZED"))
         return PrescriptionAccess(
             auth=auth,
             prescription_id=prescription_id,
-            actor_kind="author_doctor",
+            actor_kind="author_doctor" if is_author else "professional_reader",
             doctor_role_registration_id=registration.id,
+            citizen_profile_id=prescription.citizen_id,
+            access_source=decision.source,
         )
 
     raise AuthorizationError(

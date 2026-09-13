@@ -139,6 +139,7 @@ deployments are introduced later.
 | `APP_NAME` | `HealthLink` |
 | `APP_ENV` | `production` |
 | `DEBUG` | `false` |
+| `CRON_SECRET` | A separate random secret used only by the protected reminder worker |
 | `DATABASE_URL` | Production PostgreSQL/Supabase connection URL |
 | `DB_DISABLE_PREPARED_STATEMENTS` | `true` for a transaction-mode pooler; otherwise `false` |
 | `JWT_SECRET_KEY` | A cryptographically random secret of at least 32 characters |
@@ -204,6 +205,7 @@ Create:
 | `VERCEL_ORG_ID` | `orgId` from `.vercel/project.json` |
 | `VERCEL_PROJECT_ID` | `projectId` from `.vercel/project.json` |
 | `PRODUCTION_DATABASE_URL` | The same production database used by the backend |
+| `CRON_SECRET` | The same reminder-worker secret configured in Vercel |
 
 If GitHub CLI is installed, each command below securely prompts for its value:
 
@@ -212,7 +214,15 @@ gh secret set VERCEL_TOKEN
 gh secret set VERCEL_ORG_ID
 gh secret set VERCEL_PROJECT_ID
 gh secret set PRODUCTION_DATABASE_URL
+gh secret set CRON_SECRET
 ```
+
+Phase 19 reminder delivery is fail-closed by default. After the release that
+contains the reminder migrations and worker has completed successfully, create
+the GitHub Actions repository variable `REMINDERS_ENABLED` with value `true`.
+The scheduled workflow then invokes the stable production API every five
+minutes with `CRON_SECRET`; until that variable is enabled, scheduled jobs are
+skipped. Rotate the secret if either configured copy is exposed.
 
 Create a GitHub environment named `production` under:
 
