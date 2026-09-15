@@ -19,6 +19,8 @@ def test_phase_six_migration_chain_and_metadata() -> None:
     facilities = Base.metadata.tables["healthcare_facilities"]
     assert {
         "id", "name", "facility_type", "registration_number", "address",
+        "district_code", "upazila_code", "latitude", "longitude",
+        "location_status", "location_matched_address", "location_confirmed_at",
         "phone", "email", "is_active", "created_at", "updated_at",
     } == set(facilities.columns.keys())
     assert facilities.c.name.type.length == 200
@@ -34,3 +36,6 @@ def test_phase_six_migration_chain_and_metadata() -> None:
     targets = {fk.target_fullname for fk in registrations.c.facility_id.foreign_keys}
     assert targets == {"healthcare_facilities.id"}
     assert registrations.c.facility_id.nullable is True
+    assert scripts.get_revision("0030_doctor_locations").down_revision == "0029_access_grant_scopes"
+    doctor_details = Base.metadata.tables["doctor_registration_details"]
+    assert {"specialization", "qualification"}.issubset(doctor_details.columns.keys())

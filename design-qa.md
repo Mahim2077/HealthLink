@@ -91,6 +91,87 @@ final result: passed
 
 ---
 
+# HealthLink doctor discovery and nearby-location flow — final design QA
+
+## Comparison target
+
+- Approved hybrid source mock: `C:/Users/User/.codex/generated_images/01a09161-a544-7292-8a25-323ccc9166b8/exec-36e033dd-57b1-4c78-82a6-75c21f70b1b7.png` (`1488 × 1058`).
+- Browser-rendered implementation: `http://127.0.0.1:3000/citizen/doctors/search`.
+- In-app browser captures were inspected at `1440 × 1050` for desktop fidelity and `390 × 844` for the responsive layout. The implementation URL is the reproducible screenshot target; captures were emitted inline by the Codex in-app browser rather than written to the repository.
+
+## Evidence reviewed together
+
+- Full view: approved source and browser-rendered implementation were compared for the heading, unified search, six specialty cards, day/facility/sort controls, active-filter chips, results table, and action hierarchy.
+- Focused region: the source location modal was compared with the implemented approximate-location modal at desktop size, including the softened background, map-pin treatment, primary/secondary actions, privacy copy, and dismissal control.
+- Focused region: the implementation's additional manual-area state was inspected separately because it extends the approved concept. It presents bilingual zila and upazila selectors without exposing coordinates.
+- Responsive view: the `390 × 844` layout was checked separately because the approved source is desktop-only. It replaces the table with readable stacked result cards and keeps controls at touch-friendly sizes without horizontal overflow.
+
+## Findings
+
+No actionable P0, P1, or P2 visual differences remain.
+
+- [P3] The production portal shell remains visible around the discovery surface instead of reproducing the mock's isolated canvas. This preserves the application's existing navigation and visual system.
+- [P3] On mobile, specialty cards use a two-column grid and result rows become stacked cards. This is an intentional responsive adaptation of the desktop source.
+- [P3] The manual nearby flow adds a second modal state that was not pictured in the source. It follows the same dimensions, hierarchy, controls, and teal/slate styling.
+
+## Required fidelity surfaces
+
+- Typography: the strong display heading, compact filter labels, doctor hierarchy, and restrained supporting copy align with the approved source and existing portal typography.
+- Spacing and density: desktop preserves the source's search-first rhythm and compact results table; mobile increases vertical space and touch targets without clipping.
+- Colors and effects: teal actions, pale-teal icon circles, slate text, white cards, subtle borders, modal dimming, and restrained shadows remain consistent.
+- Assets: all interface symbols use the project's existing Heroicons dependency; no placeholder graphics, manually drawn SVGs, or low-resolution assets were introduced.
+- Content: specialty, qualification, facility, area, next-practice, distance, verification, and action labels use real backend response fields. Coordinate values are absent from all user-facing responses and interface states.
+
+## Interaction, privacy, and responsive checks
+
+- Unified text search, six specialty shortcuts, day selection, facility filtering, and five sorting options are present and keyboard-addressable.
+- Selecting `Nearest facility` opens an explicit location choice before browser geolocation is requested.
+- Manual location exposes 64 bilingual zila options and their dependent upazila choices; Dhaka → Savar returned the expected distance-ordered doctors.
+- Approximate GPS values are rounded before a `POST` search request, retained only in component memory, and never written to browser storage.
+- Nearby results use human-readable distance labels; an exact/near-exact match reads `Less than 1 km away` rather than `0 km`.
+- No `latitude`, `longitude`, or `coordinate` label appeared in the rendered doctor-search flow.
+- The `390 × 844` document width remained within the viewport (`375px` content width inside a `390px` viewport), with no page-level horizontal overflow.
+- Browser console warnings/errors: none.
+- Focused doctor-search tests: 4 passed.
+- Full frontend suite: 52 files and 238 tests passed.
+- Focused backend location/doctor-discovery tests: 11 passed.
+- TypeScript typecheck, ESLint, full backend suite, and the Next.js production build passed during this implementation pass.
+
+## Comparison history
+
+### Pass 1 — hybrid discovery implementation
+
+- Rebuilt doctor discovery around the approved unified search, specialty cards, compact filters, active chips, responsive results, and primary booking action.
+- Added specialization and qualification data so search results are clinically meaningful instead of generic provider rows.
+
+### Pass 2 — nearby-location implementation
+
+- Added an explicit one-time approximate-location choice and bilingual manual zila/upazila alternative.
+- Kept facility coordinates private and used them only for backend distance filtering and sorting.
+- Added admin-only address/area confirmation before a facility becomes eligible for nearby calculations.
+
+### Pass 3 — browser and regression QA
+
+- Verified the desktop source hierarchy and location modal at `1440 × 1050`.
+- Verified the responsive card layout at `390 × 844` and exercised Dhaka → Savar manual nearby search end to end.
+- [P3] Replaced `About 0 km away` with `Less than 1 km away` and added a focused regression test.
+- Confirmed no visible coordinate terminology and no browser console warnings or errors.
+
+## Implementation checklist
+
+- [x] Approved hybrid doctor-search design implemented.
+- [x] Specialty-first discovery and five sorting options implemented.
+- [x] Explicit approximate-GPS prompt implemented without browser persistence.
+- [x] Manual bilingual zila/upazila search implemented.
+- [x] Facility coordinates confined to backend location logic.
+- [x] Facility location confirmation restricted to admins.
+- [x] Desktop and mobile browser states verified.
+- [x] Automated regression, type, lint, and production-build checks passed.
+
+final result: passed
+
+---
+
 # HealthLink portal-theme consistency — final Phase 14 design QA
 
 ## Scope

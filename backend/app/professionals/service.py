@@ -111,6 +111,8 @@ class ProfessionalService:
                 DoctorRegistrationDetail(
                     professional_role_registration_id=registration.id,
                     bmdc_registration_number=request.bmdc_registration_number,
+                    specialization=request.specialization.value,
+                    qualification=request.qualification,
                 )
             )
         return SubmittedProfessionalApplication(

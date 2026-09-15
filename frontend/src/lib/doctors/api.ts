@@ -4,8 +4,9 @@ import { apiClient } from "@/lib/api/client";
 
 import type {
   DoctorProfile,
+  DoctorDiscoveryFacility,
   DoctorSearchFilters,
-  DoctorSummary,
+  DoctorSearchResponse,
   FacilityChoice,
   PracticeScheduleCreateResponse,
   PracticeScheduleDeleteResponse,
@@ -15,24 +16,25 @@ import type {
 
 export async function searchDoctors(
   filters: DoctorSearchFilters,
-): Promise<DoctorSummary[]> {
-  const params = new URLSearchParams();
-  if (filters.name && filters.name.trim()) {
-    params.set("name", filters.name.trim());
+): Promise<DoctorSearchResponse> {
+  const payload: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === undefined || value === "") continue;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed) payload[key] = trimmed;
+    } else {
+      payload[key] = value;
+    }
   }
-  if (filters.facility_name && filters.facility_name.trim()) {
-    params.set("facility_name", filters.facility_name.trim());
-  }
-  if (filters.weekday) {
-    params.set("weekday", filters.weekday);
-  }
-  if (filters.limit && filters.limit > 0) {
-    params.set("limit", String(filters.limit));
-  }
-  const query = params.toString();
-  return apiClient.get<DoctorSummary[]>(
-    `doctors${query ? `?${query}` : ""}`,
+  return apiClient.post<DoctorSearchResponse, DoctorSearchFilters>(
+    "doctors/search",
+    payload as DoctorSearchFilters,
   );
+}
+
+export async function loadDoctorDiscoveryFacilities(): Promise<DoctorDiscoveryFacility[]> {
+  return apiClient.get<DoctorDiscoveryFacility[]>("doctors/facilities");
 }
 
 export async function loadDoctorProfile(

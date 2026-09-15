@@ -59,7 +59,7 @@ function blankMedicine(): MedicineDraft {
 function draftsFromPrescription(
   prescription: PrescriptionView | null,
 ): MedicineDraft[] {
-  if (!prescription) return [blankMedicine()];
+  if (!prescription || prescription.items.length === 0) return [blankMedicine()];
   return prescription.items.map((item) => ({
     clientId: item.id,
     medicine_name: item.medicine_name,
@@ -74,11 +74,13 @@ function normalizeOptional(value: string): string | null {
   return value.trim() || null;
 }
 
-function formatTimestamp(value: string | null): string {
-  if (!value) return "Not generated";
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
-}
+export type ConsultationFields = Pick<
+  PrescriptionPayload,
+  | "chief_complaint"
+  | "clinical_notes"
+  | "diagnosis"
+  | "follow_up_instructions"
+>;
 
 export function PrescriptionPanel({
   visitId,
@@ -87,6 +89,9 @@ export function PrescriptionPanel({
   deps = defaultDeps,
   disabled = false,
   onEditStateChange,
+  initialConsultation,
+  onSaved,
+  autoGeneratePdf = false,
 }: {
   visitId?: string;
   prescriptionId?: string | null;
@@ -94,6 +99,9 @@ export function PrescriptionPanel({
   deps?: PrescriptionDeps;
   disabled?: boolean;
   onEditStateChange?: (state: { dirty: boolean; saving: boolean }) => void;
+  initialConsultation?: ConsultationFields;
+  onSaved?: (prescription: PrescriptionView) => void;
+  autoGeneratePdf?: boolean;
 }) {
   const [loadState, setLoadState] = useState<LoadState>(() =>
     prescriptionId
@@ -106,30 +114,6 @@ export function PrescriptionPanel({
   const [loadingPdf, setLoadingPdf] = useState(false);
   const pdfUrlRef = useRef<string | null>(null);
   const pdfVersion = useRef(0);
-
-  useEffect(() => {
-    if (!prescriptionId) return;
-    let active = true;
-    void deps.read(prescriptionId).then(
-      (prescription) => {
-        if (active) setLoadState({ kind: "ready", prescription });
-      },
-      (reason: unknown) => {
-        if (active) {
-          setLoadState({
-            kind: "error",
-            message:
-              reason instanceof Error
-                ? reason.message
-                : "Unable to load prescription",
-          });
-        }
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [deps, prescriptionId, version]);
 
   const replacePdfUrl = useCallback((nextUrl: string | null) => {
     const previousUrl = pdfUrlRef.current;
@@ -173,6 +157,32 @@ export function PrescriptionPanel({
     [deps, replacePdfUrl],
   );
 
+  useEffect(() => {
+    if (!prescriptionId) return;
+    let active = true;
+    void deps.read(prescriptionId).then(
+      (prescription) => {
+        if (!active) return;
+        setLoadState({ kind: "ready", prescription });
+        if (autoGeneratePdf) void openPdf(prescription);
+      },
+      (reason: unknown) => {
+        if (active) {
+          setLoadState({
+            kind: "error",
+            message:
+              reason instanceof Error
+                ? reason.message
+                : "Unable to load prescription",
+          });
+        }
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [autoGeneratePdf, deps, openPdf, prescriptionId, version]);
+
   if (loadState.kind === "loading") {
     return (
       <LoadingState
@@ -213,23 +223,26 @@ export function PrescriptionPanel({
     setPdfError(null);
     setLoadingPdf(false);
     setLoadState({ kind: "ready", prescription: saved });
+    onSaved?.(saved);
   };
+
+  const canEdit = editable && (prescription?.can_edit ?? true);
 
   return (
     <section className="hl-card p-6 sm:p-8">
       <header className="flex flex-col gap-3 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">
-            Electronic prescription
+            Consultation &amp; prescription
           </p>
           <h2 className="mt-2 text-2xl font-bold text-slate-950">
-            {prescription ? "Structured prescription" : "Create prescription"}
+            {canEdit ? "Clinical record and prescription" : "Prescription record"}
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            {editable ? "Add medicines and instructions, then save. A new PDF is prepared after each update." : "Your doctor's medicines, instructions, and advice. You can download a copy below."}
+            {canEdit ? "Record clinical notes, medicines, and advice together in one structured record." : "Review the clinical summary, medicines, and advice from this consultation."}
           </p>
         </div>
-        {prescription && editable ? (
+        {prescription && canEdit ? (
           <Link
             className="inline-flex items-center gap-2 text-sm font-bold text-sky-700 hover:text-sky-900"
             href={`/professional/prescriptions/${prescription.id}`}
@@ -240,43 +253,39 @@ export function PrescriptionPanel({
         ) : null}
       </header>
 
-      {editable ? (
+      {canEdit ? (
         <PrescriptionForm
           key={prescription?.updated_at ?? `new-${visitId}`}
           initialPrescription={prescription}
           onSave={save}
           disabled={disabled}
           onEditStateChange={onEditStateChange}
+          initialConsultation={initialConsultation}
         />
       ) : prescription ? (
         <PrescriptionReadOnly prescription={prescription} />
+      ) : initialConsultation ? (
+        <ConsultationReadOnly consultation={initialConsultation} />
       ) : null}
 
       {prescription ? (
         <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-bold text-slate-900">Prescription PDF</p>
+              <p className="text-sm font-bold text-slate-900">Printable prescription</p>
               <p className="mt-1 text-xs text-slate-600">
-                {prescription.pdf_available
-                  ? `Generated ${formatTimestamp(prescription.pdf_updated_at)}`
-                  : "The structured record is safe, but its PDF needs regeneration."}
+                Generated securely from this structured record when you open it. No PDF file is stored.
               </p>
             </div>
             <button
               className="inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-bold text-white disabled:opacity-60"
-              disabled={!prescription.pdf_available || loadingPdf}
+              disabled={loadingPdf}
               onClick={() => void openPdf(prescription)}
               type="button"
             >
-              {loadingPdf ? "Loading PDF…" : "View / download PDF"}
+              {loadingPdf ? "Generating PDF…" : "Generate PDF"}
             </button>
           </div>
-          {!prescription.pdf_available && editable ? (
-            <p className="mt-3 text-sm text-amber-800">
-              Save the prescription again to retry PDF generation.
-            </p>
-          ) : null}
           {pdfError ? (
             <p className="mt-3 text-sm text-rose-700" role="alert">
               {pdfError}
@@ -291,7 +300,7 @@ export function PrescriptionPanel({
               />
               <a
                 className="mt-3 inline-flex min-h-11 items-center text-sm font-bold text-teal-700"
-                download={prescription.pdf_file_name ?? "prescription.pdf"}
+                download={`prescription-${prescription.id}.pdf`}
                 href={pdfUrl}
               >
                 Download PDF
@@ -306,17 +315,31 @@ export function PrescriptionPanel({
 
 function PrescriptionForm({
   initialPrescription,
+  initialConsultation,
   onSave,
   disabled,
   onEditStateChange,
 }: {
   initialPrescription: PrescriptionView | null;
+  initialConsultation?: ConsultationFields;
   onSave: (payload: PrescriptionPayload) => Promise<void>;
   disabled: boolean;
   onEditStateChange?: (state: { dirty: boolean; saving: boolean }) => void;
 }) {
   const [medicines, setMedicines] = useState<MedicineDraft[]>(() =>
     draftsFromPrescription(initialPrescription),
+  );
+  const [chiefComplaint, setChiefComplaint] = useState(
+    initialPrescription?.chief_complaint ?? initialConsultation?.chief_complaint ?? "",
+  );
+  const [clinicalNotes, setClinicalNotes] = useState(
+    initialPrescription?.clinical_notes ?? initialConsultation?.clinical_notes ?? "",
+  );
+  const [diagnosis, setDiagnosis] = useState(
+    initialPrescription?.diagnosis ?? initialConsultation?.diagnosis ?? "",
+  );
+  const [followUpInstructions, setFollowUpInstructions] = useState(
+    initialPrescription?.follow_up_instructions ?? initialConsultation?.follow_up_instructions ?? "",
   );
   const [diagnosticInformation, setDiagnosticInformation] = useState(
     initialPrescription?.diagnostic_information ?? "",
@@ -328,8 +351,24 @@ function PrescriptionForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const currentItems = medicines.map(({ medicine_name, dosage, frequency, duration, instructions }) => ({ medicine_name, dosage, frequency, duration, instructions }));
+  const comparableCurrentItems = currentItems.filter((item) =>
+    [item.medicine_name, item.dosage, item.frequency, item.duration, item.instructions ?? ""]
+      .some((value) => value.trim()),
+  );
   const baselineItems = initialPrescription?.items.map(({ medicine_name, dosage, frequency, duration, instructions }) => ({ medicine_name, dosage, frequency, duration, instructions })) ?? [{ medicine_name: "", dosage: "", frequency: "", duration: "", instructions: null }];
-  const dirty = JSON.stringify(currentItems) !== JSON.stringify(baselineItems) || diagnosticInformation !== (initialPrescription?.diagnostic_information ?? "") || medicalAdvice !== (initialPrescription?.medical_advice ?? "") || notes !== (initialPrescription?.notes ?? "");
+  const initialValue = (field: keyof ConsultationFields) => initialPrescription?.[field] ?? initialConsultation?.[field] ?? "";
+  const comparableBaselineItems = baselineItems.filter((item) =>
+    [item.medicine_name, item.dosage, item.frequency, item.duration, item.instructions ?? ""]
+      .some((value) => value.trim()),
+  );
+  const dirty = JSON.stringify(comparableCurrentItems) !== JSON.stringify(comparableBaselineItems)
+    || chiefComplaint !== initialValue("chief_complaint")
+    || clinicalNotes !== initialValue("clinical_notes")
+    || diagnosis !== initialValue("diagnosis")
+    || followUpInstructions !== initialValue("follow_up_instructions")
+    || diagnosticInformation !== (initialPrescription?.diagnostic_information ?? "")
+    || medicalAdvice !== (initialPrescription?.medical_advice ?? "")
+    || notes !== (initialPrescription?.notes ?? "");
   useUnsavedChanges(dirty || saving);
   useEffect(() => { onEditStateChange?.({ dirty, saving }); }, [dirty, saving, onEditStateChange]);
 
@@ -350,7 +389,11 @@ function PrescriptionForm({
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
-    const items = medicines.map((medicine) => ({
+    const activeMedicines = medicines.filter((medicine) =>
+      [medicine.medicine_name, medicine.dosage, medicine.frequency, medicine.duration, medicine.instructions ?? ""]
+        .some((value) => value.trim()),
+    );
+    const items = activeMedicines.map((medicine) => ({
       medicine_name: medicine.medicine_name.trim(),
       dosage: medicine.dosage.trim(),
       frequency: medicine.frequency.trim(),
@@ -373,6 +416,10 @@ function PrescriptionForm({
     setSaving(true);
     try {
       await onSave({
+        chief_complaint: normalizeOptional(chiefComplaint),
+        clinical_notes: normalizeOptional(clinicalNotes),
+        diagnosis: normalizeOptional(diagnosis),
+        follow_up_instructions: normalizeOptional(followUpInstructions),
         items,
         diagnostic_information: normalizeOptional(diagnosticInformation),
         medical_advice: normalizeOptional(medicalAdvice),
@@ -391,9 +438,34 @@ function PrescriptionForm({
 
   return (
     <form className="mt-6" onChangeCapture={() => onEditStateChange?.({ dirty: true, saving })} onSubmit={submit}>
-      <p role="status" className="mb-4 text-sm text-slate-600">{saving ? "Saving prescription…" : dirty ? "Unsaved prescription changes" : initialPrescription ? "Prescription saved" : "No prescription yet. Medicines are optional for this visit."}</p>
+      <p role="status" className="mb-4 text-sm text-slate-600">{saving ? "Saving consultation…" : dirty ? "Unsaved consultation changes" : initialPrescription ? "Consultation and prescription saved" : "Medicines are optional; save the clinical record when ready."}</p>
       <fieldset disabled={saving || disabled}>
-        <legend className="text-sm font-bold text-slate-900">Medicines</legend>
+        <legend className="text-sm font-bold text-slate-900">Clinical summary</legend>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          {(
+            [
+              ["Chief complaint", chiefComplaint, setChiefComplaint, 4000],
+              ["Diagnosis", diagnosis, setDiagnosis, 4000],
+              ["Clinical notes", clinicalNotes, setClinicalNotes, 8000],
+              ["Follow-up instructions", followUpInstructions, setFollowUpInstructions, 4000],
+            ] as const
+          ).map(([label, value, setter, maxLength]) => (
+            <label className="block text-sm" key={label}>
+              <span className="font-semibold text-slate-700">{label}</span>
+              <textarea
+                className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                maxLength={maxLength}
+                onChange={(event) => setter(event.target.value)}
+                rows={label === "Clinical notes" ? 4 : 3}
+                value={value}
+              />
+            </label>
+          ))}
+        </div>
+
+        <div className="mt-7 border-t border-slate-200 pt-6">
+        <p className="text-sm font-bold text-slate-900">Medicines</p>
+        <p className="mt-1 text-xs text-slate-500">Optional. Leave the first row empty when no medicine is prescribed.</p>
         <div className="mt-3 space-y-4">
           {medicines.map((medicine, index) => (
             <div
@@ -435,7 +507,6 @@ function PrescriptionForm({
                       onChange={(event) =>
                         updateMedicine(medicine.clientId, field, event.target.value)
                       }
-                      required
                       value={medicine[field] ?? ""}
                     />
                   </label>
@@ -467,6 +538,7 @@ function PrescriptionForm({
         >
           + Add Medicine
         </button>
+        </div>
 
         <div className="mt-6 grid gap-4">
           {(
@@ -505,10 +577,10 @@ function PrescriptionForm({
         type="submit"
       >
         {saving
-          ? "Saving prescription…"
+          ? "Saving consultation…"
           : initialPrescription
-            ? "Update prescription"
-            : "Save prescription"}
+            ? "Update consultation & prescription"
+            : "Save consultation & prescription"}
       </button>
     </form>
   );
@@ -521,6 +593,20 @@ function PrescriptionReadOnly({
 }) {
   return (
     <div className="mt-6 space-y-6">
+      <div>
+        <h3 className="text-sm font-bold text-slate-900">Clinical summary</h3>
+        <dl className="mt-3 grid gap-4 sm:grid-cols-2">
+          <TextBlock label="Chief complaint" value={prescription.chief_complaint} />
+          <TextBlock label="Diagnosis" value={prescription.diagnosis} />
+          <TextBlock label="Clinical notes" value={prescription.clinical_notes} />
+          <TextBlock label="Follow-up instructions" value={prescription.follow_up_instructions} />
+        </dl>
+      </div>
+      <div>
+        <h3 className="text-sm font-bold text-slate-900">Medicines</h3>
+        {prescription.items.length === 0 ? (
+          <p className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">No medicines prescribed.</p>
+        ) : (
       <div className="grid gap-4">
         {prescription.items.map((item, index) => (
           <article className="rounded-2xl border border-slate-200 p-5" key={item.id}>
@@ -541,10 +627,30 @@ function PrescriptionReadOnly({
           </article>
         ))}
       </div>
+        )}
+      </div>
       <dl className="grid gap-4 sm:grid-cols-3">
         <TextBlock label="Diagnostic information" value={prescription.diagnostic_information} />
         <TextBlock label="Medical advice" value={prescription.medical_advice} />
         <TextBlock label="Notes" value={prescription.notes} />
+      </dl>
+    </div>
+  );
+}
+
+function ConsultationReadOnly({
+  consultation,
+}: {
+  consultation: ConsultationFields;
+}) {
+  return (
+    <div className="mt-6">
+      <h3 className="text-sm font-bold text-slate-900">Clinical summary</h3>
+      <dl className="mt-3 grid gap-4 sm:grid-cols-2">
+        <TextBlock label="Chief complaint" value={consultation.chief_complaint} />
+        <TextBlock label="Diagnosis" value={consultation.diagnosis} />
+        <TextBlock label="Clinical notes" value={consultation.clinical_notes} />
+        <TextBlock label="Follow-up instructions" value={consultation.follow_up_instructions} />
       </dl>
     </div>
   );

@@ -19,6 +19,10 @@ function prescription(
     visit_id: "visit-1",
     citizen_id: "citizen-1",
     author_doctor_role_registration_id: "doctor-role-1",
+    chief_complaint: "Fever and sore throat",
+    clinical_notes: "Temperature 38°C",
+    diagnosis: "Viral fever",
+    follow_up_instructions: "Review after three days if needed",
     items: [
       {
         id: "item-1",
@@ -32,9 +36,7 @@ function prescription(
     diagnostic_information: "Viral fever",
     medical_advice: "Rest and hydrate",
     notes: null,
-    pdf_available: true,
-    pdf_file_name: "prescription-rx-1.pdf",
-    pdf_updated_at: "2026-08-21T12:00:00Z",
+    can_edit: true,
     created_at: "2026-08-21T12:00:00Z",
     updated_at: "2026-08-21T12:00:00Z",
     ...overrides,
@@ -103,7 +105,10 @@ describe("PrescriptionPanel", () => {
     fireEvent.change(screen.getByLabelText("Diagnostic information"), {
       target: { value: " Seasonal allergy " },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save prescription" }));
+    fireEvent.change(screen.getByLabelText("Clinical notes"), {
+      target: { value: " Mild wheeze " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save consultation & prescription" }));
 
     await waitFor(() => expect(deps.create).toHaveBeenCalledOnce());
     expect(deps.create).toHaveBeenCalledWith("visit-1", {
@@ -123,6 +128,10 @@ describe("PrescriptionPanel", () => {
           instructions: "At bedtime",
         },
       ],
+      chief_complaint: null,
+      clinical_notes: "Mild wheeze",
+      diagnosis: null,
+      follow_up_instructions: null,
       diagnostic_information: "Seasonal allergy",
       medical_advice: null,
       notes: null,
@@ -148,9 +157,7 @@ describe("PrescriptionPanel", () => {
     expect(
       screen.queryByRole("button", { name: "Update prescription" }),
     ).not.toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "View / download PDF" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Generate PDF" }));
 
     await waitFor(() => expect(deps.downloadPdf).toHaveBeenCalledWith("rx-1"));
     expect(await screen.findByTitle("Prescription PDF preview")).toHaveAttribute(
@@ -163,32 +170,37 @@ describe("PrescriptionPanel", () => {
     );
   });
 
-  it("lets the author retry PDF generation by updating the saved record", async () => {
+  it("shows previous prescriptions read-only to an authorized non-author doctor", async () => {
     const deps = dependencies();
-    const unavailable = prescription({
-      pdf_available: false,
-      pdf_file_name: null,
-      pdf_updated_at: null,
-    });
-    vi.mocked(deps.read).mockResolvedValue(unavailable);
-    vi.mocked(deps.update).mockResolvedValue(prescription());
+    vi.mocked(deps.read).mockResolvedValue(prescription({ can_edit: false }));
     render(
       <PrescriptionPanel deps={deps} editable prescriptionId="rx-1" />,
     );
 
-    expect(
-      await screen.findByText("Save the prescription again to retry PDF generation."),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Update prescription" }));
+    expect(await screen.findByText("Fever and sore throat")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /update consultation/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate PDF" })).toBeEnabled();
+  });
 
-    await waitFor(() => expect(deps.update).toHaveBeenCalledOnce());
-    expect(deps.update).toHaveBeenCalledWith(
-      "rx-1",
-      expect.objectContaining({
-        items: [
-          expect.objectContaining({ medicine_name: "Paracetamol" }),
-        ],
-      }),
+  it("generates a previous prescription PDF as soon as the doctor opens it", async () => {
+    const deps = dependencies();
+    vi.mocked(deps.read).mockResolvedValue(prescription({ can_edit: false }));
+    vi.mocked(deps.downloadPdf).mockResolvedValue(
+      new Blob(["%PDF"], { type: "application/pdf" }),
+    );
+    render(
+      <PrescriptionPanel
+        autoGeneratePdf
+        deps={deps}
+        editable
+        prescriptionId="rx-1"
+      />,
+    );
+
+    await waitFor(() => expect(deps.downloadPdf).toHaveBeenCalledWith("rx-1"));
+    expect(await screen.findByTitle("Prescription PDF preview")).toHaveAttribute(
+      "src",
+      "blob:prescription-preview",
     );
   });
 
@@ -198,10 +210,10 @@ describe("PrescriptionPanel", () => {
     vi.mocked(deps.downloadPdf).mockResolvedValue(new Blob(["%PDF"], { type: "application/pdf" }));
     vi.mocked(deps.update).mockResolvedValue(prescription({ medical_advice: "Updated advice", updated_at: "2026-08-21T13:00:00Z" }));
     render(<PrescriptionPanel deps={deps} editable prescriptionId="rx-1" />);
-    fireEvent.click(await screen.findByRole("button", { name: "View / download PDF" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Generate PDF" }));
     await screen.findByTitle("Prescription PDF preview");
     fireEvent.change(screen.getByLabelText("Medical advice"), { target: { value: "Updated advice" } });
-    fireEvent.click(screen.getByRole("button", { name: "Update prescription" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update consultation & prescription" }));
     await waitFor(() => expect(screen.queryByTitle("Prescription PDF preview")).not.toBeInTheDocument());
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:prescription-preview");
   });

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import time
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.models import User
@@ -60,7 +60,11 @@ class DoctorRepository:
         *,
         name: str | None,
         facility_name: str | None,
+        query: str | None,
+        specialization: str | None,
+        facility_id: uuid.UUID | None,
         weekday: str | None,
+        offset: int,
         limit: int,
     ) -> list[ProfessionalRoleRegistration]:
         """Return verified DOCTOR registrations matching the supplied filters.
@@ -80,6 +84,15 @@ class DoctorRepository:
             )
             .join(User, User.id == HealthcareProfessionalProfile.user_id)
             .join(ProfessionalRole, ProfessionalRole.id == ProfessionalRoleRegistration.role_id)
+            .join(
+                DoctorRegistrationDetail,
+                DoctorRegistrationDetail.professional_role_registration_id
+                == ProfessionalRoleRegistration.id,
+            )
+            .join(
+                HealthcareFacility,
+                HealthcareFacility.id == ProfessionalRoleRegistration.facility_id,
+            )
             .where(
                 ProfessionalRoleRegistration.role_id == doctor_role_id
             )
@@ -88,6 +101,7 @@ class DoctorRepository:
                 == VerificationStatus.VERIFIED.value
             )
             .where(ProfessionalRoleRegistration.facility_id.is_not(None))
+            .where(HealthcareFacility.is_active.is_(True))
             .options(
                 selectinload(ProfessionalRoleRegistration.professional),
                 selectinload(ProfessionalRoleRegistration.role),
@@ -100,10 +114,28 @@ class DoctorRepository:
             base = base.where(self._full_name_expr().like(like))
 
         if facility_name:
-            base = base.join(
-                HealthcareFacility,
-                HealthcareFacility.id == ProfessionalRoleRegistration.facility_id,
-            ).where(func.lower(HealthcareFacility.name).like(f"%{facility_name.lower()}%"))
+            base = base.where(
+                func.lower(HealthcareFacility.name).like(f"%{facility_name.lower()}%")
+            )
+
+        if query:
+            like = f"%{query.lower()}%"
+            specialization_like = f"%{query.strip().upper().replace(' ', '_')}%"
+            base = base.where(
+                or_(
+                    self._full_name_expr().like(like),
+                    func.lower(HealthcareFacility.name).like(like),
+                    func.lower(ProfessionalRoleRegistration.designation).like(like),
+                    func.lower(DoctorRegistrationDetail.qualification).like(like),
+                    DoctorRegistrationDetail.specialization.like(specialization_like),
+                )
+            )
+
+        if specialization:
+            base = base.where(DoctorRegistrationDetail.specialization == specialization)
+
+        if facility_id:
+            base = base.where(ProfessionalRoleRegistration.facility_id == facility_id)
 
         if weekday:
             base = base.where(
@@ -135,10 +167,39 @@ class DoctorRepository:
                 User.last_name,
                 ProfessionalRoleRegistration.id,
             )
+            .offset(offset)
             .limit(limit)
         )
 
         return list(self.db.scalars(base).unique())
+
+    def get_doctor_registration_details(
+        self, role_registration_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, DoctorRegistrationDetail]:
+        if not role_registration_ids:
+            return {}
+        rows = self.db.scalars(
+            select(DoctorRegistrationDetail).where(
+                DoctorRegistrationDetail.professional_role_registration_id.in_(
+                    role_registration_ids
+                )
+            )
+        )
+        return {row.professional_role_registration_id: row for row in rows}
+
+    def list_active_schedules_for_doctors(
+        self, doctor_user_ids: list[uuid.UUID]
+    ) -> list[DoctorPracticeSchedule]:
+        if not doctor_user_ids:
+            return []
+        statement = (
+            select(DoctorPracticeSchedule)
+            .where(DoctorPracticeSchedule.doctor_user_id.in_(doctor_user_ids))
+            .where(DoctorPracticeSchedule.deleted_at.is_(None))
+            .where(DoctorPracticeSchedule.status == PracticeScheduleStatus.ACTIVE.value)
+            .options(selectinload(DoctorPracticeSchedule.facility))
+        )
+        return list(self.db.scalars(statement).unique())
 
     def get_verified_doctor_registration(
         self, doctor_user_id: uuid.UUID

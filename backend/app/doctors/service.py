@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
+from math import asin, cos, radians, sin, sqrt
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -11,13 +14,22 @@ from app.core.exceptions import HealthLinkError
 from app.doctors.models import DoctorPracticeSchedule
 from app.doctors.repository import DoctorRepository
 from app.doctors.schemas import (
+    DoctorFacilityOption,
     DoctorProfile,
+    DoctorSearchResponse,
+    DoctorSort,
     DoctorSummary,
+    NextPracticeWindow,
     PracticeDay,
     PracticeScheduleEntry,
     PracticeScheduleWriteRequest,
 )
 from app.doctors.facility_choice_schemas import DoctorFacilityChoice
+from app.locations.service import BangladeshAreaNotFoundError, resolve_area
+from app.professionals.constants import (
+    DOCTOR_SPECIALIZATION_LABELS,
+    DoctorSpecialization,
+)
 
 
 class DoctorNotFoundError(HealthLinkError):
@@ -58,16 +70,94 @@ class DoctorService:
         *,
         name: str | None,
         facility_name: str | None,
+        query: str | None = None,
+        specialization: str | None = None,
+        facility_id: uuid.UUID | None = None,
         weekday: str | None,
+        sort: DoctorSort = DoctorSort.BEST_MATCH,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        district_code: str | None = None,
+        upazila_code: str | None = None,
+        offset: int = 0,
         limit: int,
-    ) -> list[DoctorSummary]:
+    ) -> DoctorSearchResponse:
         registrations = self.repository.search_verified_doctors(
             name=name,
             facility_name=facility_name,
+            query=query,
+            specialization=specialization,
+            facility_id=facility_id,
             weekday=weekday,
-            limit=limit,
+            offset=0,
+            limit=500,
         )
-        return [_to_summary(registration) for registration in registrations]
+        details = self.repository.get_doctor_registration_details(
+            [registration.id for registration in registrations]
+        )
+        doctor_ids = [registration.professional.user_id for registration in registrations]
+        schedules = self.repository.list_active_schedules_for_doctors(doctor_ids)
+        schedule_map: dict[uuid.UUID, list[DoctorPracticeSchedule]] = {}
+        for schedule in schedules:
+            schedule_map.setdefault(schedule.doctor_user_id, []).append(schedule)
+
+        origin: tuple[float, float] | None = None
+        location_is_manual = district_code is not None and upazila_code is not None
+        if latitude is not None and longitude is not None:
+            origin = (latitude, longitude)
+        elif location_is_manual:
+            _, upazila = resolve_area(district_code, upazila_code)
+            origin = (upazila.point.latitude, upazila.point.longitude)
+
+        summaries: list[DoctorSummary] = []
+        for registration in registrations:
+            facility = registration.facility
+            distance = None
+            if origin is not None:
+                if (
+                    facility.location_status != "CONFIRMED"
+                    or facility.latitude is None
+                    or facility.longitude is None
+                ):
+                    continue
+                distance = _distance_km(
+                    origin[0], origin[1], facility.latitude, facility.longitude
+                )
+                if location_is_manual and distance > 50:
+                    continue
+            doctor_id = registration.professional.user_id
+            next_practice = _next_practice(schedule_map.get(doctor_id, []))
+            summaries.append(
+                _to_summary(
+                    registration,
+                    details.get(registration.id),
+                    next_practice=next_practice,
+                    distance_km=round(distance, 1) if distance is not None else None,
+                )
+            )
+
+        if sort is DoctorSort.NEAREST:
+            summaries.sort(key=lambda row: row.distance_km if row.distance_km is not None else float("inf"))
+        elif sort is DoctorSort.EARLIEST_PRACTICE:
+            summaries.sort(key=_practice_sort_key)
+        elif sort is DoctorSort.FACILITY_NAME:
+            summaries.sort(key=lambda row: (row.facility_name.lower(), row.name.lower()))
+        elif sort is DoctorSort.DOCTOR_NAME:
+            summaries.sort(key=lambda row: row.name.lower())
+
+        total = len(summaries)
+        return DoctorSearchResponse(items=summaries[offset : offset + limit], total=total)
+
+    def list_discovery_facilities(self) -> list[DoctorFacilityOption]:
+        return [
+            DoctorFacilityOption(
+                id=facility.id,
+                name=facility.name,
+                facility_type=facility.facility_type,
+                area=_facility_area(facility),
+            )
+            for facility in self.repository.list_active_facilities()
+        ]
 
     def get_doctor_profile(self, doctor_user_id: uuid.UUID) -> DoctorProfile:
         registration = self.repository.get_verified_doctor_registration(doctor_user_id)
@@ -78,7 +168,8 @@ class DoctorService:
             doctor_user_id
         )
         practice_days = [_to_practice_day(schedule) for schedule in practice_schedules]
-        return _to_profile(registration, detail, practice_days)
+        next_practice = _next_practice(practice_schedules)
+        return _to_profile(registration, detail, practice_days, next_practice)
 
     def get_doctor_practice_days(
         self, doctor_user_id: uuid.UUID
@@ -300,11 +391,19 @@ def _now():
     return datetime.now(timezone.utc)
 
 
-def _to_summary(registration) -> DoctorSummary:
+def _to_summary(
+    registration,
+    detail,
+    *,
+    next_practice: NextPracticeWindow | None = None,
+    distance_km: float | None = None,
+) -> DoctorSummary:
     profile = registration.professional
     user = _profile_user(profile)
     facility = registration.facility
-    role = registration.role
+    specialization_code = DoctorSpecialization(
+        detail.specialization if detail else DoctorSpecialization.GENERAL_MEDICINE.value
+    )
     return DoctorSummary(
         id=profile.user_id,
         name=f"{user.first_name} {user.last_name}".strip(),
@@ -314,20 +413,29 @@ def _to_summary(registration) -> DoctorSummary:
         facility_name=facility.name,
         facility_type=facility.facility_type,
         designation=registration.designation,
-        role_code=role.code,
+        role_code=registration.role.code,
         verified=registration.verification_status == "VERIFIED",
-        specialization=role.name,
+        specialization=DOCTOR_SPECIALIZATION_LABELS[specialization_code],
+        specialization_code=specialization_code,
+        qualification=detail.qualification if detail else None,
+        facility_area=_facility_area(facility),
+        next_practice=next_practice,
+        distance_km=distance_km,
     )
 
 
-def _to_profile(registration, detail, practice_days: list[PracticeDay]) -> DoctorProfile:
-    summary = _to_summary(registration)
+def _to_profile(
+    registration,
+    detail,
+    practice_days: list[PracticeDay],
+    next_practice: NextPracticeWindow | None,
+) -> DoctorProfile:
+    summary = _to_summary(registration, detail, next_practice=next_practice)
     profile = registration.professional
     user = _profile_user(profile)
     return DoctorProfile(
         **summary.model_dump(),
         email=user.email,
-        bmdc_number=detail.bmdc_registration_number if detail else None,
         verified_at=registration.verified_at,
         submitted_at=registration.submitted_at,
         practice_days=practice_days,
@@ -366,3 +474,64 @@ def _to_schedule_entry(schedule: DoctorPracticeSchedule) -> PracticeScheduleEntr
 
 def _profile_user(profile):
     return profile.user
+
+
+def _distance_km(lat_a: float, lon_a: float, lat_b: float, lon_b: float) -> float:
+    radius_km = 6371.0088
+    lat_delta = radians(lat_b - lat_a)
+    lon_delta = radians(lon_b - lon_a)
+    start = radians(lat_a)
+    end = radians(lat_b)
+    value = sin(lat_delta / 2) ** 2 + cos(start) * cos(end) * sin(lon_delta / 2) ** 2
+    return 2 * radius_km * asin(sqrt(value))
+
+
+def _next_practice(schedules: list[DoctorPracticeSchedule]) -> NextPracticeWindow | None:
+    if not schedules:
+        return None
+    now = datetime.now(ZoneInfo("Asia/Dhaka"))
+    weekday_index = {
+        "MONDAY": 0,
+        "TUESDAY": 1,
+        "WEDNESDAY": 2,
+        "THURSDAY": 3,
+        "FRIDAY": 4,
+        "SATURDAY": 5,
+        "SUNDAY": 6,
+    }
+
+    def sort_key(schedule: DoctorPracticeSchedule):
+        days = (weekday_index[schedule.weekday] - now.weekday()) % 7
+        if days == 0 and schedule.end_time <= now.time().replace(tzinfo=None):
+            days = 7
+        return days, schedule.start_time
+
+    schedule = min(schedules, key=sort_key)
+    days_away = sort_key(schedule)[0]
+    return NextPracticeWindow(
+        weekday=schedule.weekday,
+        start_time=schedule.start_time,
+        end_time=schedule.end_time,
+        facility_name=schedule.facility.name if schedule.facility else "",
+        days_away=days_away,
+    )
+
+
+def _practice_sort_key(summary: DoctorSummary):
+    if summary.next_practice is None:
+        return 8, "23:59:59", summary.name.lower()
+    return (
+        summary.next_practice.days_away,
+        summary.next_practice.start_time.isoformat(),
+        summary.name.lower(),
+    )
+
+
+def _facility_area(facility) -> str | None:
+    if not facility.district_code or not facility.upazila_code:
+        return None
+    try:
+        district, upazila = resolve_area(facility.district_code, facility.upazila_code)
+    except BangladeshAreaNotFoundError:
+        return None
+    return f"{upazila.name}, {district.name}"

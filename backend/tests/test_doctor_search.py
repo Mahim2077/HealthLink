@@ -73,7 +73,15 @@ def _admin_headers(client: TestClient, db_session) -> dict[str, str]:
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
-def _make_facility(db_session, *, name: str) -> HealthcareFacility:
+def _make_facility(
+    db_session,
+    *,
+    name: str,
+    district_code: str | None = None,
+    upazila_code: str | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+) -> HealthcareFacility:
     facility = HealthcareFacility(
         name=name,
         facility_type="HOSPITAL",
@@ -82,6 +90,11 @@ def _make_facility(db_session, *, name: str) -> HealthcareFacility:
         phone="+8801700000000",
         email="facility@example.com",
         is_active=True,
+        district_code=district_code,
+        upazila_code=upazila_code,
+        latitude=latitude,
+        longitude=longitude,
+        location_status="CONFIRMED" if latitude is not None else "PENDING",
     )
     db_session.add(facility)
     db_session.commit()
@@ -96,6 +109,8 @@ def _make_doctor(
     last_name: str,
     facility: HealthcareFacility,
     verified: bool = True,
+    specialization: str = "GENERAL_MEDICINE",
+    qualification: str | None = "MBBS",
 ) -> tuple[uuid.UUID, uuid.UUID]:
     """Create a verified (or pending) doctor user, return (user_id, registration_id)."""
 
@@ -146,6 +161,8 @@ def _make_doctor(
     detail = DoctorRegistrationDetail(
         professional_role_registration_id=registration.id,
         bmdc_registration_number=f"BMDC-{uuid.uuid4().hex[:10]}",
+        specialization=specialization,
+        qualification=qualification,
     )
     db_session.add(detail)
     db_session.commit()
@@ -158,13 +175,14 @@ def test_doctor_search_requires_authentication(client: TestClient) -> None:
     assert response.status_code == 401
 
 
-def test_doctor_search_requires_at_least_one_filter(client: TestClient) -> None:
+def test_doctor_search_supports_browsing_without_filters(client: TestClient) -> None:
     token = register_citizen(client)
     response = client.get(
         CITIZEN_SEARCH_PATH,
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert response.status_code == 422
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 def test_doctor_search_filters_by_name_facility_and_weekday(
@@ -222,7 +240,9 @@ def test_doctor_search_filters_by_name_facility_and_weekday(
     assert len(payload) == 1
     assert payload[0]["id"] == str(target_user_id)
     assert payload[0]["facility_name"] == "HealthLink River Hospital"
-    assert payload[0]["specialization"] == "Doctor"
+    assert payload[0]["specialization"] == "General Medicine"
+    assert payload[0]["specialization_code"] == "GENERAL_MEDICINE"
+    assert payload[0]["qualification"] == "MBBS"
     # NID MUST NOT be exposed
     assert "nid_number" not in payload[0]
     assert "bmdc_registration_number" not in payload[0]
@@ -385,3 +405,70 @@ def test_admin_can_also_search_doctors(client: TestClient, db_session) -> None:
     )
     assert response.status_code == 200
     assert len(response.json()) == 1
+
+
+def test_modern_search_filters_specialty_and_sorts_nearest_without_exposing_coordinates(
+    client: TestClient, db_session
+) -> None:
+    token = register_citizen(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    near = _make_facility(
+        db_session,
+        name="Savar Near Hospital",
+        district_code="BD3026",
+        upazila_code="BD30260072",
+        latitude=23.88,
+        longitude=90.281,
+    )
+    far = _make_facility(
+        db_session,
+        name="Dohar Far Hospital",
+        district_code="BD3026",
+        upazila_code="BD30260018",
+        latitude=23.602,
+        longitude=90.108,
+    )
+    near_doctor, _ = _make_doctor(
+        db_session,
+        first_name="Near",
+        last_name="Pediatrician",
+        facility=near,
+        specialization="PEDIATRICS",
+        qualification="MBBS, FCPS (Pediatrics)",
+    )
+    _make_doctor(
+        db_session,
+        first_name="Far",
+        last_name="Pediatrician",
+        facility=far,
+        specialization="PEDIATRICS",
+    )
+
+    response = client.post(
+        "/api/v1/doctors/search",
+        headers=auth,
+        json={
+            "specialization": "PEDIATRICS",
+            "sort": "NEAREST",
+            "district_code": "BD3026",
+            "upazila_code": "BD30260072",
+            "limit": 20,
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["items"][0]["id"] == str(near_doctor)
+    assert body["items"][0]["distance_km"] == 0.0
+    assert body["items"][0]["facility_area"] == "Savar, Dhaka"
+    assert "latitude" not in response.text
+    assert "longitude" not in response.text
+
+
+def test_nearest_sort_requires_a_location_choice(client: TestClient) -> None:
+    token = register_citizen(client)
+    response = client.post(
+        "/api/v1/doctors/search",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"sort": "NEAREST"},
+    )
+    assert response.status_code == 422

@@ -2,6 +2,8 @@
 // These shapes are intentionally PII-safe: nid_number, bmdc_registration_number,
 // and other sensitive identifiers are not surfaced to the citizen portal.
 
+import type { DoctorSpecialization } from "./specializations";
+
 export type PracticeWeekday =
   | "MONDAY"
   | "TUESDAY"
@@ -35,6 +37,19 @@ export type DoctorSummary = {
   role_code: string;
   verified: boolean;
   specialization: string | null;
+  specialization_code: DoctorSpecialization;
+  qualification: string | null;
+  facility_area: string | null;
+  next_practice: NextPracticeWindow | null;
+  distance_km: number | null;
+};
+
+export type NextPracticeWindow = {
+  weekday: PracticeWeekday;
+  start_time: string;
+  end_time: string;
+  facility_name: string;
+  days_away: number;
 };
 
 export type PracticeDay = {
@@ -89,8 +104,36 @@ export type PracticeScheduleDeleteResponse = {
 export type DoctorSearchFilters = {
   name?: string;
   facility_name?: string;
+  query?: string;
+  specialization?: DoctorSpecialization;
+  facility_id?: string;
   weekday?: PracticeWeekday;
+  sort?: DoctorSort;
+  latitude?: number;
+  longitude?: number;
+  district_code?: string;
+  upazila_code?: string;
+  offset?: number;
   limit?: number;
+};
+
+export type DoctorSort =
+  | "BEST_MATCH"
+  | "EARLIEST_PRACTICE"
+  | "DOCTOR_NAME"
+  | "FACILITY_NAME"
+  | "NEAREST";
+
+export type DoctorSearchResponse = {
+  items: DoctorSummary[];
+  total: number;
+};
+
+export type DoctorDiscoveryFacility = {
+  id: string;
+  name: string;
+  facility_type: string;
+  area: string | null;
 };
 
 export type FacilityChoice = {

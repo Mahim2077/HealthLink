@@ -1,9 +1,7 @@
 "use client";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
-import { listLabReports, listLabTrends, type LabReport, type LabTrendPoint } from "@/lib/diagnostics/report-api";
-import { LabPortalGate } from "./lab-report-page";
+import { listLabTrends, type LabTrendPoint } from "@/lib/diagnostics/report-api";
 
 export function LabTrendTables({ points }: { points: LabTrendPoint[] }) {
   const groups = new Map<string, LabTrendPoint[]>();
@@ -21,36 +19,34 @@ export function LabTrendTables({ points }: { points: LabTrendPoint[] }) {
   </section>)}</div>;
 }
 
-function ReportCollection({ trends }: { trends: boolean }) {
+export function CitizenDiagnosticTrends() {
   const [page, setPage] = useState(1);
-  const [data, setData] = useState<LabReport[] | LabTrendPoint[] | null>(null);
+  const [data, setData] = useState<LabTrendPoint[] | null>(null);
   const [error, setError] = useState("");
   const [version, setVersion] = useState(0);
   useEffect(() => {
     let active = true;
-    void (trends ? listLabTrends(page) : listLabReports(page)).then(value => { if (active) setData(value); }, reason => { if (active) setError(reason instanceof Error ? reason.message : "Results unavailable."); });
+    void listLabTrends(page).then(value => {
+      if (active) {
+        setData(value);
+        setError("");
+      }
+    }, reason => { if (active) setError(reason instanceof Error ? reason.message : "Results unavailable."); });
     return () => { active = false; };
-  }, [trends, page, version]);
-  if (error) return <ErrorState message={error} onAction={() => { setError(""); setVersion(v => v + 1); }} />;
-  if (!data) return <LoadingState label="Loading lab results" />;
-  return <div className="space-y-5">
-    {!data.length ? <EmptyState title="No lab results" message="There are no finalized results on this page." /> : trends ? <LabTrendTables points={data as LabTrendPoint[]} /> : <div className="space-y-4">{(data as LabReport[]).map(report => <article key={report.id} className="hl-card p-5">
-      <h2 className="text-lg font-bold"><Link className="text-sky-800 underline" href={`/citizen/lab-reports/${report.diagnostic_test_id}`}>{report.test_name}</Link></h2>
-      <p className="mt-2 text-sm text-slate-600">{report.report_date} · {report.facility_name ?? "Facility not recorded"} · Finalized</p>
-    </article>)}</div>}
-    <nav aria-label="Result pages" className="flex items-center gap-4">
+  }, [page, version]);
+
+  return <section aria-labelledby="result-trends-heading" className="space-y-5" id="result-trends">
+    <div>
+      <h2 className="text-2xl font-bold text-slate-950" id="result-trends-heading">Numeric result trends</h2>
+      <p className="mt-2 text-sm text-slate-600">Finalized numeric results in chronological order, grouped by parameter and exact unit. These tables do not interpret results or establish a diagnosis.</p>
+    </div>
+    {error ? <ErrorState title="Result trends unavailable" message={error} onAction={() => { setData(null); setError(""); setVersion(v => v + 1); }} /> : !data ? <LoadingState label="Loading result trends" /> : <div className="space-y-5">
+      {!data.length ? <EmptyState title="No numeric results" message="Finalized numeric diagnostic results will appear here." /> : <LabTrendTables points={data} />}
+      <nav aria-label="Result trend pages" className="flex items-center gap-4">
       <button className="min-h-11 rounded-xl border px-4 disabled:opacity-50" disabled={page === 1} onClick={() => { setData(null); setPage(p => p - 1); }}>Previous</button>
       <span>Page {page}</span>
-      <button className="min-h-11 rounded-xl border px-4 disabled:opacity-50" disabled={data.length < (trends ? 100 : 20)} onClick={() => { setData(null); setPage(p => p + 1); }}>Next</button>
-    </nav>
-  </div>;
-}
-
-export function CitizenLabReports({ trends = false }: { trends?: boolean }) {
-  return <main id="main-content" className="mx-auto w-full max-w-5xl flex-1 space-y-6 px-5 py-10 sm:px-8">
-    <h1 className="text-3xl font-bold">{trends ? "Lab result trends" : "My lab reports"}</h1>
-    <p className="text-sm text-slate-600">{trends ? "Finalized numeric results in chronological order, grouped by parameter and exact unit. These tables do not interpret results or establish a diagnosis." : "Your finalized reports. Draft reports remain private to the assigned lab technician."}</p>
-    <Link className="inline-block min-h-11 text-sm font-semibold text-sky-800 underline" href={trends ? "/citizen/lab-reports" : "/citizen/lab-trends"}>{trends ? "View reports" : "View numeric trends"}</Link>
-    <LabPortalGate portal="CITIZEN"><ReportCollection key={String(trends)} trends={trends} /></LabPortalGate>
-  </main>;
+        <button className="min-h-11 rounded-xl border px-4 disabled:opacity-50" disabled={data.length < 100} onClick={() => { setData(null); setPage(p => p + 1); }}>Next</button>
+      </nav>
+    </div>}
+  </section>;
 }

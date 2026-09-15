@@ -110,6 +110,7 @@ class ProfessionalRoleRegistration(Base):
 
 class DoctorRegistrationDetail(Base):
     __tablename__ = "doctor_registration_details"
+    __table_args__ = (Index("ix_doctor_registration_details_specialization", "specialization"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     professional_role_registration_id: Mapped[uuid.UUID] = mapped_column(
@@ -120,6 +121,10 @@ class DoctorRegistrationDetail(Base):
     bmdc_registration_number: Mapped[str] = mapped_column(
         String(100), nullable=False, unique=True
     )
+    specialization: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="GENERAL_MEDICINE", server_default="GENERAL_MEDICINE"
+    )
+    qualification: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

@@ -15,9 +15,7 @@ import {
 import { finishAppointment } from "@/lib/appointments/api";
 import {
   loadCurrentPatient,
-  readDoctorVisit,
   startVisitForCurrent,
-  updateDoctorVisit,
 } from "@/lib/visits/api";
 import { loadProfessionalMe } from "@/lib/professional/api";
 import type { ProfessionalMe } from "@/lib/professional/types";
@@ -27,9 +25,7 @@ import { listCurrentPatientMedicalHistory } from "@/lib/medical-records/api";
 const defaultDeps: VisitsDeps = {
   finishAppointment,
   loadCurrentPatient,
-  readVisit: readDoctorVisit,
   startVisitForCurrent,
-  updateVisit: updateDoctorVisit,
 };
 
 export default function VisitsPage() {

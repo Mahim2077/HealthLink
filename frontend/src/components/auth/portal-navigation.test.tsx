@@ -60,6 +60,11 @@ describe("PortalNavigation", () => {
       "href",
       "/citizen/medical-history",
     );
+    expect(screen.getByRole("link", { name: "Diagnostic tests" })).toHaveAttribute(
+      "href",
+      "/citizen/diagnostic-tests",
+    );
+    expect(screen.queryByRole("link", { name: "Lab reports" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "My profile" })).toHaveAttribute(
       "href",
       "/citizen/profile",

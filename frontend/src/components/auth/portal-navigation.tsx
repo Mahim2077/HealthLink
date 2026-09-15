@@ -38,7 +38,6 @@ const links: Record<Portal, NavigationItem[]> = {
     { href: "/citizen/appointments", icon: CalendarDaysIcon, label: "Appointments" },
     { href: "/citizen/medical-history", icon: ClipboardDocumentListIcon, label: "Medical history" },
     { href: "/citizen/diagnostic-tests", icon: BeakerIcon, label: "Diagnostic tests" },
-    { href: "/citizen/lab-reports", icon: ClipboardDocumentCheckIcon, label: "Lab reports" },
     { href: "/citizen/emergency-profile", icon: IdentificationIcon, label: "Emergency profile" },
     { href: "/citizen/reminders", icon: CalendarDaysIcon, label: "Reminders" },
     { href: "/citizen/privacy", icon: ShieldCheckIcon, label: "Privacy & access" },

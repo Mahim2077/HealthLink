@@ -26,6 +26,11 @@ export type Facility = {
   facility_type: FacilityType;
   registration_number: string | null;
   address: string;
+  district_code: string | null;
+  upazila_code: string | null;
+  location_status: "PENDING" | "CONFIRMED";
+  location_matched_address: string | null;
+  location_confirmed_at: string | null;
   phone: string | null;
   email: string | null;
   is_active: boolean;
@@ -33,7 +38,20 @@ export type Facility = {
   updated_at: string;
 };
 
-export type FacilityWriteRequest = Omit<Facility, "id" | "created_at" | "updated_at">;
+export type FacilityWriteRequest = Omit<
+  Facility,
+  | "id"
+  | "created_at"
+  | "updated_at"
+  | "location_status"
+  | "location_matched_address"
+  | "location_confirmed_at"
+  | "district_code"
+  | "upazila_code"
+> & {
+  district_code?: string | null;
+  upazila_code?: string | null;
+};
 
 export type VerificationStatus = "PENDING" | "VERIFIED" | "REJECTED";
 
@@ -55,6 +73,8 @@ export type ProfessionalRegistrationSummary = {
 export type ProfessionalRegistrationDetail = ProfessionalRegistrationSummary & {
   additional_info: string | null;
   bmdc_registration_number: string | null;
+  specialization: import("@/lib/doctors/specializations").DoctorSpecialization | null;
+  qualification: string | null;
   facility: Facility | null;
   verified_at: string | null;
   verified_by: string | null;

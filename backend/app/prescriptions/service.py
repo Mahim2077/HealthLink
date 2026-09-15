@@ -1,13 +1,12 @@
 """Phase 13 prescription service.
 
-Owns the author-only-edit invariant and PDF regeneration. The route
+Owns the author-only-edit invariant and on-demand PDF rendering. The route
 handlers are intentionally thin — they capture HTTP concerns (auth,
 status codes) while every multi-step rule lives here so it can be
 exercised from unit tests without going through FastAPI.
 """
 from __future__ import annotations
 
-import logging
 import re
 import uuid
 from dataclasses import dataclass
@@ -21,7 +20,6 @@ from app.core.exceptions import HealthLinkError
 from app.facilities.models import HealthcareFacility
 from app.prescriptions.models import (
     Prescription,
-    PrescriptionDocument,
     PrescriptionItem,
 )
 from app.prescriptions.pdf import (
@@ -37,19 +35,12 @@ from app.prescriptions.schemas import (
     PrescriptionUpdateRequest,
     PrescriptionView,
 )
-from app.prescriptions.storage import (
-    PrescriptionStorage,
-    get_prescription_storage,
-)
 from app.professionals.models import (
     DoctorRegistrationDetail,
     HealthcareProfessionalProfile,
     ProfessionalRoleRegistration,
 )
 from app.visits.models import MedicalVisit
-
-
-logger = logging.getLogger(__name__)
 
 
 # Service-layer mirror of the PDF forbidden-pattern guard. The PDF
@@ -212,6 +203,10 @@ def _build_pdf_view(
         patient_age=patient_age,
         serial_label=serial_label,
         items=pdf_items,
+        chief_complaint=visit.chief_complaint,
+        clinical_notes=visit.clinical_notes,
+        diagnosis=visit.diagnosis,
+        follow_up_instructions=visit.follow_up_instructions,
         diagnostic_information=prescription.diagnostic_information,
         medical_advice=prescription.medical_advice,
         notes=prescription.notes,
@@ -219,6 +214,10 @@ def _build_pdf_view(
 
 
 def _validate_payload_text(
+    chief_complaint: str | None,
+    clinical_notes: str | None,
+    diagnosis: str | None,
+    follow_up_instructions: str | None,
     diagnostic_information: str | None,
     medical_advice: str | None,
     notes: str | None,
@@ -230,11 +229,16 @@ def _validate_payload_text(
     guarantees the request fails with HTTP 400 instead of an internal
     server error and gives a stable code path for tests.
     """
-    _assert_no_forbidden_payload_text(
-        diagnostic_information, "diagnostic_information"
-    )
-    _assert_no_forbidden_payload_text(medical_advice, "medical_advice")
-    _assert_no_forbidden_payload_text(notes, "notes")
+    for location, value in (
+        ("chief_complaint", chief_complaint),
+        ("clinical_notes", clinical_notes),
+        ("diagnosis", diagnosis),
+        ("follow_up_instructions", follow_up_instructions),
+        ("diagnostic_information", diagnostic_information),
+        ("medical_advice", medical_advice),
+        ("notes", notes),
+    ):
+        _assert_no_forbidden_payload_text(value, location)
     for index, item in enumerate(items):
         _assert_no_forbidden_payload_text(
             item.medicine_name, f"items[{index}].medicine_name"
@@ -267,48 +271,19 @@ def _materialise_items(payload_items: Iterable) -> list[PrescriptionItem]:
     ]
 
 
-def _write_pdf(
-    storage: PrescriptionStorage,
-    repository: PrescriptionsRepository,
-    prescription: Prescription,
-    view: PrescriptionPdfView,
-) -> tuple[PrescriptionDocument, str | None]:
-    payload = generate_prescription_pdf_bytes(view)
-    document = repository.get_document_for_prescription(prescription.id)
-    previous_storage_key = (
-        document.storage_key if document is not None else None
-    )
-    storage_key = storage.save(
-        prescription.id,
-        f"prescription-{uuid.uuid4().hex}.pdf",
-        payload,
-    )
-    if document is None:
-        document = PrescriptionDocument(
-            id=uuid.uuid4(),
-            prescription_id=prescription.id,
-            storage_key=storage_key,
-            file_name="prescription.pdf",
-            content_type="application/pdf",
-            file_size_bytes=len(payload),
-        )
-        repository.db.add(document)
-    else:
-        document.storage_key = storage_key
-        document.file_name = "prescription.pdf"
-        document.content_type = "application/pdf"
-        document.file_size_bytes = len(payload)
-        document.generated_at = datetime.now(timezone.utc)
-    return document, previous_storage_key
-
-
-def _prescription_view(prescription: Prescription) -> PrescriptionView:
-    document = prescription.document
+def _prescription_view(
+    prescription: Prescription, *, can_edit: bool = False
+) -> PrescriptionView:
+    visit = prescription.visit
     return PrescriptionView(
         id=prescription.id,
         visit_id=prescription.visit_id,
         citizen_id=prescription.citizen_id,
         author_doctor_role_registration_id=prescription.author_doctor_role_registration_id,
+        chief_complaint=visit.chief_complaint,
+        clinical_notes=visit.clinical_notes,
+        diagnosis=visit.diagnosis,
+        follow_up_instructions=visit.follow_up_instructions,
         diagnostic_information=prescription.diagnostic_information,
         medical_advice=prescription.medical_advice,
         notes=prescription.notes,
@@ -323,37 +298,48 @@ def _prescription_view(prescription: Prescription) -> PrescriptionView:
             )
             for item in prescription.items
         ],
-        pdf_available=document is not None,
-        pdf_file_name=document.file_name if document is not None else None,
-        pdf_updated_at=document.updated_at if document is not None else None,
+        can_edit=can_edit,
         created_at=prescription.created_at,
         updated_at=prescription.updated_at,
     )
 
 
+def _apply_clinical_record(
+    visit: MedicalVisit,
+    payload: PrescriptionCreateRequest | PrescriptionUpdateRequest,
+) -> None:
+    requested = {
+        field: getattr(payload, field)
+        for field in (
+            "chief_complaint",
+            "clinical_notes",
+            "diagnosis",
+            "follow_up_instructions",
+        )
+        if field in payload.model_fields_set
+    }
+    if visit.status != "DRAFT":
+        changed = any(getattr(visit, field) != value for field, value in requested.items())
+        if changed:
+            raise HealthLinkError(
+                "Clinical notes cannot be changed after the visit is finalized.",
+                status_code=409,
+            )
+        return
+    for field, value in requested.items():
+        setattr(visit, field, value)
+
+
 class PrescriptionsService:
     """Author-only-edit prescription lifecycle for chamber visits."""
 
-    def __init__(
-        self,
-        db: Session,
-        storage: PrescriptionStorage | None = None,
-    ) -> None:
+    def __init__(self, db: Session) -> None:
         self._db = db
         self._repository = PrescriptionsRepository(db)
-        self._storage = storage or get_prescription_storage()
 
-    def _delete_storage_quietly(self, storage_key: str | None) -> None:
-        if not storage_key:
-            return
-        try:
-            self._storage.delete(storage_key)
-        except Exception:  # pragma: no cover - best-effort orphan cleanup.
-            logger.exception(
-                "Could not delete superseded prescription PDF object."
-            )
-
-    def _reload_view(self, prescription_id: uuid.UUID) -> PrescriptionView:
+    def _reload_view(
+        self, prescription_id: uuid.UUID, *, can_edit: bool = False
+    ) -> PrescriptionView:
         self._db.expire_all()
         prescription = self._repository.get_prescription_by_id(
             prescription_id
@@ -362,69 +348,16 @@ class PrescriptionsService:
             raise HealthLinkError(
                 "Prescription could not be reloaded.", status_code=500
             )
-        return _prescription_view(prescription)
+        return _prescription_view(prescription, can_edit=can_edit)
 
-    def _commit_with_best_effort_pdf(
+    def _commit_structured_record(
         self,
         prescription: Prescription,
     ) -> PrescriptionView:
-        """Commit structured data even when PDF generation/storage fails.
+        """Commit only structured data; PDFs are rendered for each read."""
 
-        A new object is uploaded under a versioned key before the database
-        document pointer is committed. On success the old object is removed.
-        On render/upload failure the stale document row is removed and the
-        structured prescription is still committed, making a later PUT a safe
-        regeneration retry.
-        """
-
-        previous_document = self._repository.get_document_for_prescription(
-            prescription.id
-        )
-        previous_storage_key = (
-            previous_document.storage_key
-            if previous_document is not None
-            else None
-        )
-        new_storage_key: str | None = None
-
-        try:
-            pdf_view = _build_pdf_view(
-                self._db, prescription, list(prescription.items)
-            )
-            document, previous_storage_key = _write_pdf(
-                self._storage,
-                self._repository,
-                prescription,
-                pdf_view,
-            )
-            new_storage_key = document.storage_key
-        except Exception:
-            logger.exception(
-                "Prescription %s was saved without a PDF; regeneration is "
-                "available through the author update flow.",
-                prescription.id,
-            )
-            if previous_document is not None:
-                self._db.delete(previous_document)
-            try:
-                self._db.commit()
-            except Exception:
-                self._db.rollback()
-                self._delete_storage_quietly(new_storage_key)
-                raise
-            self._delete_storage_quietly(previous_storage_key)
-            return self._reload_view(prescription.id)
-
-        try:
-            self._db.commit()
-        except Exception:
-            self._db.rollback()
-            self._delete_storage_quietly(new_storage_key)
-            raise
-
-        if previous_storage_key != new_storage_key:
-            self._delete_storage_quietly(previous_storage_key)
-        return self._reload_view(prescription.id)
+        self._db.commit()
+        return self._reload_view(prescription.id, can_edit=True)
 
     # ---- read paths ---------------------------------------------------
 
@@ -453,7 +386,7 @@ class PrescriptionsService:
                 "queue.",
                 status_code=403,
             )
-        return _prescription_view(prescription)
+        return _prescription_view(prescription, can_edit=True)
 
     def read_for_citizen(
         self,
@@ -488,11 +421,16 @@ class PrescriptionsService:
                 status_code=409,
             )
         _validate_payload_text(
+            payload.chief_complaint,
+            payload.clinical_notes,
+            payload.diagnosis,
+            payload.follow_up_instructions,
             payload.diagnostic_information,
             payload.medical_advice,
             payload.notes,
             payload.items,
         )
+        _apply_clinical_record(visit, payload)
         prescription = Prescription(
             id=uuid.uuid4(),
             visit_id=visit_id,
@@ -505,7 +443,7 @@ class PrescriptionsService:
         )
         self._db.add(prescription)
         self._db.flush()
-        return self._commit_with_best_effort_pdf(prescription)
+        return self._commit_structured_record(prescription)
 
     def update(
         self,
@@ -534,11 +472,16 @@ class PrescriptionsService:
             )
         _ensure_visit_doctor_owns_visit(visit, doctor_role_registration_id)
         _validate_payload_text(
+            payload.chief_complaint,
+            payload.clinical_notes,
+            payload.diagnosis,
+            payload.follow_up_instructions,
             payload.diagnostic_information,
             payload.medical_advice,
             payload.notes,
             payload.items,
         )
+        _apply_clinical_record(visit, payload)
 
         prescription.diagnostic_information = payload.diagnostic_information
         prescription.medical_advice = payload.medical_advice
@@ -546,7 +489,7 @@ class PrescriptionsService:
         self._repository.replace_items(
             prescription, _materialise_items(payload.items)
         )
-        return self._commit_with_best_effort_pdf(prescription)
+        return self._commit_structured_record(prescription)
 
     # ---- pdf streaming ------------------------------------------------
 
@@ -559,19 +502,13 @@ class PrescriptionsService:
             raise HealthLinkError(
                 "Prescription not found.", status_code=404
             )
-        document = prescription.document
-        if document is None:
-            raise HealthLinkError(
-                "Prescription PDF has not been generated yet.",
-                status_code=404,
-            )
-        if not self._storage.exists(document.storage_key):
-            raise HealthLinkError(
-                "Prescription PDF is not currently available; ask the "
-                "doctor to regenerate.",
-                status_code=410,
-            )
-        return self._storage.load(document.storage_key), document.file_name
+        view = _build_pdf_view(
+            self._db, prescription, list(prescription.items)
+        )
+        return (
+            generate_prescription_pdf_bytes(view),
+            f"prescription-{prescription.id}.pdf",
+        )
 
 
 __all__ = [

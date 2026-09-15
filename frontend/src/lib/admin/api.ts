@@ -52,6 +52,14 @@ export async function updateFacility(id: string, payload: FacilityWriteRequest):
   return apiClient.put<Facility, FacilityWriteRequest>(`admin/facilities/${id}`, payload);
 }
 
+export async function confirmFacilityLocation(id: string): Promise<Facility> {
+  const response = await apiClient.post<
+    { facility: Facility; message: string },
+    Record<string, never>
+  >(`admin/facilities/${id}/confirm-location`, {});
+  return response.facility;
+}
+
 export async function loadProfessionalRegistrations(
   verificationStatus?: VerificationStatus,
 ): Promise<ProfessionalRegistrationSummary[]> {
@@ -74,10 +82,19 @@ export async function loadProfessionalRegistration(
 export async function verifyProfessionalRegistration(
   id: string,
   facilityId: string,
+  specialization?: import("@/lib/doctors/specializations").DoctorSpecialization,
+  qualification?: string,
 ): Promise<ProfessionalRegistrationDetail> {
-  return apiClient.post<ProfessionalRegistrationDetail, { facility_id: string }>(
+  return apiClient.post<
+    ProfessionalRegistrationDetail,
+    { facility_id: string; specialization?: string; qualification?: string }
+  >(
     `admin/professional-registrations/${id}/verify`,
-    { facility_id: facilityId },
+    {
+      facility_id: facilityId,
+      ...(specialization ? { specialization } : {}),
+      ...(qualification ? { qualification } : {}),
+    },
   );
 }
 

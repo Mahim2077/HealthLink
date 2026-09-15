@@ -28,7 +28,11 @@ from app.auth.dependencies import AuthContext, require_portal
 from app.auth.schemas import TokenResponse
 from app.core.config import Settings
 from app.db.session import get_db
-from app.facilities.schemas import FacilityResponse, FacilityWriteRequest
+from app.facilities.schemas import (
+    FacilityLocationConfirmationResponse,
+    FacilityResponse,
+    FacilityWriteRequest,
+)
 from app.facilities.service import FacilityService
 from app.professionals.constants import VerificationStatus
 
@@ -127,6 +131,8 @@ def verify_professional_registration(
         registration_id,
         payload.facility_id,
         admin_user_id=context.user.id,
+        specialization=(payload.specialization.value if payload.specialization else None),
+        qualification=payload.qualification,
     )
 
 
@@ -158,7 +164,7 @@ def list_facilities(
     _require_active_admin(request, db, context)
     return [
         FacilityResponse.model_validate(facility)
-        for facility in FacilityService(db).list_facilities()
+        for facility in FacilityService(db, _settings(request)).list_facilities()
     ]
 
 
@@ -174,7 +180,9 @@ def create_facility(
     context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
 ) -> FacilityResponse:
     _require_active_admin(request, db, context)
-    facility = FacilityService(db).create(payload, admin_user_id=context.user.id)
+    facility = FacilityService(db, _settings(request)).create(
+        payload, admin_user_id=context.user.id
+    )
     return FacilityResponse.model_validate(facility)
 
 
@@ -187,10 +195,30 @@ def update_facility(
     context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
 ) -> FacilityResponse:
     _require_active_admin(request, db, context)
-    facility = FacilityService(db).update(
+    facility = FacilityService(db, _settings(request)).update(
         facility_id, payload, admin_user_id=context.user.id
     )
     return FacilityResponse.model_validate(facility)
+
+
+@admin_router.post(
+    "/facilities/{facility_id}/confirm-location",
+    response_model=FacilityLocationConfirmationResponse,
+)
+def confirm_facility_location(
+    facility_id: uuid.UUID,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
+) -> FacilityLocationConfirmationResponse:
+    _require_active_admin(request, db, context)
+    facility = FacilityService(db, _settings(request)).confirm_location(
+        facility_id, admin_user_id=context.user.id
+    )
+    return FacilityLocationConfirmationResponse(
+        facility=FacilityResponse.model_validate(facility),
+        message="Location confirmed for nearby facility search.",
+    )
 
 
 @admin_router.get(

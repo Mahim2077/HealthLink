@@ -1,2 +1,5 @@
-import { CitizenLabReports } from "@/components/diagnostics/citizen-lab-reports";
-export default function Page() { return <CitizenLabReports trends />; }
+import { permanentRedirect } from "next/navigation";
+
+export default function Page() {
+  permanentRedirect("/citizen/diagnostic-tests#result-trends");
+}

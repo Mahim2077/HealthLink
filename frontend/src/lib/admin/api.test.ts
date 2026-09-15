@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), rep
 vi.mock("@/lib/api/client", () => ({ apiClient: { get: mocks.get, post: mocks.post, put: mocks.put } }));
 vi.mock("@/lib/auth/actions", () => ({ replaceSession: mocks.replaceSession }));
 
-import { createFacility, loadAdminMe, loadFacilities, loadProfessionalRegistration, loadProfessionalRegistrations, loginAdmin, rejectProfessionalRegistration, updateFacility, verifyProfessionalRegistration } from "./api";
+import { confirmFacilityLocation, createFacility, loadAdminMe, loadFacilities, loadProfessionalRegistration, loadProfessionalRegistrations, loginAdmin, rejectProfessionalRegistration, updateFacility, verifyProfessionalRegistration } from "./api";
 
 describe("Admin API", () => {
   beforeEach(() => { mocks.get.mockReset(); mocks.post.mockReset(); mocks.put.mockReset(); mocks.replaceSession.mockReset(); });
@@ -37,6 +37,9 @@ describe("Admin API", () => {
     expect(mocks.get).toHaveBeenCalledWith("admin/facilities");
     expect(mocks.post).toHaveBeenCalledWith("admin/facilities", payload);
     expect(mocks.put).toHaveBeenCalledWith("admin/facilities/f1", payload);
+    mocks.post.mockResolvedValue({ facility: { id: "f1" }, message: "confirmed" });
+    await confirmFacilityLocation("f1");
+    expect(mocks.post).toHaveBeenLastCalledWith("admin/facilities/f1/confirm-location", {});
   });
 
   it("uses the documented verification queue, detail, verify, and reject endpoints", async () => {

@@ -19,6 +19,10 @@ import {
 } from "./api";
 
 const payload = {
+  chief_complaint: "Fever",
+  clinical_notes: "Temperature 38°C",
+  diagnosis: "Viral fever",
+  follow_up_instructions: "Return if symptoms worsen",
   items: [
     {
       medicine_name: "Paracetamol",

@@ -1,11 +1,114 @@
 # HealthLink Phase 0–14 implementation handoff
 
+> **CURRENT CONTINUATION NOTICE — 2026-09-15**
+>
+> This file remains the historical Phase 0–14 implementation record. It is no
+> longer the current stopping point. Phases 15–21 have since been implemented,
+> verified, committed, migrated, and released. A fresh agent must read the
+> current checkpoint below before using the older Phase 0–14 material.
+>
+> The standalone operational source of truth is now
+> `AGENTIC_IMPLEMENTATION_HANDOFF_CURRENT.md`.
+
+## Current continuation checkpoint — read first
+
+### Released baseline
+
+- Repository: `https://github.com/Mahim2077/HealthLink`
+- Production: `https://healthlink-sd.vercel.app/`
+- Branch: `main`
+- Current local and `origin/main` commit at handoff creation:
+  `cb075e21b652fd7d17d7f104fb1a30656ea57b44`
+- Production release includes Phases 15–21 and database migrations through
+  `0029_access_grant_scopes`.
+- Phase 15 provides the derived medical-history timeline; Phases 16–17 provide
+  diagnostic requests, finalized structured results, and numeric trends;
+  Phases 18–21 provide the citizen emergency profile, reminder records,
+  clinical-access auditing, and scoped citizen-managed historical-read grants.
+
+### Intentionally uncommitted, verified work
+
+The workspace is deliberately dirty. Do not reset, clean, discard, or replace
+these changes. They belong to the project owner and are awaiting a separate
+commit/push/deploy instruction.
+
+1. **Modern doctor discovery and private facility location**
+   - Specialty-first doctor search, unified text search, weekday/facility
+     filters, five sort modes including nearest facility, active-filter chips,
+     responsive desktop table/mobile cards, and qualification data.
+   - Approximate browser location is requested only after an explicit choice,
+     rounded, held only in component memory, and never displayed or persisted.
+   - Manual nearby search uses the bundled bilingual Bangladesh zila/upazila
+     list. Facility coordinates are private backend fields and become usable
+     only after an admin confirms the facility address/area match.
+   - Pending Alembic revision: `0030_doctor_locations`.
+
+2. **Citizen diagnostics consolidation**
+   - `Diagnostic tests` is the single citizen section for requests, completed
+     results, and numeric trends.
+   - Old `/citizen/lab-reports` and `/citizen/lab-trends` routes remain only as
+     permanent compatibility redirects; the duplicate navigation item is gone.
+
+3. **Doctor consultation/prescription consolidation**
+   - Clinical summary, medicines, and prescription advice now use one form and
+     one atomic structured save. Medicines are optional; partially completed
+     medicine rows are rejected.
+   - The current-patient history links previous prescriptions. The current
+     doctor may read them through the centralized clinical-read policy, while
+     only the author doctor receives edit capability.
+   - Prescription PDFs are regenerated in memory for each authorized request.
+     New PDF files and `prescription_documents` rows are not created. The legacy
+     table remains mapped only for migration compatibility; the storage module,
+     Vercel Blob dependency, and storage environment settings were removed.
+
+4. **Reminder scheduler removal**
+   - `.github/workflows/reminders.yml` is deleted in the working tree. After the
+     deletion is pushed, GitHub will stop creating recurring skipped reminder
+     runs. Existing Actions history is not automatically deleted.
+   - Citizen reminder records/UI remain, but no automated worker is scheduled.
+
+### Verification already completed
+
+- Backend: `285 passed, 38 skipped` in the full local suite. Skips are the
+  explicitly environment-gated PostgreSQL suites.
+- Frontend: `52` test files / `239` tests passed.
+- ESLint, TypeScript, Python AST parsing, `git diff --check`, and the optimized
+  Next.js 16.3.0 production build passed.
+- Browser acceptance with synthetic local data passed doctor discovery on
+  desktop/mobile, manual Dhaka → Savar nearby search, the unified consultation
+  editor, previous-prescription navigation, and automatic fresh PDF preview.
+- Browser inspection found no Next.js error overlay. A regenerated prior PDF
+  left zero document rows in the local test database.
+- Production was not accessed or modified for the current dirty-worktree work.
+
+### Immediate continuation procedure
+
+1. Read `frontend/AGENTS.md`, the Phase 15–31 continuation prompt, the end of
+   `docs/implementation-progress.md`, and the doctor-discovery section of
+   `design-qa.md`.
+2. Inspect `git status --short` and the full diff. Preserve all existing changes
+   and unrelated owner work.
+3. Treat migration `0030_doctor_locations`, the removed reminder workflow, the
+   on-demand PDF behavior, and the compatibility redirects as intentional.
+4. If any code is changed, rerun the proportional focused checks followed by
+   the full backend/frontend release gates.
+5. Do not commit, push, migrate, deploy, or touch the production database until
+   the project owner explicitly requests that release step.
+6. Once the pending work is released and production-verified, continue with a
+   design/authorization plan for Phase 22 AI infrastructure before writing AI
+   code. Use official current OpenAI documentation, keep API keys server-side,
+   send minimum authorized structured context, and log metadata rather than PHI.
+
+This notice supersedes the old `Safe continuation` instruction at the bottom of
+this historical document wherever the two conflict.
+
 Last updated: 2026-09-11 (Asia/Dhaka)
 
 Repository: `D:\HealthLink_V_1`
 
 Branch: `main`
-Final requested state: Phases 0–14 complete; Phase 15 not authorized.
+Historical requested state at 2026-09-11: Phases 0–14 complete; Phase 15 was not
+yet authorized. See the current continuation notice above.
 
 This handoff is a navigation aid. It does not replace the three governing
 documents. Before changing the project, read them completely in this order:
@@ -28,7 +131,7 @@ A10EBADE322D9A238DF61CFE118D2088067756F0CF5D4A375AACB51C6828CF8E
   HealthLink_System_Context_and_Developer_Documentation(3).md
 ```
 
-## Current checkpoint
+## Historical Phase-14 checkpoint
 
 | State | Count | Phases |
 | --- | ---: | --- |
@@ -59,7 +162,8 @@ Production is served by the single Vercel Services project at
 - FastAPI at `/api/v1/*`
 - health check at `/health`
 - Supabase PostgreSQL as the production database
-- private Vercel Blob storage for prescription PDFs
+- private Vercel Blob storage for prescription PDFs at the Phase-14 checkpoint
+  (superseded by the current on-demand, non-persistent PDF implementation)
 
 Credentials and environment values remain only in ignored local files, GitHub
 secrets, and Vercel environment configuration. Never place them in source,
@@ -323,7 +427,7 @@ writing generated files under `node_modules/.vite-temp` or `.next`. Approved
 execution outside the sandbox works. Do not delete broad directories; inspect
 and resolve any exact generated target first.
 
-## Safe continuation
+## Historical safe continuation — superseded
 
 1. Confirm `git status --short` is clean and `main` matches `origin/main`.
 2. Read the governing documents and this final-state handoff.
@@ -332,4 +436,5 @@ and resolve any exact generated target first.
 5. Do not implement Phase 15 or later behavior without explicit user
    instruction.
 
-The authorized task is complete at Phase 14. Stop here.
+This was the stop point on 2026-09-11. It is superseded by
+`AGENTIC_IMPLEMENTATION_HANDOFF_CURRENT.md`.

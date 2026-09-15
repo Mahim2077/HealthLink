@@ -42,6 +42,14 @@ class Settings(BaseSettings):
         default="http://localhost:3000",
         validation_alias="FRONTEND_URL",
     )
+    geocoder_base_url: str = Field(
+        default="https://nominatim.openstreetmap.org",
+        validation_alias="GEOCODER_BASE_URL",
+    )
+    geocoder_user_agent: str = Field(
+        default="HealthLink/0.1 (+https://healthlink-sd.vercel.app/)",
+        validation_alias="GEOCODER_USER_AGENT",
+    )
     jwt_secret_key: str = Field(
         default="",
         validation_alias="JWT_SECRET_KEY",
@@ -60,24 +68,6 @@ class Settings(BaseSettings):
         validation_alias="REFRESH_TOKEN_EXPIRE_DAYS",
     )
 
-    # Phase 13 prescription PDFs use private local storage in development and
-    # a private Vercel Blob store in production. The application always serves
-    # the bytes through an authorized API route; raw storage keys never reach
-    # the browser.
-    prescription_storage_backend: Literal["local", "vercel_blob"] = Field(
-        default="local",
-        validation_alias="PRESCRIPTION_STORAGE_BACKEND",
-    )
-    prescription_storage_path: str = Field(
-        default="",
-        validation_alias="PRESCRIPTION_STORAGE_PATH",
-    )
-    blob_read_write_token: str = Field(
-        default="",
-        validation_alias="BLOB_READ_WRITE_TOKEN",
-        repr=False,
-    )
-
     @field_validator("debug", mode="before")
     @classmethod
     def normalize_debug_mode(cls, value: object) -> object:
@@ -94,8 +84,9 @@ class Settings(BaseSettings):
     @field_validator(
         "database_url",
         "frontend_url",
+        "geocoder_base_url",
+        "geocoder_user_agent",
         "jwt_secret_key",
-        "blob_read_write_token",
     )
     @classmethod
     def strip_surrounding_whitespace(cls, value: str) -> str:

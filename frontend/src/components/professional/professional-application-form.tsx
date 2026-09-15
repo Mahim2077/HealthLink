@@ -7,6 +7,7 @@ import { useState, type FormEvent } from "react";
 import { citizenInputClassName, FormField } from "@/components/citizen/form-field";
 import { StatusAlert } from "@/components/citizen/status-alert";
 import { citizenErrorMessage } from "@/lib/citizen/presentation";
+import { DOCTOR_SPECIALIZATIONS, type DoctorSpecialization } from "@/lib/doctors/specializations";
 import { onboardProfessional, registerProfessional } from "@/lib/professional/api";
 import {
   PROFESSIONAL_ROLES,
@@ -22,6 +23,8 @@ type FormState = {
   designation: string;
   additionalInfo: string;
   bmdc: string;
+  specialization: DoctorSpecialization;
+  qualification: string;
   email: string;
   password: string;
   confirmPassword: string;
@@ -33,6 +36,8 @@ type FormState = {
 const INITIAL_FORM: FormState = {
   additionalInfo: "",
   bmdc: "",
+  specialization: "GENERAL_MEDICINE",
+  qualification: "",
   confirmPassword: "",
   designation: "",
   email: "",
@@ -99,6 +104,10 @@ export function ProfessionalApplicationForm({
       setError("BM&DC Registration Number is required for doctors.");
       return;
     }
+    if (isDoctor && !form.qualification.trim()) {
+      setError("Professional qualification is required for doctors.");
+      return;
+    }
     if (mode === "new") {
       if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.nid.trim()) {
         setError("Complete every required identity and account field.");
@@ -115,7 +124,13 @@ export function ProfessionalApplicationForm({
     }
 
     const application = isDoctor
-      ? { ...common, role_code: "DOCTOR" as const, bmdc_registration_number: form.bmdc.trim() }
+      ? {
+          ...common,
+          role_code: "DOCTOR" as const,
+          bmdc_registration_number: form.bmdc.trim(),
+          specialization: form.specialization,
+          qualification: form.qualification.trim(),
+        }
       : { ...common, role_code: form.role as Exclude<ProfessionalRoleCode, "DOCTOR"> };
     setSubmitting(true);
     try {
@@ -168,11 +183,13 @@ export function ProfessionalApplicationForm({
           <fieldset className="grid gap-5 sm:grid-cols-2" disabled={submitting}>
             <legend className="col-span-full text-lg font-bold text-slate-950">Role application</legend>
             <FormField className="sm:col-span-2" htmlFor="professional-role" label="Professional role" required>
-              <select className={citizenInputClassName} id="professional-role" onChange={(event) => { const role = event.target.value as ProfessionalRoleCode; setForm((current) => ({ ...current, bmdc: role === "DOCTOR" ? current.bmdc : "", role })); }} value={form.role}>
+              <select className={citizenInputClassName} id="professional-role" onChange={(event) => { const role = event.target.value as ProfessionalRoleCode; setForm((current) => ({ ...current, bmdc: role === "DOCTOR" ? current.bmdc : "", qualification: role === "DOCTOR" ? current.qualification : "", role })); }} value={form.role}>
                 {PROFESSIONAL_ROLES.map((role) => <option key={role.code} value={role.code}>{role.name}</option>)}
               </select>
             </FormField>
             {isDoctor ? <FormField className="sm:col-span-2" htmlFor="professional-bmdc" hint="Required only for the Doctor role and globally unique." label="BM&DC Registration Number" required><input className={citizenInputClassName} id="professional-bmdc" maxLength={100} onChange={(event) => setField("bmdc", event.target.value)} required value={form.bmdc} /></FormField> : null}
+            {isDoctor ? <FormField htmlFor="professional-specialization" label="Primary specialization" required><select className={citizenInputClassName} id="professional-specialization" onChange={(event) => setField("specialization", event.target.value as DoctorSpecialization)} value={form.specialization}>{DOCTOR_SPECIALIZATIONS.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></FormField> : null}
+            {isDoctor ? <FormField htmlFor="professional-qualification" hint="For example: MBBS, FCPS (Pediatrics)." label="Qualification" required><input className={citizenInputClassName} id="professional-qualification" maxLength={255} onChange={(event) => setField("qualification", event.target.value)} required value={form.qualification} /></FormField> : null}
             <FormField htmlFor="professional-facility" hint="Submit the facility name as you know it; an administrator will match it later." label="Medical facility name" required><input className={citizenInputClassName} id="professional-facility" maxLength={255} onChange={(event) => setField("facility", event.target.value)} required value={form.facility} /></FormField>
             <FormField htmlFor="professional-designation" label="Designation" required><input className={citizenInputClassName} id="professional-designation" maxLength={150} onChange={(event) => setField("designation", event.target.value)} required value={form.designation} /></FormField>
             <FormField className="sm:col-span-2" htmlFor="professional-additional-info" hint="Include qualifications, experience, department, or other information useful for verification." label="Additional information" required><textarea className={citizenInputClassName + " min-h-40 py-3"} id="professional-additional-info" onChange={(event) => setField("additionalInfo", event.target.value)} required value={form.additionalInfo} /></FormField>

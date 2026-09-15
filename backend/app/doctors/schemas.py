@@ -2,13 +2,23 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, time
+from enum import StrEnum
 from typing import Annotated
 
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from app.doctors.models import PracticeScheduleStatus, PracticeWeekday
+from app.professionals.constants import DoctorSpecialization
+
+
+class DoctorSort(StrEnum):
+    BEST_MATCH = "BEST_MATCH"
+    EARLIEST_PRACTICE = "EARLIEST_PRACTICE"
+    DOCTOR_NAME = "DOCTOR_NAME"
+    FACILITY_NAME = "FACILITY_NAME"
+    NEAREST = "NEAREST"
 
 
 class DoctorSearchFilters(BaseModel):
@@ -22,10 +32,21 @@ class DoctorSearchFilters(BaseModel):
 
     name: Annotated[str | None, Field(max_length=200)] = None
     facility_name: Annotated[str | None, Field(max_length=200)] = None
+    query: Annotated[str | None, Field(max_length=200)] = None
+    specialization: DoctorSpecialization | None = None
+    facility_id: uuid.UUID | None = None
     weekday: PracticeWeekday | None = None
+    sort: DoctorSort = DoctorSort.BEST_MATCH
+    latitude: Annotated[float | None, Field(ge=20, le=27)] = None
+    longitude: Annotated[float | None, Field(ge=88, le=93)] = None
+    district_code: Annotated[str | None, Field(max_length=16)] = None
+    upazila_code: Annotated[str | None, Field(max_length=20)] = None
+    offset: Annotated[int, Field(ge=0, le=500)] = 0
     limit: Annotated[int, Field(ge=1, le=50)] = 20
 
-    @field_validator("name", "facility_name", mode="before")
+    @field_validator(
+        "name", "facility_name", "query", "district_code", "upazila_code", mode="before"
+    )
     @classmethod
     def strip_text(cls, value: object) -> object:
         if isinstance(value, str):
@@ -33,11 +54,19 @@ class DoctorSearchFilters(BaseModel):
             return stripped or None
         return value
 
-    def has_filter(self) -> bool:
-        return any(
-            value is not None
-            for value in (self.name, self.facility_name, self.weekday)
-        )
+    @model_validator(mode="after")
+    def validate_location(self) -> "DoctorSearchFilters":
+        has_coordinates = self.latitude is not None or self.longitude is not None
+        has_area = self.district_code is not None or self.upazila_code is not None
+        if has_coordinates and (self.latitude is None or self.longitude is None):
+            raise ValueError("Approximate location must include both values.")
+        if has_area and (self.district_code is None or self.upazila_code is None):
+            raise ValueError("Select both a zila and an upazila.")
+        if has_coordinates and has_area:
+            raise ValueError("Use either approximate location or a selected area.")
+        if self.sort is DoctorSort.NEAREST and not (has_coordinates or has_area):
+            raise ValueError("Nearest facility sorting requires a location choice.")
+        return self
 
     @classmethod
     def as_query(cls, request: Request) -> "DoctorSearchFilters":
@@ -89,6 +118,31 @@ class DoctorSummary(BaseModel):
     role_code: str
     verified: bool
     specialization: str | None = None
+    specialization_code: DoctorSpecialization
+    qualification: str | None = None
+    facility_area: str | None = None
+    next_practice: "NextPracticeWindow | None" = None
+    distance_km: float | None = None
+
+
+class NextPracticeWindow(BaseModel):
+    weekday: PracticeWeekday
+    start_time: time
+    end_time: time
+    facility_name: str
+    days_away: int
+
+
+class DoctorSearchResponse(BaseModel):
+    items: list[DoctorSummary]
+    total: int
+
+
+class DoctorFacilityOption(BaseModel):
+    id: uuid.UUID
+    name: str
+    facility_type: str
+    area: str | None = None
 
 
 class DoctorProfile(DoctorSummary):
@@ -173,7 +227,11 @@ class DoctorScheduleUnavailableResponse(BaseModel):
 
 __all__ = [
     "DoctorSearchFilters",
+    "DoctorSearchResponse",
+    "DoctorSort",
     "DoctorSummary",
+    "DoctorFacilityOption",
+    "NextPracticeWindow",
     "DoctorProfile",
     "PracticeDay",
     "PracticeScheduleEntry",

@@ -53,44 +53,43 @@ class PrescriptionItemView(BaseModel):
     instructions: str | None
 
 
-class PrescriptionCreateRequest(BaseModel):
+class _PrescriptionWriteRequest(BaseModel):
+    """One atomic consultation-and-prescription write."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    chief_complaint: str | None = Field(default=None, max_length=4000)
+    clinical_notes: str | None = Field(default=None, max_length=8000)
+    diagnosis: str | None = Field(default=None, max_length=4000)
+    follow_up_instructions: str | None = Field(default=None, max_length=4000)
+    items: list[PrescriptionItemPayload] = Field(default_factory=list, max_length=50)
+    diagnostic_information: str | None = Field(default=None, max_length=8000)
+    medical_advice: str | None = Field(default=None, max_length=8000)
+    notes: str | None = Field(default=None, max_length=8000)
+
+    @field_validator(
+        "chief_complaint",
+        "clinical_notes",
+        "diagnosis",
+        "follow_up_instructions",
+        "diagnostic_information",
+        "medical_advice",
+        "notes",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_text(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
+
+class PrescriptionCreateRequest(_PrescriptionWriteRequest):
     """Payload for ``POST /api/v1/visits/{visit_id}/prescription``."""
 
-    model_config = ConfigDict(extra="forbid")
 
-    items: list[PrescriptionItemPayload] = Field(min_length=1, max_length=50)
-    diagnostic_information: str | None = Field(default=None, max_length=8000)
-    medical_advice: str | None = Field(default=None, max_length=8000)
-    notes: str | None = Field(default=None, max_length=8000)
-
-    @field_validator(
-        "diagnostic_information", "medical_advice", "notes", mode="before"
-    )
-    @classmethod
-    def normalize_optional_text(cls, value: object) -> object:
-        if isinstance(value, str):
-            return value.strip() or None
-        return value
-
-
-class PrescriptionUpdateRequest(BaseModel):
+class PrescriptionUpdateRequest(_PrescriptionWriteRequest):
     """Payload for ``PUT /api/v1/prescriptions/{id}``."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    items: list[PrescriptionItemPayload] = Field(min_length=1, max_length=50)
-    diagnostic_information: str | None = Field(default=None, max_length=8000)
-    medical_advice: str | None = Field(default=None, max_length=8000)
-    notes: str | None = Field(default=None, max_length=8000)
-
-    @field_validator(
-        "diagnostic_information", "medical_advice", "notes", mode="before"
-    )
-    @classmethod
-    def normalize_optional_text(cls, value: object) -> object:
-        if isinstance(value, str):
-            return value.strip() or None
-        return value
 
 
 class PrescriptionView(BaseModel):
@@ -100,13 +99,15 @@ class PrescriptionView(BaseModel):
     visit_id: uuid.UUID
     citizen_id: uuid.UUID
     author_doctor_role_registration_id: uuid.UUID
+    chief_complaint: str | None
+    clinical_notes: str | None
+    diagnosis: str | None
+    follow_up_instructions: str | None
     diagnostic_information: str | None
     medical_advice: str | None
     notes: str | None
     items: list[PrescriptionItemView]
-    pdf_available: bool
-    pdf_file_name: str | None
-    pdf_updated_at: datetime | None
+    can_edit: bool = False
     created_at: datetime
     updated_at: datetime
 

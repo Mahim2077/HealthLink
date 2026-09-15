@@ -1,7 +1,7 @@
 """Phase 13 persistence helpers for prescriptions.
 
 Thin layer over SQLAlchemy queries; the business logic that enforces the
-author-only edit invariant and regenerates the PDF lives in the service
+author-only edit invariant and renders PDFs on demand lives in the service
 module.
 """
 from __future__ import annotations
@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.prescriptions.models import (
     Prescription,
-    PrescriptionDocument,
     PrescriptionItem,
 )
 from app.visits.models import MedicalVisit
@@ -41,10 +40,7 @@ class PrescriptionsRepository:
         stmt = (
             select(Prescription)
             .where(Prescription.visit_id == visit_id)
-            .options(
-                selectinload(Prescription.items),
-                selectinload(Prescription.document),
-            )
+            .options(selectinload(Prescription.items))
         )
         return self.db.execute(stmt).scalar_one_or_none()
 
@@ -54,10 +50,7 @@ class PrescriptionsRepository:
         stmt = (
             select(Prescription)
             .where(Prescription.id == prescription_id)
-            .options(
-                selectinload(Prescription.items),
-                selectinload(Prescription.document),
-            )
+            .options(selectinload(Prescription.items))
         )
         return self.db.execute(stmt).scalar_one_or_none()
 
@@ -71,14 +64,6 @@ class PrescriptionsRepository:
         """
 
         return self.db.get(MedicalVisit, prescription.visit_id)
-
-    def get_document_for_prescription(
-        self, prescription_id: uuid.UUID
-    ) -> PrescriptionDocument | None:
-        stmt = select(PrescriptionDocument).where(
-            PrescriptionDocument.prescription_id == prescription_id
-        )
-        return self.db.execute(stmt).scalar_one_or_none()
 
     # ------------------------------------------------------------------
     # Item management

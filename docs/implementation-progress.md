@@ -996,9 +996,31 @@ Phase 17 is complete, committed, pushed, migrated, and live in production.
   loaded or safe empty states, and the Admin dashboard, professional review
   queue, and citizen identity search loaded without browser errors. Some first
   requests required up to 15 seconds while serverless functions were cold.
-- Scheduled reminder delivery remains fail-closed until the documented
-  `CRON_SECRET` is configured in both environments and the GitHub repository
-  variable `REMINDERS_ENABLED` is explicitly set to `true`; the deployed
-  reminder UI, API, and protected worker are otherwise live.
+- Automated reminder delivery is intentionally unscheduled. The GitHub Actions
+  reminder workflow was removed so disabled reminders do not create recurring
+  skipped runs; the existing reminder UI and stored records remain intact.
 
 Phases 15–21 are verified, committed, migrated, and live in production.
+
+## Post-Phase 21 consultation and prescription consolidation — 2026-09-15, pending release
+
+- The doctor consultation workspace now saves the clinical summary, medicines,
+  and prescription advice through one atomic structured request. A consultation
+  can be saved without medicines, while partially completed medicine rows are
+  still rejected.
+- The current-patient history now links earlier prescriptions for doctors. The
+  centralized clinical-read policy remains authoritative: an active current
+  doctor can review the patient's history, while only the author doctor receives
+  edit capability.
+- Prescription PDFs are no longer created or uploaded during a save. Each
+  authorized PDF request renders fresh bytes in memory from the structured visit
+  and prescription record. The legacy document table remains mapped only for
+  migration compatibility and is not read or written by the application.
+- Local verification passed the complete backend suite (**285 passed, 38
+  PostgreSQL-only tests skipped**), the complete frontend suite (**52 files / 239
+  tests passed**), ESLint, TypeScript, Python AST parsing, `git diff --check`, and
+  the optimized Next.js build.
+- Browser acceptance with synthetic local data confirmed the unified editor,
+  previous-prescription navigation, read-only historical record, automatic fresh
+  PDF preview, no framework error overlay, and no document row created by the PDF
+  request. Production was not accessed or modified.

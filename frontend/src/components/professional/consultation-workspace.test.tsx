@@ -8,6 +8,8 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ConsultationWorkspace, type VisitsDeps } from "./consultation-workspace";
+import type { PrescriptionDeps } from "@/components/prescriptions/prescription-panel";
+import type { PrescriptionPayload, PrescriptionView } from "@/lib/prescriptions/types";
 import type {
   DoctorCurrentPatientView,
   VisitDraftView,
@@ -67,11 +69,33 @@ function buildDeps(
   const spies: VisitsDeps = {
     finishAppointment: vi.fn().mockResolvedValue({} as never),
     loadCurrentPatient: vi.fn().mockResolvedValue(null),
-    readVisit: vi.fn().mockResolvedValue({} as never),
     startVisitForCurrent: vi.fn().mockResolvedValue({} as never),
-    updateVisit: vi.fn().mockResolvedValue({} as never),
   };
   return { deps: { ...spies, ...overrides }, spies };
+}
+
+function savedPrescription(payload: PrescriptionPayload): PrescriptionView {
+  return {
+    id: "rx-1",
+    visit_id: baseVisitId,
+    citizen_id: "citizen-1",
+    author_doctor_role_registration_id: "reg-1",
+    ...payload,
+    items: payload.items.map((item, index) => ({ ...item, id: `item-${index}` })),
+    can_edit: true,
+    created_at: "2026-08-10T09:35:00Z",
+    updated_at: "2026-08-10T09:35:00Z",
+  };
+}
+
+function prescriptionDeps(): PrescriptionDeps {
+  const create = vi.fn(async (_visitId: string, payload: PrescriptionPayload) => savedPrescription(payload));
+  return {
+    create,
+    read: vi.fn().mockImplementation(async () => savedPrescription(vi.mocked(create).mock.calls.at(-1)![1])),
+    update: vi.fn(),
+    downloadPdf: vi.fn(),
+  };
 }
 
 describe("ConsultationWorkspace", () => {
@@ -110,20 +134,14 @@ describe("ConsultationWorkspace", () => {
         diagnosis: "viral",
       }),
     );
-    const updateVisit = vi.fn().mockImplementation(
-      async (_id: string, payload: { clinical_notes?: string }) => ({
-        ...baseVisit({}),
-        clinical_notes: payload.clinical_notes ?? null,
-      }),
-    );
+    const rxDeps = prescriptionDeps();
 
     const { deps } = buildDeps({
       loadCurrentPatient: vi.fn().mockResolvedValue(baseCurrent({ visit: null })),
       startVisitForCurrent: startVisit,
-      updateVisit,
     });
 
-    render(<ConsultationWorkspace visitsDeps={deps} />);
+    render(<ConsultationWorkspace prescriptionDeps={rxDeps} visitsDeps={deps} />);
 
     expect(
       await screen.findByRole("heading", { name: /serial #1/i }),
@@ -138,12 +156,12 @@ describe("ConsultationWorkspace", () => {
 
     const notes = await screen.findByLabelText(/clinical notes/i);
     fireEvent.change(notes, { target: { value: "Temp 38C" } });
-    fireEvent.click(screen.getByRole("button", { name: /save draft/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save consultation & prescription/i }));
 
     await waitFor(() => {
-      expect(updateVisit).toHaveBeenCalledWith(
+      expect(rxDeps.create).toHaveBeenCalledWith(
         baseVisitId,
-        expect.objectContaining({ clinical_notes: "Temp 38C" }),
+        expect.objectContaining({ clinical_notes: "Temp 38C", items: [] }),
       );
     });
   });
@@ -228,17 +246,17 @@ describe("ConsultationWorkspace", () => {
   });
 
   it("blocks finish until edited clinical notes are saved", async () => {
+    const rxDeps = prescriptionDeps();
     const { deps } = buildDeps({
       loadCurrentPatient: vi.fn().mockResolvedValue(baseCurrent({ visit: baseVisit({}) })),
-      updateVisit: vi.fn().mockResolvedValue(baseVisit({ clinical_notes: "New notes" })),
     });
-    render(<ConsultationWorkspace visitsDeps={deps} />);
+    render(<ConsultationWorkspace prescriptionDeps={rxDeps} visitsDeps={deps} />);
     const finish = await screen.findByRole("button", { name: /finish appointment/i });
     fireEvent.change(screen.getByLabelText(/clinical notes/i), { target: { value: "New notes" } });
     await waitFor(() => expect(finish).toBeDisabled());
     fireEvent.click(finish);
     expect(deps.finishAppointment).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /save draft/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save consultation & prescription/i }));
     await waitFor(() => expect(finish).toBeEnabled());
   });
 
@@ -254,15 +272,9 @@ describe("ConsultationWorkspace", () => {
     render(<ConsultationWorkspace visitsDeps={deps} />);
 
     expect(
-      await screen.findByText(/further edits are disabled/i),
+      await screen.findByText(/review the clinical summary/i),
     ).toBeInTheDocument();
-    expect(
-      (screen.getByLabelText(/clinical notes/i) as HTMLTextAreaElement).disabled,
-    ).toBe(true);
-    expect(
-      (screen.getByRole("button", { name: /save draft/i }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true);
+    expect(screen.queryByRole("button", { name: /save consultation/i })).not.toBeInTheDocument();
   });
 
   it("blocks finish while a diagnostic request is unsaved", async () => {
@@ -319,7 +331,7 @@ describe("ConsultationWorkspace", () => {
     );
     const notes = await screen.findByLabelText(/clinical notes/i);
     fireEvent.change(notes, { target: { value: "Unsaved observation" } });
-    await screen.findByRole("heading", { name: /^medical history$/i });
+    await screen.findByRole("heading", { name: /^patient history$/i });
     fireEvent.change(screen.getByLabelText("Record type"), {
       target: { value: "VISIT" },
     });

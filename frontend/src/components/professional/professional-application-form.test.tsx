@@ -21,6 +21,8 @@ function fillRoleFields(role = "DOCTOR") {
   fireEvent.change(screen.getByLabelText(/Additional information/), { target: { value: " Experienced healthcare professional. " } });
   if (role === "DOCTOR") {
     fireEvent.change(screen.getByLabelText(/BM&DC Registration Number/), { target: { value: " BMDC-001 " } });
+    fireEvent.change(screen.getByLabelText(/Primary specialization/), { target: { value: "PEDIATRICS" } });
+    fireEvent.change(screen.getByLabelText(/^Qualification/), { target: { value: " MBBS, FCPS (Pediatrics) " } });
   }
 }
 
@@ -52,7 +54,9 @@ describe("ProfessionalApplicationForm", () => {
       last_name: "Rahman",
       nid_number: "001-NID",
       password: "StrongPassword123!",
+      qualification: "MBBS, FCPS (Pediatrics)",
       role_code: "DOCTOR",
+      specialization: "PEDIATRICS",
     });
     expect(await screen.findByRole("heading", { name: /application is pending/ })).toBeInTheDocument();
     expect(screen.getByText("PENDING")).toBeInTheDocument();
@@ -111,6 +115,7 @@ describe("ProfessionalApplicationForm", () => {
     fireEvent.change(screen.getByLabelText(/Medical facility name/), { target: { value: "Hospital" } });
     fireEvent.change(screen.getByLabelText(/Designation/), { target: { value: "Doctor" } });
     fireEvent.change(screen.getByLabelText(/Additional information/), { target: { value: "Details" } });
+    fireEvent.change(screen.getByLabelText(/^Qualification/), { target: { value: "MBBS" } });
     fireEvent.change(screen.getByLabelText(/BM&DC Registration Number/), { target: { value: " " } });
     fireEvent.click(screen.getByRole("button", { name: "Submit professional application" }));
     expect(screen.getByRole("alert")).toHaveTextContent("BM&DC Registration Number is required");

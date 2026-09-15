@@ -1,15 +1,22 @@
 # HealthLink
 
+> **Agentic continuation:** read
+> [`AGENTIC_IMPLEMENTATION_HANDOFF_CURRENT.md`](AGENTIC_IMPLEMENTATION_HANDOFF_CURRENT.md)
+> before changing the repository. Phases 15–21 are released, and the current
+> dirty worktree contains verified, intentionally uncommitted post-Phase-21
+> improvements. The older baseline descriptions below remain historical
+> context and must not be used to discard or recreate current work.
+
 HealthLink is a modular healthcare information platform with separate Citizen,
 Professional, and Admin portal contexts. This repository implements the
-documented roadmap sequentially through Phase 17. The Phase 15–17 release is
-live in production.
+documented roadmap sequentially through Phase 21, followed by verified product
+improvements to doctor discovery, diagnostics, and consultation workflows.
 
-The current Phase 17 production release is available at
+The production application is available at
 [healthlink-sd.vercel.app](https://healthlink-sd.vercel.app/). It is deployed as
 one Vercel Services project: Next.js serves the web interface, FastAPI serves
 `/api/v1/*` and `/health`, Supabase PostgreSQL stores application data, and
-private Vercel Blob storage holds prescription PDFs.
+prescription PDFs are regenerated in memory from authorized structured records.
 
 ## Applications
 
@@ -20,7 +27,7 @@ private Vercel Blob storage holds prescription PDFs.
 The three Markdown files at the repository root are the governing project
 documents and are preserved under their attached filenames.
 
-## Implemented product through Phase 14
+## Implemented product through Phase 21
 
 - Citizen registration, authentication, profile and protected identity
   management, verified-doctor discovery, appointment booking/cancellation,
@@ -32,6 +39,12 @@ documents and are preserved under their attached filenames.
   verification/rejection, and controlled citizen-identity support.
 - Same-origin refresh-cookie authentication with in-memory access tokens and
   backend-authoritative portal, role, ownership, and record-access checks.
+- Derived medical history, structured diagnostic requests and finalized results,
+  numeric result trends, citizen emergency profiles, reminder records,
+  metadata-only clinical-access auditing, and scoped patient access grants.
+- Specialty-first doctor discovery with private admin-confirmed facility
+  location logic, one citizen Diagnostic tests area, and a unified doctor
+  consultation/prescription editor with on-demand PDF rendering.
 
 ## Current interface
 

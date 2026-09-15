@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
-from pathlib import Path
-
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -25,11 +22,6 @@ from app.prescriptions.models import (
     Prescription,
     PrescriptionDocument,
     PrescriptionItem,
-)
-from app.prescriptions.storage import (
-    LocalPrescriptionStorage,
-    PrescriptionStorage,
-    reset_prescription_storage_for_tests,
 )
 from app.professionals.constants import ProfessionalRoleCode, VerificationStatus
 from app.professionals.models import (
@@ -340,6 +332,10 @@ def _login_citizen_for_visit(
 
 
 _VALID_PAYLOAD = {
+    "chief_complaint": "Fever and sore throat",
+    "clinical_notes": "Temperature 38 C; hydration maintained",
+    "diagnosis": "Acute pharyngitis",
+    "follow_up_instructions": "Return in 3 days if symptoms persist",
     "items": [
         {
             "medicine_name": "Paracetamol",
@@ -360,26 +356,6 @@ _VALID_PAYLOAD = {
     "medical_advice": "Warm gargles, plenty of fluids",
     "notes": "Follow-up if no improvement in 3 days",
 }
-
-
-# ---------------------------------------------------------------------------
-# Storage fixture
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def prescription_storage(tmp_path, monkeypatch):
-    """Provide a fresh local prescription storage backed by ``tmp_path``.
-
-    The default ``<backend>/.prescription_storage`` directory is replaced
-    with a per-test directory so generated PDFs do not pollute the
-    repository and so failures are inspectable per test.
-    """
-
-    storage = LocalPrescriptionStorage(tmp_path)
-    reset_prescription_storage_for_tests(storage)
-    yield storage
-    reset_prescription_storage_for_tests(None)
 
 
 # ---------------------------------------------------------------------------
@@ -441,8 +417,8 @@ def test_create_prescription_requires_verified_doctor(
     assert response.status_code == 403, response.text
 
 
-def test_create_prescription_writes_payload_and_pdf(
-    client: TestClient, db_session, prescription_storage
+def test_create_prescription_writes_only_structured_payload(
+    client: TestClient, db_session
 ) -> None:
     doctor_token, visit_id, _ = _set_up_visit(
         client, db_session, clinic_name="Rx Create Clinic", weekday="MONDAY",
@@ -455,10 +431,11 @@ def test_create_prescription_writes_payload_and_pdf(
     )
     assert response.status_code == 201, response.text
     body = response.json()
-    assert body["status" if "status" in body else "items"]
     assert len(body["items"]) == 2
-    assert body["pdf_available"] is True
-    assert body["pdf_file_name"] == "prescription.pdf"
+    assert body["clinical_notes"] == _VALID_PAYLOAD["clinical_notes"]
+    assert body["diagnosis"] == _VALID_PAYLOAD["diagnosis"]
+    assert body["can_edit"] is True
+    assert "pdf_available" not in body
     prescription_id = uuid.UUID(body["id"])
 
     persisted = db_session.get(Prescription, prescription_id)
@@ -470,18 +447,22 @@ def test_create_prescription_writes_payload_and_pdf(
     assert persisted.notes == _VALID_PAYLOAD["notes"]
     assert len(persisted.items) == 2
 
+    visit = db_session.get(MedicalVisit, visit_id)
+    assert visit is not None
+    assert visit.chief_complaint == _VALID_PAYLOAD["chief_complaint"]
+    assert visit.clinical_notes == _VALID_PAYLOAD["clinical_notes"]
+    assert visit.diagnosis == _VALID_PAYLOAD["diagnosis"]
+
     document = db_session.scalar(
         select(PrescriptionDocument).where(
             PrescriptionDocument.prescription_id == prescription_id
         )
     )
-    assert document is not None
-    assert document.content_type == "application/pdf"
-    assert prescription_storage.exists(document.storage_key)
+    assert document is None
 
 
 def test_create_prescription_rejects_second_per_visit(
-    client: TestClient, db_session, prescription_storage
+    client: TestClient, db_session
 ) -> None:
     doctor_token, visit_id, _ = _set_up_visit(
         client, db_session, clinic_name="Rx Duplicate Clinic", weekday="MONDAY",
@@ -503,7 +484,7 @@ def test_create_prescription_rejects_second_per_visit(
 
 
 def test_doctor_can_read_own_prescription(
-    client: TestClient, db_session, prescription_storage
+    client: TestClient, db_session
 ) -> None:
     doctor_token, visit_id, _ = _set_up_visit(
         client, db_session, clinic_name="Rx Read Clinic", weekday="MONDAY",
@@ -524,11 +505,11 @@ def test_doctor_can_read_own_prescription(
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["id"] == prescription_id
-    assert body["pdf_available"] is True
+    assert body["can_edit"] is True
 
 
-def test_update_prescription_replaces_items_and_regenerates_pdf(
-    client: TestClient, db_session, prescription_storage
+def test_update_prescription_replaces_items_and_clinical_record(
+    client: TestClient, db_session
 ) -> None:
     doctor_token, visit_id, _ = _set_up_visit(
         client, db_session, clinic_name="Rx Edit Clinic", weekday="MONDAY",
@@ -540,14 +521,12 @@ def test_update_prescription_replaces_items_and_regenerates_pdf(
         json=_VALID_PAYLOAD,
     )
     prescription_id = created.json()["id"]
-    original_doc = db_session.scalar(
-        select(PrescriptionDocument).where(
-            PrescriptionDocument.prescription_id == uuid.UUID(prescription_id)
-        )
-    )
-    assert original_doc is not None
 
     new_payload = {
+        "chief_complaint": "Headache",
+        "clinical_notes": "Neurological examination normal",
+        "diagnosis": "Tension headache",
+        "follow_up_instructions": "Review in one week if unresolved",
         "items": [
             {
                 "medicine_name": "Ibuprofen",
@@ -571,6 +550,7 @@ def test_update_prescription_replaces_items_and_regenerates_pdf(
     assert len(body["items"]) == 1
     assert body["items"][0]["medicine_name"] == "Ibuprofen"
     assert body["diagnostic_information"] == "Tension headache"
+    assert body["clinical_notes"] == "Neurological examination normal"
     assert body["notes"] is None
 
     refreshed_doc = db_session.scalar(
@@ -578,14 +558,14 @@ def test_update_prescription_replaces_items_and_regenerates_pdf(
             PrescriptionDocument.prescription_id == uuid.UUID(prescription_id)
         )
     )
-    assert refreshed_doc is not None
-    assert refreshed_doc.id == original_doc.id
-    assert refreshed_doc.storage_key == original_doc.storage_key
-    assert refreshed_doc.file_size_bytes > 0
+    assert refreshed_doc is None
+    visit = db_session.get(MedicalVisit, visit_id)
+    assert visit is not None
+    assert visit.diagnosis == "Tension headache"
 
 
 def test_foreign_doctor_cannot_read_or_edit_prescription(
-    client: TestClient, db_session, prescription_storage
+    client: TestClient, db_session
 ) -> None:
     facility = _make_facility(db_session, name="Rx Foreign Doctor Clinic")
 
@@ -662,7 +642,7 @@ def test_foreign_doctor_cannot_read_or_edit_prescription(
 
 
 def test_create_prescription_rejects_forbidden_identifier_in_payload(
-    client: TestClient, db_session, prescription_storage
+    client: TestClient, db_session
 ) -> None:
     doctor_token, visit_id, _ = _set_up_visit(
         client, db_session, clinic_name="Rx Forbidden Clinic", weekday="MONDAY",
@@ -691,7 +671,7 @@ def test_create_prescription_rejects_forbidden_identifier_in_payload(
 
 
 def test_citizen_can_read_own_prescription(
-    client: TestClient, db_session, prescription_storage
+    client: TestClient, db_session
 ) -> None:
     # Phase 13 rule: a citizen reads a prescription via citizen_id == own.
     # We register the citizen AFTER the doctor opens the visit so that
@@ -744,7 +724,7 @@ def test_citizen_can_read_own_prescription(
 
 
 def test_citizen_cannot_edit_own_prescription(
-    client: TestClient, db_session, prescription_storage
+    client: TestClient, db_session
 ) -> None:
     doctor_token, visit_id, _ = _set_up_visit(
         client,
@@ -773,7 +753,7 @@ def test_citizen_cannot_edit_own_prescription(
 
 
 def test_citizen_cannot_read_another_citizens_prescription(
-    client: TestClient, db_session, prescription_storage
+    client: TestClient, db_session
 ) -> None:
     doctor_token, visit_id, _ = _set_up_visit(
         client, db_session, clinic_name="Rx Citizen Denied Clinic", weekday="MONDAY",
@@ -794,8 +774,8 @@ def test_citizen_cannot_read_another_citizens_prescription(
     assert response.status_code == 404, response.text
 
 
-def test_pdf_stream_returns_application_pdf(
-    client: TestClient, db_session, prescription_storage
+def test_pdf_stream_generates_application_pdf_on_demand(
+    client: TestClient, db_session
 ) -> None:
     doctor_token, visit_id, _ = _set_up_visit(
         client, db_session, clinic_name="Rx PDF Stream Clinic", weekday="MONDAY",
@@ -821,8 +801,108 @@ def test_pdf_stream_returns_application_pdf(
     assert b"birth certificate" not in body.lower()
 
 
+def test_current_doctor_can_open_a_previous_doctors_prescription(
+    client: TestClient, db_session
+) -> None:
+    facility = _make_facility(db_session, name="Rx Previous Record Clinic")
+    _, previous_registration_id, _, _ = _make_verified_doctor(
+        db_session,
+        first_name="Previous",
+        last_name="Doctor",
+        facility=facility,
+        nid_number="NID-RX-PREVIOUS",
+        bmdc="BMDC-PREVIOUS",
+    )
+    _, current_registration_id, current_nid, current_password = _make_verified_doctor(
+        db_session,
+        first_name="Current",
+        last_name="Doctor",
+        facility=facility,
+        nid_number="NID-RX-CURRENT",
+        bmdc="BMDC-CURRENT",
+    )
+    _, citizen_id_value = _register_citizen(client)
+    citizen_id = uuid.UUID(str(citizen_id_value))
+    previous_visit = MedicalVisit(
+        citizen_id=citizen_id,
+        doctor_role_registration_id=previous_registration_id,
+        facility_id=facility.id,
+        visit_date=datetime.now(timezone.utc) - timedelta(days=30),
+        chief_complaint="Previous fever",
+        diagnosis="Recovered infection",
+        status=VisitStatus.FINALIZED.value,
+        finalized_at=datetime.now(timezone.utc) - timedelta(days=30),
+    )
+    db_session.add(previous_visit)
+    db_session.flush()
+    previous_prescription = Prescription(
+        visit_id=previous_visit.id,
+        citizen_id=citizen_id,
+        author_doctor_role_registration_id=previous_registration_id,
+        diagnostic_information="Prior treatment",
+    )
+    db_session.add(previous_prescription)
+    db_session.flush()
+    db_session.add(
+        PrescriptionItem(
+            prescription_id=previous_prescription.id,
+            medicine_name="Previous medicine",
+            dosage="1 tablet",
+            frequency="Daily",
+            duration="5 days",
+        )
+    )
+    session = DoctorPracticeSession(
+        doctor_role_registration_id=current_registration_id,
+        facility_id=facility.id,
+        session_date=date.today(),
+        status=SessionStatus.ACTIVE.value,
+        started_at=datetime.now(timezone.utc),
+    )
+    appointment = Appointment(
+        citizen_id=citizen_id,
+        doctor_role_registration_id=current_registration_id,
+        facility_id=facility.id,
+        appointment_date=date.today(),
+        serial_number=1,
+        status=AppointmentStatus.BOOKED.value,
+        booked_at=datetime.now(timezone.utc),
+    )
+    db_session.add_all([session, appointment])
+    db_session.flush()
+    db_session.add(
+        AppointmentQueueEntry(
+            appointment_id=appointment.id,
+            practice_session_id=session.id,
+            queue_status=QueueStatus.CURRENT.value,
+            became_current_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    current_token = _login_professional(
+        client, nid_number=current_nid, password=current_password
+    )
+    response = client.get(
+        DOCTOR_PRESCRIPTION_PATH.format(
+            prescription_id=previous_prescription.id
+        ),
+        headers={"Authorization": f"Bearer {current_token}"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["can_edit"] is False
+    assert response.json()["diagnosis"] == "Recovered infection"
+
+    pdf = client.get(
+        PDF_PATH.format(prescription_id=previous_prescription.id),
+        headers={"Authorization": f"Bearer {current_token}"},
+    )
+    assert pdf.status_code == 200, pdf.text
+    assert pdf.content.startswith(b"%PDF")
+
+
 def test_pdf_stream_rejects_non_author_doctor(
-    client: TestClient, db_session, prescription_storage
+    client: TestClient, db_session
 ) -> None:
     facility = _make_facility(db_session, name="Rx PDF Foreign Clinic")
     alice_user_id, _, nid_a, password_a = _make_verified_doctor(
@@ -887,7 +967,7 @@ def test_pdf_stream_rejects_non_author_doctor(
 
 
 def test_pdf_stream_allows_owning_citizen(
-    client: TestClient, db_session, prescription_storage
+    client: TestClient, db_session
 ) -> None:
     doctor_token, visit_id, _ = _set_up_visit(
         client, db_session, clinic_name="Rx PDF Citizen Block Clinic", weekday="MONDAY",
@@ -923,57 +1003,73 @@ def test_pdf_stream_allows_owning_citizen(
     assert response.content.startswith(b"%PDF")
 
 
-class _FailingPrescriptionStorage(PrescriptionStorage):
-    def save(self, prescription_id, file_name: str, payload: bytes) -> str:
-        raise OSError("simulated object storage outage")
-
-    def load(self, storage_key: str) -> bytes:
-        raise FileNotFoundError(storage_key)
-
-    def delete(self, storage_key: str) -> None:
-        return None
-
-    def exists(self, storage_key: str) -> bool:
-        return False
-
-
-def test_pdf_failure_preserves_structured_record_and_put_retries_generation(
-    client: TestClient, db_session, prescription_storage
+def test_pdf_is_rendered_fresh_for_each_authorized_request(
+    client: TestClient, db_session, monkeypatch
 ) -> None:
     doctor_token, visit_id, _ = _set_up_visit(
         client,
         db_session,
-        clinic_name="Rx Durable Retry Clinic",
+        clinic_name="Rx On Demand Clinic",
         weekday="MONDAY",
-        nid_number="NID-RX-RETRY",
-        bmdc="BMDC-RETRY",
+        nid_number="NID-RX-ON-DEMAND",
+        bmdc="BMDC-ON-DEMAND",
     )
-    reset_prescription_storage_for_tests(_FailingPrescriptionStorage())
+    rendered = []
+
+    def render(view):
+        rendered.append(view)
+        return b"%PDF-on-demand"
+
+    monkeypatch.setattr(
+        "app.prescriptions.service.generate_prescription_pdf_bytes", render
+    )
     created = client.post(
         CREATE_PRESCRIPTION_PATH.format(visit_id=visit_id),
         headers={"Authorization": f"Bearer {doctor_token}"},
         json=_VALID_PAYLOAD,
     )
     assert created.status_code == 201, created.text
-    assert created.json()["pdf_available"] is False
-
     prescription_id = uuid.UUID(created.json()["id"])
-    persisted = db_session.get(Prescription, prescription_id)
-    assert persisted is not None
-    assert len(persisted.items) == 2
+    assert rendered == []
     assert db_session.scalar(
         select(PrescriptionDocument).where(
             PrescriptionDocument.prescription_id == prescription_id
         )
     ) is None
 
-    reset_prescription_storage_for_tests(prescription_storage)
-    retried = client.put(
-        DOCTOR_PRESCRIPTION_PATH.format(
-            prescription_id=prescription_id
-        ),
-        headers={"Authorization": f"Bearer {doctor_token}"},
-        json=_VALID_PAYLOAD,
+    for _ in range(2):
+        response = client.get(
+            PDF_PATH.format(prescription_id=prescription_id),
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.content == b"%PDF-on-demand"
+
+    assert len(rendered) == 2
+    assert all(view.clinical_notes == _VALID_PAYLOAD["clinical_notes"] for view in rendered)
+
+
+def test_consultation_can_be_saved_without_medicines(
+    client: TestClient, db_session
+) -> None:
+    doctor_token, visit_id, _ = _set_up_visit(
+        client,
+        db_session,
+        clinic_name="Rx Notes Only Clinic",
+        weekday="MONDAY",
+        nid_number="NID-RX-NOTES-ONLY",
+        bmdc="BMDC-NOTES-ONLY",
     )
-    assert retried.status_code == 200, retried.text
-    assert retried.json()["pdf_available"] is True
+    payload = {
+        **_VALID_PAYLOAD,
+        "items": [],
+        "diagnosis": "Observation only",
+    }
+    saved = client.post(
+        CREATE_PRESCRIPTION_PATH.format(visit_id=visit_id),
+        headers={"Authorization": f"Bearer {doctor_token}"},
+        json=payload,
+    )
+    assert saved.status_code == 201, saved.text
+    assert saved.json()["items"] == []
+    assert saved.json()["diagnosis"] == "Observation only"

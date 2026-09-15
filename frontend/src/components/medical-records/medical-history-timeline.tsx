@@ -71,17 +71,25 @@ function HistoryEventCard({
               .filter(Boolean)
               .join(" · ")}
           </p>
+          {event.resource_type === "PRESCRIPTION" ? (
+            <p className="mt-3 text-sm font-bold text-[var(--portal-strong)]">
+              {portal === "professional" ? "Open previous prescription" : "Open prescription"}
+            </p>
+          ) : null}
         </div>
       </div>
     </article>
   );
 
-  if (portal === "citizen" && event.resource_type === "PRESCRIPTION") {
+  if (event.resource_type === "PRESCRIPTION") {
+    const href = portal === "citizen"
+      ? `/citizen/prescriptions/${event.resource_id}`
+      : `/professional/prescriptions/${event.resource_id}`;
     return (
       <Link
-        aria-label={`Open prescription from ${formatTimestamp(event.occurred_at)}`}
+        aria-label={`${portal === "professional" ? "Open previous" : "Open"} prescription from ${formatTimestamp(event.occurred_at)}`}
         className="block rounded-2xl transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--portal-accent)]"
-        href={`/citizen/prescriptions/${event.resource_id}`}
+        href={href}
       >
         {body}
       </Link>
@@ -162,10 +170,12 @@ export function MedicalHistoryTimeline({
           Longitudinal record
         </p>
         <h2 className="mt-2 text-2xl font-bold text-slate-950" id="medical-history-heading">
-          Medical history
+          {portal === "professional" ? "Patient history" : "Medical history"}
         </h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Finalized visits and prescriptions, newest first. Draft clinical work is never shown here.
+          {portal === "professional"
+            ? "Finalized visits and prescriptions, newest first. Open a previous prescription to review it and regenerate its PDF securely."
+            : "Finalized visits and prescriptions, newest first. Draft clinical work is never shown here."}
         </p>
       </div>
 

@@ -69,6 +69,8 @@ class ProfessionalVerificationService:
             bmdc_registration_number=(
                 doctor_detail.bmdc_registration_number if doctor_detail else None
             ),
+            specialization=(doctor_detail.specialization if doctor_detail else None),
+            qualification=(doctor_detail.qualification if doctor_detail else None),
             facility=registration.facility,
             verified_at=registration.verified_at,
             verified_by=registration.verified_by,
@@ -95,12 +97,20 @@ class ProfessionalVerificationService:
         facility_id: uuid.UUID,
         *,
         admin_user_id: uuid.UUID,
+        specialization: str | None = None,
+        qualification: str | None = None,
     ) -> ProfessionalRegistrationDetail:
         registration = self._pending_for_update(registration_id)
         facility = self.facilities.get_by_id(facility_id, for_update=True)
         if facility is None or not facility.is_active:
             raise FacilityUnavailableError()
         now = utc_now()
+        doctor_detail = self.repository.get_doctor_detail(registration.id)
+        if doctor_detail is not None:
+            if specialization is not None:
+                doctor_detail.specialization = specialization
+            if qualification is not None:
+                doctor_detail.qualification = qualification
         registration.facility_id = facility.id
         registration.verification_status = VerificationStatus.VERIFIED.value
         registration.verified_at = now

@@ -74,7 +74,7 @@ def create_prescription_for_visit(
 @prescriptions_router.get(
     "/{prescription_id}",
     response_model=PrescriptionView,
-    summary="Read a prescription as its citizen or author doctor",
+    summary="Read a prescription through the clinical access policy",
 )
 def get_prescription(
     access: Annotated[
@@ -93,7 +93,9 @@ def get_prescription(
     prescription = db.get(Prescription, access.prescription_id)
     assert prescription is not None
     # The canonical dependency has already resolved the centralized read policy.
-    result = service.read_for_citizen(prescription.citizen_id, access.prescription_id)
+    result = service.read_for_citizen(
+        prescription.citizen_id, access.prescription_id
+    ).model_copy(update={"can_edit": access.actor_kind == "author_doctor"})
     AuditService(db).record(auth=access.auth, citizen_id=prescription.citizen_id,
         resource_type="PRESCRIPTION", resource_id=access.prescription_id,
         access_source=access.access_source)
@@ -103,7 +105,7 @@ def get_prescription(
 @prescriptions_router.put(
     "/{prescription_id}",
     response_model=PrescriptionView,
-    summary="Edit and regenerate a prescription as its author doctor",
+    summary="Edit a structured prescription as its author doctor",
 )
 def update_prescription(
     payload: PrescriptionUpdateRequest,
@@ -133,7 +135,7 @@ def update_prescription(
 
 @prescriptions_router.get(
     "/{prescription_id}/pdf",
-    summary="Stream a private prescription PDF after authorization",
+    summary="Generate and stream a private prescription PDF after authorization",
     response_class=Response,
 )
 def stream_prescription_pdf(

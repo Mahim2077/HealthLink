@@ -92,6 +92,7 @@ export function PrescriptionPage({
       </Link>
       <div className="mt-6">
         <PrescriptionPanel
+          autoGeneratePdf={portal === "PROFESSIONAL"}
           editable={portal === "PROFESSIONAL"}
           prescriptionId={prescriptionId}
         />

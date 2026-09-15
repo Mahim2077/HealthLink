@@ -1,5 +1,6 @@
-import { LabReportPage } from "@/components/diagnostics/lab-report-page";
+import { permanentRedirect } from "next/navigation";
+
 export default async function Page({ params }: { params: Promise<{ test_id: string }> }) {
   const { test_id } = await params;
-  return <LabReportPage testId={test_id} portal="CITIZEN" />;
+  permanentRedirect(`/citizen/diagnostic-tests/${encodeURIComponent(test_id)}`);
 }

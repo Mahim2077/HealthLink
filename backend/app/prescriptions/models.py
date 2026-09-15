@@ -8,9 +8,9 @@ Three tables from V6 sections 26-28:
   exception to ordinary finalized-record immutability.
 * ``prescription_items`` - structured medicines rows; ``CASCADE`` on
   delete so removing a prescription wipes its medicines.
-* ``prescription_documents`` - pointer to the rendered PDF binary that
-  lives in private storage; ``UNIQUE`` on ``prescription_id`` so each
-  prescription has exactly one current document.
+* ``prescription_documents`` - legacy metadata retained for migration
+  compatibility. New PDF files are never persisted; every authorized PDF
+  request is rendered from the structured prescription and visit record.
 """
 from __future__ import annotations
 
@@ -120,7 +120,7 @@ class PrescriptionItem(Base):
 
 
 class PrescriptionDocument(Base):
-    """Pointer to the rendered PDF binary (V6 section 28)."""
+    """Legacy stored-document pointer; no longer written by the application."""
 
     __tablename__ = "prescription_documents"
     __table_args__ = (

@@ -23,6 +23,8 @@ export type ProfessionalApplicationFields =
   | (ProfessionalApplicationBase & {
       role_code: "DOCTOR";
       bmdc_registration_number: string;
+      specialization?: DoctorSpecialization;
+      qualification?: string;
     })
   | (ProfessionalApplicationBase & {
       role_code: Exclude<ProfessionalRoleCode, "DOCTOR">;
@@ -83,3 +85,4 @@ export type ProfessionalMe = {
   rejected_at: string | null;
   rejection_reason: string | null;
 };
+import type { DoctorSpecialization } from "@/lib/doctors/specializations";

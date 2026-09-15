@@ -4,8 +4,9 @@ import { DiagnosticRequestPanel } from "./diagnostic-request-panel";
 import { DiagnosticList } from "./diagnostic-list";
 import { DiagnosticsPage } from "./diagnostics-page";
 
-const mocks = vi.hoisted(() => ({ create: vi.fn(), search: vi.fn(), assign: vi.fn(), citizen: vi.fn(), professional: vi.fn(), me: vi.fn(), auth: vi.fn() }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), search: vi.fn(), assign: vi.fn(), citizen: vi.fn(), professional: vi.fn(), trends: vi.fn(), me: vi.fn(), auth: vi.fn() }));
 vi.mock("@/lib/diagnostics/api", () => ({ createDiagnosticTest: mocks.create, listDiagnosticTechnicians: mocks.search, assignDiagnosticTest: mocks.assign, listCitizenDiagnostics: mocks.citizen, listProfessionalDiagnostics: mocks.professional, transitionDiagnosticTest: vi.fn() }));
+vi.mock("@/lib/diagnostics/report-api", () => ({ listLabTrends: mocks.trends }));
 vi.mock("@/lib/professional/api", () => ({ loadProfessionalMe: mocks.me }));
 vi.mock("@/components/auth/auth-provider", () => ({ usePortalAuth: mocks.auth }));
 
@@ -16,7 +17,7 @@ const testRecord = {
 };
 
 describe("Diagnostic safety and assignment", () => {
-  beforeEach(() => { vi.clearAllMocks(); mocks.search.mockResolvedValue([]); });
+  beforeEach(() => { vi.clearAllMocks(); mocks.search.mockResolvedValue([]); mocks.trends.mockResolvedValue([]); });
 
   it("keeps failed requests and binds submission to the displayed visit", async () => {
     mocks.create.mockRejectedValue(new Error("Consultation changed"));
@@ -62,6 +63,20 @@ describe("Diagnostic safety and assignment", () => {
     render(<DiagnosticsPage portal="CITIZEN" />);
     expect(screen.getByText("Portal access required")).toBeInTheDocument();
     expect(mocks.citizen).not.toHaveBeenCalled();
+  });
+
+  it("merges citizen requests, finalized-result access, and trends into one diagnostic section", async () => {
+    mocks.auth.mockReturnValue({ status: "authenticated", isRequiredPortal: true, claims: { sid: "citizen" }, refreshSession: vi.fn() });
+    mocks.citizen.mockResolvedValue({ tests: [{ ...testRecord, status: "COMPLETED" }] });
+    render(<DiagnosticsPage portal="CITIZEN" />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "Diagnostic tests" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Requests and results" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Numeric result trends" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "View results" })).toHaveAttribute("href", "/citizen/diagnostic-tests/test-1");
+    expect(await screen.findByText("No numeric results")).toBeInTheDocument();
+    expect(mocks.citizen).toHaveBeenCalledOnce();
+    expect(mocks.trends).toHaveBeenCalledWith(1);
   });
 
   it("shows a retryable role failure instead of an endless spinner", async () => {

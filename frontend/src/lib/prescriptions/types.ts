@@ -11,6 +11,10 @@ export type PrescriptionItemView = PrescriptionItemPayload & {
 };
 
 export type PrescriptionPayload = {
+  chief_complaint: string | null;
+  clinical_notes: string | null;
+  diagnosis: string | null;
+  follow_up_instructions: string | null;
   items: PrescriptionItemPayload[];
   diagnostic_information: string | null;
   medical_advice: string | null;
@@ -23,9 +27,7 @@ export type PrescriptionView = Omit<PrescriptionPayload, "items"> & {
   citizen_id: string;
   author_doctor_role_registration_id: string;
   items: PrescriptionItemView[];
-  pdf_available: boolean;
-  pdf_file_name: string | null;
-  pdf_updated_at: string | null;
+  can_edit: boolean;
   created_at: string;
   updated_at: string;
 };

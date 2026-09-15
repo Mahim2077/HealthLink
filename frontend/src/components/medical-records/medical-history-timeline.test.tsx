@@ -77,7 +77,7 @@ describe("MedicalHistoryTimeline", () => {
     );
   });
 
-  it("does not offer cross-record navigation in the professional view", async () => {
+  it("lets a doctor open an authorized previous prescription", async () => {
     render(
       <MedicalHistoryTimeline
         loadAction={vi.fn().mockResolvedValue(page())}
@@ -85,6 +85,9 @@ describe("MedicalHistoryTimeline", () => {
       />,
     );
     await screen.findByText("Seasonal allergy");
-    expect(screen.queryByRole("link", { name: /open prescription/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open previous prescription/i })).toHaveAttribute(
+      "href",
+      "/professional/prescriptions/prescription-1",
+    );
   });
 });

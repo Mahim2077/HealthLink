@@ -50,21 +50,22 @@ describe("Doctor API", () => {
         verified: true,
       },
     ];
-    apiMocks.get.mockResolvedValue(summaries);
+    apiMocks.post.mockResolvedValue({ items: summaries, total: 1 });
 
     await expect(
       searchDoctors({ name: "Amina", weekday: "MONDAY", limit: 5 }),
-    ).resolves.toEqual(summaries);
+    ).resolves.toEqual({ items: summaries, total: 1 });
 
-    expect(apiMocks.get).toHaveBeenCalledWith(
-      "doctors?name=Amina&weekday=MONDAY&limit=5",
+    expect(apiMocks.post).toHaveBeenCalledWith(
+      "doctors/search",
+      { name: "Amina", weekday: "MONDAY", limit: 5 },
     );
   });
 
   it("omits empty filters from the doctor search query string", async () => {
-    apiMocks.get.mockResolvedValue([]);
-    await expect(searchDoctors({ facility_name: "  " })).resolves.toEqual([]);
-    expect(apiMocks.get).toHaveBeenCalledWith("doctors");
+    apiMocks.post.mockResolvedValue({ items: [], total: 0 });
+    await expect(searchDoctors({ facility_name: "  " })).resolves.toEqual({ items: [], total: 0 });
+    expect(apiMocks.post).toHaveBeenCalledWith("doctors/search", {});
   });
 
   it("loads the doctor profile with the user id path segment", async () => {

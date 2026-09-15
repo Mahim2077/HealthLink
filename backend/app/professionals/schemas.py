@@ -8,7 +8,11 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_va
 
 from app.auth.schemas import TokenResponse
 from app.facilities.schemas import FacilityResponse
-from app.professionals.constants import ProfessionalRoleCode, VerificationStatus
+from app.professionals.constants import (
+    DoctorSpecialization,
+    ProfessionalRoleCode,
+    VerificationStatus,
+)
 
 
 ProfessionalPassword = Annotated[SecretStr, Field(min_length=8, max_length=128)]
@@ -22,12 +26,15 @@ class ProfessionalApplicationFields(BaseModel):
     designation: Annotated[str, Field(min_length=1, max_length=150)]
     additional_info: Annotated[str, Field(min_length=1)]
     bmdc_registration_number: Annotated[str | None, Field(max_length=100)] = None
+    specialization: DoctorSpecialization | None = None
+    qualification: Annotated[str | None, Field(max_length=255)] = None
 
     @field_validator(
         "facility_name",
         "designation",
         "additional_info",
         "bmdc_registration_number",
+        "qualification",
         mode="before",
     )
     @classmethod
@@ -49,6 +56,11 @@ class ProfessionalApplicationFields(BaseModel):
             and self.bmdc_registration_number is not None
         ):
             raise ValueError("BM&DC Registration Number applies only to doctors.")
+        if self.role_code is ProfessionalRoleCode.DOCTOR:
+            if self.specialization is None:
+                self.specialization = DoctorSpecialization.GENERAL_MEDICINE
+        elif self.specialization is not None or self.qualification is not None:
+            raise ValueError("Specialization and qualification apply only to doctors.")
         return self
 
 

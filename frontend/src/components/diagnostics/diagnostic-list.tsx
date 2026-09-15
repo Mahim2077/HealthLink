@@ -76,7 +76,7 @@ export function DiagnosticList({ loadAction, transitionAction, role }: {
       </div>
       {role === "lab" && transitionAction && test.status === "REQUESTED" ? <button type="button" className="mt-4 min-h-11 rounded-xl bg-sky-700 px-4 text-sm font-bold text-white disabled:opacity-50" disabled={Boolean(pending)} onClick={() => void transition(test.id, "IN_PROGRESS")}>Begin work</button> : null}
       {role === "lab" && ["IN_PROGRESS", "COMPLETED"].includes(test.status) ? <Link className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-sky-700 px-4 text-sm font-bold text-white" href={`/professional/diagnostics/${test.id}/report`}>Open lab report</Link> : null}
-      {role === "citizen" && test.status === "COMPLETED" ? <Link className="mt-4 inline-flex min-h-11 items-center text-sm font-bold text-sky-800 underline" href={`/citizen/lab-reports/${test.id}`}>View lab report</Link> : null}
+      {role === "citizen" && test.status === "COMPLETED" ? <Link className="mt-4 inline-flex min-h-11 items-center text-sm font-bold text-sky-800 underline" href={`/citizen/diagnostic-tests/${test.id}`}>View results</Link> : null}
       {role === "doctor" && test.status === "REQUESTED" ? <>
         <AssignmentEditor test={test} disabled={Boolean(pending)} onSaved={updated => setData(current => current ? { tests: current.tests.map(item => item.id === updated.id ? updated : item) } : current)} />
         {transitionAction ? <button type="button" className="mt-4 min-h-11 rounded-xl border border-rose-200 px-4 text-sm font-bold text-rose-700 disabled:opacity-50" disabled={Boolean(pending)} onClick={() => void transition(test.id, "CANCELLED")}>Cancel request</button> : null}

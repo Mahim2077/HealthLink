@@ -115,8 +115,8 @@ function ReportLoader({ testId, portal }: { testId: string; portal: "CITIZEN" | 
 
 export function LabReportPage({ testId, portal }: { testId: string; portal: "CITIZEN" | "PROFESSIONAL" }) {
   return <main id="main-content" className="mx-auto w-full max-w-5xl flex-1 space-y-6 px-5 py-10 sm:px-8">
-    <Link href={portal === "CITIZEN" ? "/citizen/lab-reports" : "/professional/diagnostics"} className="text-sm font-semibold text-sky-800">Back to {portal === "CITIZEN" ? "lab reports" : "diagnostics"}</Link>
-    <h1 className="text-3xl font-bold">Lab report</h1>
+    <Link href={portal === "CITIZEN" ? "/citizen/diagnostic-tests" : "/professional/diagnostics"} className="text-sm font-semibold text-sky-800">Back to diagnostic tests</Link>
+    <h1 className="text-3xl font-bold">Diagnostic test results</h1>
     <LabPortalGate portal={portal}><ReportLoader key={testId} testId={testId} portal={portal} /></LabPortalGate>
   </main>;
 }

@@ -73,6 +73,10 @@ class PrescriptionPdfView:
     patient_age: str
     serial_label: str
     items: tuple[PrescriptionItemView, ...]
+    chief_complaint: str | None
+    clinical_notes: str | None
+    diagnosis: str | None
+    follow_up_instructions: str | None
     diagnostic_information: str | None
     medical_advice: str | None
     notes: str | None
@@ -157,6 +161,8 @@ def _doctor_block(styles: dict[str, ParagraphStyle], doctor: PrescriptionDoctor)
 
 
 def _items_table(styles: dict[str, ParagraphStyle], items: tuple[PrescriptionItemView, ...]) -> list:
+    if not items:
+        return [Paragraph("No medicines prescribed.", styles["body"])]
     header = ["Medicine", "Dosage", "Frequency", "Duration", "Instructions"]
     rows = [header]
     for item in items:
@@ -209,6 +215,12 @@ def generate_prescription_pdf_bytes(view: PrescriptionPdfView) -> bytes:
     _assert_no_forbidden_text(view.patient_name, "patient_name")
     _assert_no_forbidden_text(view.patient_age, "patient_age")
     _assert_no_forbidden_text(view.serial_label, "serial_label")
+    _assert_no_forbidden_text(view.chief_complaint, "chief_complaint")
+    _assert_no_forbidden_text(view.clinical_notes, "clinical_notes")
+    _assert_no_forbidden_text(view.diagnosis, "diagnosis")
+    _assert_no_forbidden_text(
+        view.follow_up_instructions, "follow_up_instructions"
+    )
     _assert_no_forbidden_text(view.diagnostic_information, "diagnostic_information")
     _assert_no_forbidden_text(view.medical_advice, "medical_advice")
     _assert_no_forbidden_text(view.notes, "notes")
@@ -243,6 +255,14 @@ def generate_prescription_pdf_bytes(view: PrescriptionPdfView) -> bytes:
     story.append(Spacer(1, 8))
     story.extend(_patient_block(styles, view))
     story.append(Spacer(1, 6))
+    story.extend(_optional_section(styles, "Chief complaint", view.chief_complaint))
+    story.extend(_optional_section(styles, "Clinical notes", view.clinical_notes))
+    story.extend(_optional_section(styles, "Diagnosis", view.diagnosis))
+    story.extend(
+        _optional_section(
+            styles, "Follow-up instructions", view.follow_up_instructions
+        )
+    )
     story.append(Paragraph("Medicines", styles["section"]))
     story.extend(_items_table(styles, view.items))
     story.extend(_optional_section(styles, "Diagnostic information", view.diagnostic_information))

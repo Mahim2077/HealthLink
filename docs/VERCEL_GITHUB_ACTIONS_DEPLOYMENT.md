@@ -67,9 +67,8 @@ At the time this deployment snapshot was prepared:
   at `0023_prescription_documents`.
 - Phase 14 backend, frontend, authorization, transaction, concurrency, and
   automatic-next-serial tests pass.
-- A private Vercel Blob store is connected to production, and the backend
-  selects it with `PRESCRIPTION_STORAGE_BACKEND=vercel_blob`.
-- The local filesystem adapter remains development-only.
+- Prescription PDFs are rendered from structured clinical data for each
+  authorized request; the application does not persist generated PDF files.
 
 The workflow deliberately retains every quality gate. The first production
 snapshot was released directly through Vercel CLI only because the owner
@@ -139,7 +138,6 @@ deployments are introduced later.
 | `APP_NAME` | `HealthLink` |
 | `APP_ENV` | `production` |
 | `DEBUG` | `false` |
-| `CRON_SECRET` | A separate random secret used only by the protected reminder worker |
 | `DATABASE_URL` | Production PostgreSQL/Supabase connection URL |
 | `DB_DISABLE_PREPARED_STATEMENTS` | `true` for a transaction-mode pooler; otherwise `false` |
 | `JWT_SECRET_KEY` | A cryptographically random secret of at least 32 characters |
@@ -147,9 +145,6 @@ deployments are introduced later.
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `7` |
 | `NEXT_PUBLIC_API_BASE_URL` | `/api/v1` |
-| `PRESCRIPTION_STORAGE_BACKEND` | `vercel_blob` |
-| `BLOB_READ_WRITE_TOKEN` | Automatically added by the linked private Vercel Blob store; treat as sensitive |
-| `PRESCRIPTION_STORAGE_PATH` | Not used in production; optional local-development path only |
 
 Vercel Services supplies a service-aware `FRONTEND_URL` for the service named
 `frontend`. This project also sets it explicitly to
@@ -172,13 +167,12 @@ Remove-Variable secret, bytes
 
 Paste the clipboard value directly into Vercel and GitHub secret forms.
 
-### Prescription PDF storage
+### Prescription PDF generation
 
-Vercel Functions have an ephemeral filesystem, so production must not select
-the local adapter. Create and link a private Blob store, retain its generated
-`BLOB_READ_WRITE_TOKEN`, and set `PRESCRIPTION_STORAGE_BACKEND=vercel_blob`.
-The backend uses versioned private objects and serves bytes only through the
-authorized `/api/v1/prescriptions/{id}/pdf` route.
+The backend stores only the structured prescription and consultation fields.
+Each authorized `/api/v1/prescriptions/{id}/pdf` request renders a fresh PDF in
+memory and streams it with `Cache-Control: private, no-store`; no Blob or local
+filesystem configuration is required.
 
 ## 5. Create the Vercel access token
 
@@ -205,7 +199,6 @@ Create:
 | `VERCEL_ORG_ID` | `orgId` from `.vercel/project.json` |
 | `VERCEL_PROJECT_ID` | `projectId` from `.vercel/project.json` |
 | `PRODUCTION_DATABASE_URL` | The same production database used by the backend |
-| `CRON_SECRET` | The same reminder-worker secret configured in Vercel |
 
 If GitHub CLI is installed, each command below securely prompts for its value:
 
@@ -214,15 +207,12 @@ gh secret set VERCEL_TOKEN
 gh secret set VERCEL_ORG_ID
 gh secret set VERCEL_PROJECT_ID
 gh secret set PRODUCTION_DATABASE_URL
-gh secret set CRON_SECRET
 ```
 
-Phase 19 reminder delivery is fail-closed by default. After the release that
-contains the reminder migrations and worker has completed successfully, create
-the GitHub Actions repository variable `REMINDERS_ENABLED` with value `true`.
-The scheduled workflow then invokes the stable production API every five
-minutes with `CRON_SECRET`; until that variable is enabled, scheduled jobs are
-skipped. Rotate the secret if either configured copy is exposed.
+Automated reminder delivery is intentionally not scheduled. The former
+GitHub Actions reminder workflow was removed to avoid creating recurring
+workflow-run entries. Citizen reminder records remain available in the product,
+but no background job delivers new in-app notifications.
 
 Create a GitHub environment named `production` under:
 
@@ -400,13 +390,11 @@ Use the provider's serverless/transaction-pooler connection string. Set
 `DB_DISABLE_PREPARED_STATEMENTS=true` when required by that pooler, keep TLS
 enabled in the URL, and place the Vercel function region near the database.
 
-### Prescription PDF disappears
+### Prescription PDF does not generate
 
-Confirm production still has `PRESCRIPTION_STORAGE_BACKEND=vercel_blob` and a
-valid `BLOB_READ_WRITE_TOKEN`. The local-storage adapter is development-only
-and must never be selected on Vercel's ephemeral filesystem. Check the private
-`healthlink-prescriptions` store and function logs without exposing storage
-tokens or raw object keys.
+Confirm the structured prescription and its linked visit still exist, then
+inspect the authorized PDF endpoint's function logs. The PDF is generated in
+memory per request, so there is no storage object or storage token to repair.
 
 ### Local Windows `vercel build` reports a missing lambda
 

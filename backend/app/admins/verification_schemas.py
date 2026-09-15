@@ -7,7 +7,11 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.facilities.schemas import FacilityResponse
-from app.professionals.constants import ProfessionalRoleCode, VerificationStatus
+from app.professionals.constants import (
+    DoctorSpecialization,
+    ProfessionalRoleCode,
+    VerificationStatus,
+)
 
 
 class ProfessionalRegistrationSummary(BaseModel):
@@ -28,6 +32,8 @@ class ProfessionalRegistrationSummary(BaseModel):
 class ProfessionalRegistrationDetail(ProfessionalRegistrationSummary):
     additional_info: str | None
     bmdc_registration_number: str | None
+    specialization: DoctorSpecialization | None
+    qualification: str | None
     facility: FacilityResponse | None
     verified_at: datetime | None
     verified_by: uuid.UUID | None
@@ -38,6 +44,16 @@ class ProfessionalRegistrationDetail(ProfessionalRegistrationSummary):
 class VerifyProfessionalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     facility_id: uuid.UUID
+    specialization: DoctorSpecialization | None = None
+    qualification: Annotated[str | None, Field(max_length=255)] = None
+
+    @field_validator("qualification", mode="before")
+    @classmethod
+    def strip_qualification(cls, value: object) -> object:
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return value
 
 
 class RejectProfessionalRequest(BaseModel):
