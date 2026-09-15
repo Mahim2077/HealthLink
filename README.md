@@ -2,9 +2,9 @@
 
 > **Agentic continuation:** read
 > [`AGENTIC_IMPLEMENTATION_HANDOFF_CURRENT.md`](AGENTIC_IMPLEMENTATION_HANDOFF_CURRENT.md)
-> before changing the repository. Phases 15–21 are released, and the current
-> dirty worktree contains verified, intentionally uncommitted post-Phase-21
-> improvements. The older baseline descriptions below remain historical
+> before changing the repository. Phases 15–21 and the post-Phase-21 doctor
+> discovery, diagnostics, and consultation improvements are released. The
+> older baseline descriptions below remain historical
 > context and must not be used to discard or recreate current work.
 
 HealthLink is a modular healthcare information platform with separate Citizen,

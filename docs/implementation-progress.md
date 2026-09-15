@@ -1002,7 +1002,20 @@ Phase 17 is complete, committed, pushed, migrated, and live in production.
 
 Phases 15–21 are verified, committed, migrated, and live in production.
 
-## Post-Phase 21 consultation and prescription consolidation — 2026-09-15, pending release
+## Post-Phase 21 product improvements — 2026-09-15, released
+
+- Citizen doctor discovery now uses a specialty-first hybrid search with six
+  common specialty shortcuts, unified doctor/specialty/facility search,
+  availability and facility filters, and five sort modes including nearest.
+  Nearest search asks before requesting approximate GPS; manual fallback uses
+  bilingual Bangladesh zila/upazila choices. Coordinate fields stay private and
+  are not returned by Citizen or Admin DTOs.
+- Admin facility management now captures zila, upazila, and a human-readable
+  registration address, while backend-only geocoding and confirmation determine
+  whether a facility participates in nearest sorting.
+- Citizen diagnostic requests, finalized results, and numeric trends now share
+  one `Diagnostic tests` section. Legacy lab-report and trend URLs redirect to
+  the unified section.
 
 - The doctor consultation workspace now saves the clinical summary, medicines,
   and prescription advice through one atomic structured request. A consultation
@@ -1020,7 +1033,34 @@ Phases 15–21 are verified, committed, migrated, and live in production.
   PostgreSQL-only tests skipped**), the complete frontend suite (**52 files / 239
   tests passed**), ESLint, TypeScript, Python AST parsing, `git diff --check`, and
   the optimized Next.js build.
-- Browser acceptance with synthetic local data confirmed the unified editor,
+- Browser acceptance with synthetic local data confirmed the modern doctor
+  discovery flow, private location behavior, unified diagnostics, the editor,
   previous-prescription navigation, read-only historical record, automatic fresh
   PDF preview, no framework error overlay, and no document row created by the PDF
-  request. Production was not accessed or modified.
+  request.
+
+### Production release
+
+- Release commit `c8d2f26` (`feat(platform): modernize discovery and clinical
+  workflows`) was pushed to `Mahim2077/HealthLink` `main`.
+- GitHub Actions run `34915012756` completed successfully in 4m 24s. Backend and
+  frontend quality gates passed, production migration completed in 36s, and the
+  Vercel build/deploy/smoke-test job passed in 1m 32s.
+- Production reached Alembic head `0030_doctor_locations`. The stable
+  `https://healthlink-sd.vercel.app/health` endpoint returned `healthy` with the
+  `production` environment.
+- Read-only production acceptance passed Citizen, Doctor, and Admin login and
+  routing; 3 verified doctors loaded in the redesigned search. The nearest sort
+  showed explicit approximate/manual/not-now choices; manual mode showed all 64
+  bilingual zila choices and a dependent upazila field without coordinate text
+  or values.
+- The unified Diagnostic tests page loaded and `/citizen/lab-reports` redirected
+  to it. Current-patient history exposed two prior-prescription links; the
+  selected historical record regenerated a new in-memory `blob:` PDF after
+  reload while explicitly stating that no PDF file is stored.
+- Admin facility management loaded the area selectors, registration address,
+  and existing facilities with private-location status. No coordinate labels or
+  numeric coordinate pairs appeared. The production browser console was clean.
+- `.github/workflows/reminders.yml` is deleted from `main`, so no future scheduled
+  `Deliver in-app reminders` workflow runs will be created. Existing reminder UI
+  and stored reminder data remain unchanged.

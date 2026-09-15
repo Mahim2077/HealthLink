@@ -13,12 +13,11 @@ Workspace:              D:\HealthLink_V_1
 Repository:             https://github.com/Mahim2077/HealthLink
 Production:             https://healthlink-sd.vercel.app/
 Branch:                 main
-Local HEAD:             cb075e21b652fd7d17d7f104fb1a30656ea57b44
-origin/main at handoff: cb075e21b652fd7d17d7f104fb1a30656ea57b44
-Released DB head:       0029_access_grant_scopes
-Pending local DB head:  0030_doctor_locations
-Released roadmap:       Phases 15–21
-Next roadmap phase:     Phase 22, only after the pending release is healthy
+Released app commit:    c8d2f26a836d39f3153b1af3e9ff9d4ac079ba9e
+GitHub Actions run:     34915012756 (successful, 4m 24s)
+Released DB head:       0030_doctor_locations
+Released roadmap:       Phases 15–21 plus approved product improvements
+Next roadmap phase:     Phase 22
 ```
 
 Relevant released commits:
@@ -27,19 +26,20 @@ Relevant released commits:
 fa07edf  feat(clinical): complete phases 15 through 17
 6ca19f6  feat(clinical): complete phases 18 through 21
 cb075e2  docs(phase-21): record production verification [skip ci]
+c8d2f26  feat(platform): modernize discovery and clinical workflows
 ```
 
-The current worktree is intentionally dirty. Recent owner-approved changes are
-implemented and verified locally but have **not** been committed, pushed,
-migrated, or deployed. Do not discard them.
+The product release is committed, pushed, migrated, and live on the stable
+production domain. The documentation-only release ledger may be the newest
+`[skip ci]` commit; no application deployment is required for that follow-up.
 
 ## 2. Mandatory reading order
 
 1. This file.
 2. `frontend/AGENTS.md`.
 3. `AGENTIC_IMPLEMENTATION_HANDOFF_PHASES_0_TO_14.md` for the historical base.
-4. The end of `docs/implementation-progress.md` for Phases 15–21 release
-   evidence and the pending prescription consolidation.
+4. The end of `docs/implementation-progress.md` for Phases 15–21 and the latest
+   product-release evidence.
 5. The `HealthLink doctor discovery and nearby-location flow` section in
    `design-qa.md`.
 6. `docs/implementation-assumptions.md` and
@@ -77,7 +77,7 @@ handoff files.
 - Production database and Vercel release are verified through migration
   `0029_access_grant_scopes`.
 
-## 4. Pending owner-approved work in the dirty tree
+## 4. Released post-Phase-21 product improvements
 
 ### 4.1 Modern doctor discovery
 
@@ -89,7 +89,7 @@ Implemented behavior:
 - six common specialty shortcuts and a complete normalized specialty catalog;
 - weekday and facility filters;
 - active-filter chips and a single clear action;
-- five sort modes: relevance, earliest availability, experience, name, nearest;
+- five sort modes: best match, earliest practice, nearest, doctor name, facility name;
 - meaningful specialization and qualification fields;
 - responsive desktop results table and mobile result cards;
 - existing booking and doctor-detail paths preserved.
@@ -140,7 +140,8 @@ Migration `0030_doctor_locations` adds:
 - location bounds/status constraints and area index;
 - doctor specialization and qualification plus specialization index.
 
-This migration is local/pending and has not been applied to production.
+This migration passed the clean PostgreSQL CI gate and was applied to
+production before the Vercel deployment was promoted.
 
 ### 4.2 Citizen diagnostics and lab results merged
 
@@ -234,13 +235,13 @@ Do not restore the previous save/upload/document-pointer flow.
 
 ### 4.5 GitHub reminder scheduler removed
 
-`.github/workflows/reminders.yml` is deleted in the working tree.
+`.github/workflows/reminders.yml` is deleted from `main`.
 
 Reason: its five-minute `schedule` event created GitHub workflow-run records
 before the job-level `REMINDERS_ENABLED` guard was evaluated, so disabled jobs
 still cluttered the Actions history.
 
-After the deletion is committed and pushed:
+After release:
 
 - no new scheduled reminder Action runs should be created;
 - historical Actions entries remain unless separately deleted;
@@ -267,7 +268,7 @@ Do not recreate a reminder scheduler unless the owner explicitly requests it.
 - Clinical audit entries contain access metadata, not copied clinical payloads.
 - Coordinates are sensitive implementation details and must remain backend-only.
 
-## 6. Verification evidence for current dirty tree
+## 6. Verification and production release evidence
 
 Latest complete local gates:
 
@@ -281,9 +282,9 @@ git diff --check:        passed; existing CRLF normalization warnings only
 Next.js production build: passed
 ```
 
-The 38 backend skips are explicit environment-gated PostgreSQL suites, not test
-failures. Before production release, run the available PostgreSQL migration and
-concurrency gates as appropriate for migration `0030`.
+The 38 local backend skips are explicit environment-gated PostgreSQL suites,
+not test failures. GitHub Actions subsequently ran the canonical clean
+PostgreSQL migration and backend gates successfully.
 
 Browser acceptance used synthetic local data only and verified:
 
@@ -300,25 +301,23 @@ Browser acceptance used synthetic local data only and verified:
 - no stored document row after regeneration;
 - no Next.js error overlay.
 
-The reminder-workflow deletion and handoff-document updates occurred after the
-code gates; they are YAML/Markdown-only and passed `git diff --check`.
+Release commit `c8d2f26` passed GitHub Actions run `34915012756` in 4m 24s:
+backend quality gates, frontend quality gates, production migration, Vercel
+deployment, and deployment smoke tests all succeeded. The stable `/health`
+endpoint returned `healthy` for the production environment.
+
+Read-only production browser acceptance verified Citizen, Doctor, and Admin
+login/routing, specialty-first doctor search, all five sort options, explicit
+nearest-location choice, 64 bilingual zila choices with dependent upazila,
+unified Diagnostic tests plus the legacy redirect, the combined consultation
+and prescription editor, prior-prescription navigation, and a fresh `blob:` PDF
+URL after reloading the historical record. No coordinate label/value appeared
+in the Citizen or Admin interface, and the browser console contained no warnings
+or errors.
 
 ## 7. Current source tree cautions
 
-Expect both modified and untracked files. Important untracked source includes:
-
-```text
-backend/alembic/versions/0030_doctor_discovery_locations.py
-backend/app/facilities/geocoding.py
-backend/app/locations/
-backend/tests/test_locations.py
-frontend/src/app/citizen/diagnostic-tests/[test_id]/
-frontend/src/components/citizen/doctor-search.test.tsx
-frontend/src/lib/doctors/specializations.ts
-frontend/src/lib/locations/
-```
-
-Important intended deletions include:
+Release commit `c8d2f26` intentionally deleted:
 
 ```text
 .github/workflows/reminders.yml
@@ -326,44 +325,21 @@ backend/app/prescriptions/storage.py
 backend/tests/test_prescription_storage.py
 ```
 
-Do not confuse any of these with disposable generated files.
+These deletions are released product decisions, not files to restore.
 
 Local ignored `.runtime`, `.env`, and `.vercel` material may exist. Preserve it,
 do not enumerate or expose secrets unnecessarily, and never commit it.
 
-## 8. Release procedure when explicitly authorized
+## 8. Release procedure for future changes
 
-The owner previously required commit/push/deploy to be a separate explicit
-prompt. Until that instruction arrives, stop before all external mutations.
-
-When authorized:
-
-1. Re-read the current diff and verify no credential or coordinate leakage.
-2. Run focused tests for any final edits.
-3. Run full backend/frontend gates, including migration checks and available
-   PostgreSQL-specific coverage.
-4. Confirm `0030_doctor_locations` is the single Alembic head and metadata
-   matches migrations.
-5. Commit the complete coherent pending work without dropping unrelated owner
-   changes.
-6. Push `main` to `Mahim2077/HealthLink` only with explicit approval.
-7. Observe the configured HealthLink CI/CD workflow through completion.
-8. Confirm production migration reaches `0030_doctor_locations`.
-9. Verify `https://healthlink-sd.vercel.app/`, `/health`, Citizen/Doctor/Admin
-   login routing, doctor search, admin facility confirmation, diagnostic
-   compatibility redirects, consultation, prior prescription access, and fresh
-   PDF generation.
-10. Confirm no new `Deliver in-app reminders` runs are scheduled after the
-    workflow deletion reaches the default branch.
-11. Record the release commit, Actions run, deployment, migration head, smoke
-    results, and known limitations in `docs/implementation-progress.md`.
-
-Do not include secret values in the commit, output, logs, or verification notes.
+The latest release is complete. For every future external release, obtain fresh
+owner authorization, run the full quality/migration gates, let GitHub Actions
+apply production migrations before Vercel promotion, verify the stable domain,
+and record exact evidence without including secret values.
 
 ## 9. Next roadmap work: Phase 22
 
-Phase 22 has not started. Do not write AI code before planning and before the
-pending release is stable.
+Phase 22 has not started. Do not write AI code before planning.
 
 Minimum Phase-22 design constraints:
 
@@ -391,19 +367,19 @@ Interpret these older statements as historical:
 
 ```text
 Start/continue from Phase 15
-    -> Phases 15–21 are released; finish the pending release, then Phase 22.
+    -> Phases 15–21 and the approved follow-up improvements are released; next is Phase 22.
 
 Phase-14 is the current production baseline
     -> Phase 21 is the released baseline.
 
 Alembic head is 0023_prescription_documents
-    -> Production is 0029; pending local head is 0030.
+    -> Production is at 0030_doctor_locations.
 
 Prescription PDFs use private Vercel Blob and document pointers
     -> New PDFs are regenerated in memory and are not persisted.
 
 PDF availability/file metadata is part of the response contract
-    -> Those fields are removed from the pending implementation.
+    -> Those fields are removed from the released implementation.
 
 GitHub reminder scheduling is disabled with REMINDERS_ENABLED
     -> The scheduled workflow is deleted; no scheduler is requested.
@@ -420,16 +396,15 @@ database provider or deployment architecture.
 
 A fresh agent is ready to act only when it can explain:
 
-- what is already released versus merely local;
-- why migration `0030` is pending;
+- what is already released and what remains for Phase 22;
+- why migration `0030` stores location fields privately;
 - why facility coordinates never reach DTOs/UI;
 - why grants and current-patient access are different;
 - why previous prescriptions may be readable but not editable;
 - why PDF regeneration must not create a stored object or document row;
 - why old diagnostic routes redirect rather than disappear;
-- why deleting the reminder workflow stops future history clutter only after a
-  push;
-- which tests already passed and which PostgreSQL gates remain release work;
+- why deleting the reminder workflow stopped future scheduled-run clutter;
+- which local and CI tests passed for the release;
 - which external operations require fresh owner authorization.
 
 If any answer is unclear, stop, search the repository, and update the internal
