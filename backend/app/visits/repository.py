@@ -10,9 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.appointments.models import (
     Appointment,
+    AppointmentStatus,
     AppointmentQueueEntry,
     DoctorPracticeSession,
     QueueStatus,
+    SessionStatus,
 )
 from app.auth.models import User
 from app.citizens.models import CitizenProfile
@@ -111,7 +113,7 @@ class VisitsRepository:
         if doctor_user is None:
             return None
 
-        # Find the most recent CURRENT queue entry authored by this doctor.
+        # CURRENT alone is not authority after session/appointment closure.
         queue_entry = self.db.scalar(
             select(AppointmentQueueEntry)
             .join(
@@ -119,6 +121,12 @@ class VisitsRepository:
                 DoctorPracticeSession.id
                 == AppointmentQueueEntry.practice_session_id,
             )
+            .join(Appointment, Appointment.id == AppointmentQueueEntry.appointment_id)
+            .where(DoctorPracticeSession.status == SessionStatus.ACTIVE.value,
+                   Appointment.status == AppointmentStatus.BOOKED.value,
+                   Appointment.doctor_role_registration_id == registration.id,
+                   Appointment.facility_id == DoctorPracticeSession.facility_id,
+                   Appointment.appointment_date == DoctorPracticeSession.session_date)
             .where(
                 DoctorPracticeSession.doctor_role_registration_id
                 == registration.id
@@ -202,12 +210,17 @@ class VisitsRepository:
             )
             .where(AppointmentQueueEntry.id == queue_id)
             .where(AppointmentQueueEntry.queue_status == QueueStatus.CURRENT.value)
+            .where(DoctorPracticeSession.status == SessionStatus.ACTIVE.value)
+            .join(Appointment, Appointment.id == AppointmentQueueEntry.appointment_id)
+            .where(Appointment.facility_id == DoctorPracticeSession.facility_id,
+                   Appointment.appointment_date == DoctorPracticeSession.session_date)
         )
         if queue_entry is None:
             return None
 
         appointment = self.db.get(Appointment, queue_entry.appointment_id)
-        if appointment is None:
+        if (appointment is None or appointment.status != AppointmentStatus.BOOKED.value
+            or appointment.doctor_role_registration_id != registration.id):
             return None
         citizen = self.db.get(CitizenProfile, appointment.citizen_id)
         if citizen is None:

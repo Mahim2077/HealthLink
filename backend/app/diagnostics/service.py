@@ -108,11 +108,12 @@ class DiagnosticsService:
     def eligible_technicians(self, facility_id: uuid.UUID, search: str | None) -> list[DiagnosticTechnicianChoice]:
         return [DiagnosticTechnicianChoice(role_registration_id=row["registration"].id, full_name=" ".join(filter(None, (row["user"].first_name, row["user"].last_name))), designation=row["registration"].designation, facility_id=row["facility"].id, facility_name=row["facility"].name) for row in self.repository.eligible_technicians(facility_id, search)]
 
-    def list_citizen(self, citizen_id: uuid.UUID) -> list[DiagnosticTestView]:
-        return self.views(self.repository.list_for_citizen(citizen_id))
+    def list_citizen(self, citizen_id: uuid.UUID, page=1, page_size=50) -> list[DiagnosticTestView]:
+        return self.views(self.repository.list_for_citizen(citizen_id, page, page_size))
 
-    def list_professional(self, registration: ProfessionalRoleRegistration) -> list[DiagnosticTestView]:
-        return self.views(self.repository.list_for_registration(registration.id, registration.role.code))
+    def list_professional(self, registration: ProfessionalRoleRegistration, page=1, page_size=50) -> list[DiagnosticTestView]:
+        return self.views(self.repository.list_for_registration(registration.id, registration.role.code,
+            page, page_size, registration.facility_id))
 
     def views(self, tests: list[DiagnosticTest]) -> list[DiagnosticTestView]:
         names = self.repository.names(tests)

@@ -35,7 +35,7 @@ function AssignmentEditor({ test, onSaved, disabled }: {
 }
 
 export function DiagnosticList({ loadAction, transitionAction, role }: {
-  loadAction: () => Promise<DiagnosticTestList>;
+  loadAction: (page?: number) => Promise<DiagnosticTestList>;
   transitionAction?: (id: string, status: DiagnosticStatus) => Promise<unknown>;
   role: "citizen" | "doctor" | "lab";
 }) {
@@ -44,13 +44,14 @@ export function DiagnosticList({ loadAction, transitionAction, role }: {
   const [actionError, setActionError] = useState("");
   const [version, setVersion] = useState(0);
   const [pending, setPending] = useState("");
+  const [page, setPage] = useState(1);
   const inFlight = useRef(false);
   useEffect(() => {
     let active = true;
-    void loadAction().then(value => { if (active) { setData(value); setError(""); } },
+    void loadAction(page).then(value => { if (active) { setData(value); setError(""); } },
       reason => { if (active) setError(reason instanceof Error ? reason.message : "Unable to load diagnostic tests"); });
     return () => { active = false; };
-  }, [loadAction, version]);
+  }, [loadAction, version, page]);
   const transition = async (id: string, status: DiagnosticStatus) => {
     if (!transitionAction || inFlight.current) return;
     if (status === "CANCELLED" && !window.confirm("Cancel this diagnostic request?")) return;
@@ -61,7 +62,8 @@ export function DiagnosticList({ loadAction, transitionAction, role }: {
   };
   if (error) return <ErrorState message={error} onAction={() => { setData(null); setError(""); setVersion(value => value + 1); }} title="Diagnostic tests unavailable" />;
   if (!data) return <LoadingState label="Loading diagnostic tests" description="Fetching diagnostic requests." />;
-  if (!data.tests.length) return <EmptyState icon={<BeakerIcon aria-hidden="true" className="size-6" />} title="No diagnostic tests" message="No diagnostic requests are available for this account." />;
+  const changePage = (next: number) => { setData(null); setError(""); setActionError(""); setPage(next); };
+  if (!data.tests.length) return <EmptyState icon={<BeakerIcon aria-hidden="true" className="size-6" />} title="No diagnostic tests" message="No diagnostic requests are available on this page." action={page > 1 ? <button type="button" className="min-h-11 font-bold text-sky-700" onClick={() => changePage(page - 1)}>Previous page</button> : undefined} />;
   return <div className="space-y-4">
     {actionError ? <p role="alert" className="rounded-xl bg-rose-50 p-3 text-rose-800">{actionError}</p> : null}
     {data.tests.map(test => <article className="hl-card p-5" key={test.id}>
@@ -78,9 +80,14 @@ export function DiagnosticList({ loadAction, transitionAction, role }: {
       {role === "lab" && ["IN_PROGRESS", "COMPLETED"].includes(test.status) ? <Link className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-sky-700 px-4 text-sm font-bold text-white" href={`/professional/diagnostics/${test.id}/report`}>Open lab report</Link> : null}
       {role === "citizen" && test.status === "COMPLETED" ? <Link className="mt-4 inline-flex min-h-11 items-center text-sm font-bold text-sky-800 underline" href={`/citizen/diagnostic-tests/${test.id}`}>View results</Link> : null}
       {role === "doctor" && test.status === "REQUESTED" ? <>
-        <AssignmentEditor test={test} disabled={Boolean(pending)} onSaved={updated => setData(current => current ? { tests: current.tests.map(item => item.id === updated.id ? updated : item) } : current)} />
+        <AssignmentEditor test={test} disabled={Boolean(pending)} onSaved={updated => setData(current => current ? { ...current, tests: current.tests.map(item => item.id === updated.id ? updated : item) } : current)} />
         {transitionAction ? <button type="button" className="mt-4 min-h-11 rounded-xl border border-rose-200 px-4 text-sm font-bold text-rose-700 disabled:opacity-50" disabled={Boolean(pending)} onClick={() => void transition(test.id, "CANCELLED")}>Cancel request</button> : null}
       </> : null}
     </article>)}
+    <nav aria-label="Diagnostic test pages" className="flex flex-wrap items-center justify-between gap-3">
+      <button type="button" className="min-h-11 rounded-xl border border-slate-200 px-4 font-bold disabled:opacity-50" disabled={page === 1 || Boolean(pending)} onClick={() => changePage(page - 1)}>Previous page</button>
+      <span className="text-sm text-slate-600">Page {page}</span>
+      <button type="button" className="min-h-11 rounded-xl border border-slate-200 px-4 font-bold disabled:opacity-50" disabled={!data.has_next || Boolean(pending)} onClick={() => changePage(page + 1)}>Next page</button>
+    </nav>
   </div>;
 }

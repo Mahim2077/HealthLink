@@ -4,6 +4,7 @@ import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useUnsavedChanges } from "@/components/ui/use-unsaved-changes";
+import { PrescriptionExplanation } from "@/components/ai/prescription-explanation";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import {
@@ -92,6 +93,7 @@ export function PrescriptionPanel({
   initialConsultation,
   onSaved,
   autoGeneratePdf = false,
+  showAiExplanation = false,
 }: {
   visitId?: string;
   prescriptionId?: string | null;
@@ -102,6 +104,7 @@ export function PrescriptionPanel({
   initialConsultation?: ConsultationFields;
   onSaved?: (prescription: PrescriptionView) => void;
   autoGeneratePdf?: boolean;
+  showAiExplanation?: boolean;
 }) {
   const [loadState, setLoadState] = useState<LoadState>(() =>
     prescriptionId
@@ -308,6 +311,9 @@ export function PrescriptionPanel({
             </div>
           ) : null}
         </div>
+      ) : null}
+      {prescription && showAiExplanation ? (
+        <PrescriptionExplanation prescriptionId={prescription.id} />
       ) : null}
     </section>
   );

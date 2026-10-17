@@ -83,6 +83,7 @@ export function PrescriptionPage({
       className="mx-auto w-full max-w-6xl flex-1 px-5 py-10 sm:px-8 lg:px-10"
       id="main-content"
     >
+      <h1 className="sr-only">Prescription</h1>
       <Link
         className="inline-flex items-center gap-2 text-sm font-bold text-teal-700 hover:text-teal-900"
         href={backPath}
@@ -92,9 +93,11 @@ export function PrescriptionPage({
       </Link>
       <div className="mt-6">
         <PrescriptionPanel
+          key={`${auth.claims?.sid}-${prescriptionId}`}
           autoGeneratePdf={portal === "PROFESSIONAL"}
           editable={portal === "PROFESSIONAL"}
           prescriptionId={prescriptionId}
+          showAiExplanation={portal === "CITIZEN"}
         />
       </div>
     </main>

@@ -5,6 +5,10 @@ from app.access.routes import router as access_router
 from app.access.history_routes import router as shared_history_router
 from app.reminders.routes import router as reminders_router
 from app.locations.routes import router as locations_router
+from app.ai.routes import router as ai_router
+from app.ai.assistant_routes import router as ai_assistant_router
+from app.ai.clinical_routes import router as ai_clinical_router
+from app.dashboards.routes import router as dashboards_router
 
 from app.admins.routes import admin_router
 from app.admins.routes import auth_router as admin_auth_router
@@ -36,12 +40,16 @@ from app.visits.routes import (
 
 
 api_router = APIRouter()
+api_router.include_router(dashboards_router)
 api_router.include_router(emergency_router)
 api_router.include_router(clinical_audit_router)
 api_router.include_router(access_router)
 api_router.include_router(shared_history_router)
 api_router.include_router(reminders_router)
 api_router.include_router(locations_router)
+api_router.include_router(ai_router)
+api_router.include_router(ai_clinical_router)
+api_router.include_router(ai_assistant_router)
 
 api_router.include_router(auth_router)
 api_router.include_router(citizen_auth_router)

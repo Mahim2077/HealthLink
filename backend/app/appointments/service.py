@@ -508,6 +508,12 @@ class AppointmentService:
             )
 
         try:
+            # Activation and first-patient promotion share the advisory-locked
+            # transaction. Reopening must retain an existing CURRENT patient.
+            current = self.repository.current_queue_entry(session.id)
+            if current is None:
+                current = self._promote_lowest_waiting(session.id)
+            result = self._build_session_view(session, facility, current)
             self.db.commit()
         except IntegrityError as error:
             self.db.rollback()
@@ -515,13 +521,7 @@ class AppointmentService:
                 "Unable to start chamber session."
             ) from error
 
-        self.db.refresh(session)
-
-        # Immediately promote the lowest WAITING serial so the doctor has a
-        # patient to work with the moment the session opens.
-        promoted = self._promote_lowest_waiting(session.id)
-
-        return self._build_session_view(session, facility, promoted)
+        return result
 
     def view_today_queue(
         self,

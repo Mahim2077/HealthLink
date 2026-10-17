@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useEffect, useState, type ComponentType, type SVGProps } from "react";
 
 import { usePortalAuth } from "@/components/auth/auth-provider";
+import { AdminCareOverview } from "@/components/dashboards/care-overview";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import { loadAdminMe } from "@/lib/admin/api";
 import type { AdminMe } from "@/lib/admin/types";
@@ -48,7 +49,7 @@ const adminActions: AdminAction[] = [
   },
 ];
 
-export function AdminDashboard({
+function AdminDashboardContent({
   loadAction = loadAdminMe,
 }: {
   loadAction?: () => Promise<AdminMe>;
@@ -165,6 +166,8 @@ export function AdminDashboard({
         </div>
       </header>
 
+      <AdminCareOverview />
+
       <section className="mt-10" aria-labelledby="admin-work-title">
         <h2 className="text-2xl font-bold tracking-[-0.04em] text-slate-950 sm:text-3xl" id="admin-work-title">
           Administrative workspace
@@ -190,4 +193,9 @@ export function AdminDashboard({
       </section>
     </main>
   );
+}
+
+export function AdminDashboard({ loadAction = loadAdminMe }: { loadAction?: () => Promise<AdminMe> }) {
+  const auth = usePortalAuth("ADMIN");
+  return <AdminDashboardContent key={auth.claims?.sid ?? "signed-out"} loadAction={loadAction} />;
 }

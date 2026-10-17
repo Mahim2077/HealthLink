@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { usePortalAuth } from "@/components/auth/auth-provider";
+import { CitizenCareOverview } from "@/components/dashboards/care-overview";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import { loadCitizenDashboard } from "@/lib/citizen/api";
 import { citizenErrorMessage } from "@/lib/citizen/presentation";
@@ -155,6 +156,8 @@ function DashboardContent({
         </div>
       </section>
 
+      <CitizenCareOverview />
+
       <section className="mt-10" aria-labelledby="care-links-title">
         <h2
           className="text-2xl font-bold tracking-[-0.04em] text-slate-950 sm:text-3xl"
@@ -231,7 +234,7 @@ export function CitizenDashboard({
 
   return (
     <DashboardContent
-      key={auth.claims?.sub ?? "citizen"}
+      key={auth.claims?.sid ?? "citizen"}
       loadAction={loadAction}
     />
   );

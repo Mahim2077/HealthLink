@@ -15,12 +15,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version="0.1.0",
     )
     application.state.settings = application_settings
+    application.state.ai_provider = None
 
     @application.middleware("http")
     async def private_authenticated_responses(request, call_next):
         response = await call_next(request)
-        if request.headers.get("authorization"):
+        # Login/refresh responses also contain credentials without a bearer header.
+        if request.headers.get("authorization") or request.url.path.startswith("/api/v1/auth/"):
             response.headers["Cache-Control"] = "private, no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
     application.add_middleware(

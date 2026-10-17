@@ -41,10 +41,9 @@ def _build_access(
     repository: VisitsRepository,
     queue_id: uuid.UUID | None = None,
 ) -> CurrentPatientAccess:
-    del registration_id  # kept for future grant-lookup wiring
     if queue_id is not None:
         ctx = repository.load_queue_entry_for_doctor(doctor_user_id, queue_id)
-        if ctx is None:
+        if ctx is None or ctx.appointment.doctor_role_registration_id != registration_id:
             raise HealthLinkError(
                 "Queue entry is not your current chamber patient.",
                 status_code=404,
@@ -52,7 +51,7 @@ def _build_access(
         return CurrentPatientAccess(context=ctx, source="queue")
 
     ctx = repository.load_current_patient_for_doctor(doctor_user_id)
-    if ctx is not None:
+    if ctx is not None and ctx.appointment.doctor_role_registration_id == registration_id:
         return CurrentPatientAccess(context=ctx, source="queue")
 
     # Manual grants are reserved for Phase 14+; Phase 12 requires an
@@ -82,7 +81,7 @@ def get_current_patient_access_for_doctor(
 
     repository = VisitsRepository(db)
     ctx = repository.load_current_patient_for_doctor(context.auth.user.id)
-    if ctx is None:
+    if ctx is None or ctx.appointment.doctor_role_registration_id != context.role_registration.id:
         return None
     return CurrentPatientAccess(context=ctx, source="queue")
 

@@ -64,6 +64,10 @@ describe("PortalNavigation", () => {
       "href",
       "/citizen/diagnostic-tests",
     );
+    expect(screen.getByRole("link", { name: "AI assistant" })).toHaveAttribute(
+      "href",
+      "/citizen/ai-assistant",
+    );
     expect(screen.queryByRole("link", { name: "Lab reports" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "My profile" })).toHaveAttribute(
       "href",

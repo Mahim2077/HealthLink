@@ -3,6 +3,25 @@
 This guide deploys the existing HealthLink monorepo as one Vercel project named
 `healthlink-sd` through GitHub Actions.
 
+> **Latest local checkpoint: 2026-10-17.** The last verified released application
+> is `c8d2f26` (Phases 15–21 and approved product improvements), with migration
+> `0030_doctor_locations`. Later AI/dashboard/security changes remain local.
+> Production has not been re-inspected in this continuation. The owner explicitly
+> withheld deployment approval. Read `PHASES_28_31_RELEASE_READINESS.md` and the
+> current handover first. A push or manual Actions run on `main` can deploy;
+> do not trigger one simply to test local readiness.
+>
+> Final local repairs/acceptance passed: 532 backend tests, 263 frontend tests,
+> 8 production-build browser cases and 9 live synthetic AI/UI cases. See
+> `PHASE_31_LOCAL_RELEASE_REPORT.md`. This does not change the release hold.
+
+> **2026-10-18 update:** the owner has authorized release and production Groq
+> configuration. The CI ordering defect is repaired in the candidate: one release
+> job lock covers migration through promotion, stale main commits fail closed,
+> the staged production URL is smoke-tested before promotion, and the stable
+> domain is checked afterwards. See `PRODUCTION_RELEASE_2026_10_18.md` for actual
+> release status; the older hold/evidence above is historical.
+
 The production surface is:
 
 | URL | Service |
@@ -20,7 +39,7 @@ Instead, Vercel Services builds `frontend/` and `backend/` independently and
 merges their routes behind the same project domain according to the root
 `vercel.json`.
 
-### Current Vercel setup state (2026-09-04)
+### Historical Vercel setup state (2026-09-04)
 
 - Vercel CLI 59.10.0 is authenticated locally as `mahimchow2077-3904`.
 - `mahimchow2077-3904s-projects/healthlink-sd` has been created and linked to the
@@ -52,14 +71,17 @@ The workflow in `.github/workflows/ci-cd.yml` performs this sequence:
 5. Run frontend lint, TypeScript, Vitest, and production-build checks.
 6. On `main` only, upgrade the production database.
 7. Build both Vercel Services.
-8. Deploy one prebuilt production application.
-9. Smoke-test `/` and `/health`.
+8. Stage one prebuilt production application without assigning live domains.
+9. Smoke-test the staged URL, recheck main, promote that tested build, then
+   smoke-test the generated deployment URL and stable production domain with
+   `scripts/smoke_release.py`: process health, home/three sign-in pages and four
+   anonymous-denial API probes. This is not authenticated journey verification.
 
 Pull requests run only the CI jobs. They do not migrate production or deploy.
 A push to `main`, or a manual run on `main`, can deploy only after both CI jobs
 pass.
 
-### Current repository checkpoint
+### Historical Phase-14 repository checkpoint
 
 At the time this deployment snapshot was prepared:
 

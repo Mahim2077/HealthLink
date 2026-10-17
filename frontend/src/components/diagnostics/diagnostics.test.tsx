@@ -65,6 +65,23 @@ describe("Diagnostic safety and assignment", () => {
     expect(mocks.citizen).not.toHaveBeenCalled();
   });
 
+  it("pages diagnostic records without leaving old page data visible", async () => {
+    const load = vi.fn().mockImplementation(async (page: number) => ({
+      tests: [{ ...testRecord, id: `test-${page}`, test_name: `Page ${page} test` }],
+      page, page_size: 1, has_next: page === 1,
+    }));
+    render(<DiagnosticList loadAction={load} role="citizen" />);
+    await screen.findByRole("heading", { name: "Page 1 test" });
+    expect(screen.getByRole("button", { name: "Previous page" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.queryByRole("heading", { name: "Page 1 test" })).not.toBeInTheDocument();
+    await screen.findByRole("heading", { name: "Page 2 test" });
+    expect(load).toHaveBeenLastCalledWith(2);
+    expect(screen.getByRole("button", { name: "Next page" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Previous page" }));
+    await screen.findByRole("heading", { name: "Page 1 test" });
+  });
+
   it("merges citizen requests, finalized-result access, and trends into one diagnostic section", async () => {
     mocks.auth.mockReturnValue({ status: "authenticated", isRequiredPortal: true, claims: { sid: "citizen" }, refreshSession: vi.fn() });
     mocks.citizen.mockResolvedValue({ tests: [{ ...testRecord, status: "COMPLETED" }] });

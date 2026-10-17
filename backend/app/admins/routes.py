@@ -221,9 +221,30 @@ def confirm_facility_location(
     )
 
 
+@admin_router.post(
+    "/citizen-identities/search",
+    response_model=list[CitizenIdentitySummary],
+)
+def search_citizen_identities_private(
+    query: CitizenIdentitySearchQuery,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
+) -> list[CitizenIdentitySummary]:
+    _require_active_admin(request, db, context)
+    return CitizenIdentitySupportService(db).search(
+        nid_number=query.nid_number,
+        birth_certificate_number=query.birth_certificate_number,
+        email=str(query.email) if query.email else None,
+        user_id=query.user_id,
+        limit=query.limit,
+    )
+
+
 @admin_router.get(
     "/citizen-identities/search",
     response_model=list[CitizenIdentitySummary],
+    deprecated=True,
 )
 def search_citizen_identities(
     request: Request,

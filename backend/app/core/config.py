@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, PositiveInt, field_validator
+from pydantic import Field, PositiveInt, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -67,6 +67,40 @@ class Settings(BaseSettings):
         default=7,
         validation_alias="REFRESH_TOKEN_EXPIRE_DAYS",
     )
+    ai_enabled: bool = Field(default=False, validation_alias="AI_ENABLED")
+    ai_provider: Literal["mock", "gemini", "groq"] = Field(
+        default="groq",
+        validation_alias="AI_PROVIDER",
+    )
+    ai_api_key: str = Field(
+        default="",
+        validation_alias="AI_API_KEY",
+        repr=False,
+    )
+    ai_model: str = Field(
+        default="",
+        validation_alias="AI_MODEL",
+    )
+    ai_record_context_enabled: bool = Field(
+        default=False,
+        validation_alias="AI_RECORD_CONTEXT_ENABLED",
+    )
+    ai_timeout_seconds: PositiveInt = Field(
+        default=20,
+        validation_alias="AI_TIMEOUT_SECONDS",
+        le=60,
+    )
+    ai_max_input_characters: PositiveInt = Field(
+        default=12_000,
+        validation_alias="AI_MAX_INPUT_CHARACTERS",
+        ge=2_000,
+        le=50_000,
+    )
+    ai_max_context_records: PositiveInt = Field(
+        default=10,
+        validation_alias="AI_MAX_CONTEXT_RECORDS",
+        le=25,
+    )
 
     @field_validator("debug", mode="before")
     @classmethod
@@ -87,10 +121,32 @@ class Settings(BaseSettings):
         "geocoder_base_url",
         "geocoder_user_agent",
         "jwt_secret_key",
+        "ai_api_key",
+        "ai_model",
     )
     @classmethod
     def strip_surrounding_whitespace(cls, value: str) -> str:
         return value.strip()
+
+    @model_validator(mode="after")
+    def validate_ai_configuration(self) -> "Settings":
+        # A provider switch without AI_MODEL must not send a Gemini model ID to
+        # Groq (or vice versa). Explicit model overrides remain replaceable.
+        if not self.ai_model:
+            self.ai_model = (
+                "gemini-3.5-flash"
+                if self.ai_provider == "gemini"
+                else "qwen/qwen3.8-27b"
+            )
+        if self.ai_record_context_enabled and not self.ai_enabled:
+            raise ValueError(
+                "AI_RECORD_CONTEXT_ENABLED requires AI_ENABLED=true."
+            )
+        if self.ai_enabled and self.ai_provider != "mock" and not self.ai_api_key:
+            raise ValueError(
+                "AI_API_KEY is required when an external AI provider is enabled."
+            )
+        return self
 
     @property
     def cors_origins(self) -> list[str]:

@@ -37,6 +37,9 @@ jobs:
       JWT_ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: "30"
       REFRESH_TOKEN_EXPIRE_DAYS: "7"
+      AI_ENABLED: "false"
+      AI_PROVIDER: mock
+      AI_RECORD_CONTEXT_ENABLED: "false"
       FRONTEND_URL: http://localhost:3000
     steps:
       - name: Check out repository
@@ -102,23 +105,24 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-  migrate-production:
-    name: Migrate production database
+  release-production:
+    name: Migrate, stage, verify and promote production
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs:
       - backend-quality
       - frontend-quality
     runs-on: ubuntu-latest
     environment: production
+    # One non-cancelling lock covers migration, staging, smoke and promotion.
+    # Never split this lifecycle into separately locked jobs.
     concurrency:
       group: healthlink-production
       cancel-in-progress: false
-    env:
-      APP_ENV: production
-      DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -132,39 +136,30 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r backend/requirements.txt
 
+      - name: Reject stale release before production migration
+        run: python scripts/check_release_head.py
+
+      - name: Verify the owner-approved Vercel target
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          test "$VERCEL_ORG_ID" = 'team_l9GeumDweBdowhhoxPfAS0yM'
+          test "$VERCEL_PROJECT_ID" = 'prj_kQyhfaS1tFS7NXlUMYr9C0FA8W5f'
+
       - name: Upgrade production database
         working-directory: backend
+        env:
+          APP_ENV: production
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
         run: |
           python -m alembic upgrade head
           python -m alembic current
-
-  deploy-production:
-    name: Deploy healthlink to Vercel
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs:
-      - migrate-production
-    runs-on: ubuntu-latest
-    environment: production
-    concurrency:
-      group: healthlink-production
-      cancel-in-progress: false
-    env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "24"
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.13"
 
       - name: Install uv for Vercel Python builds
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -175,24 +170,56 @@ jobs:
         run: npm install --global vercel@59.10.0
 
       - name: Pull Vercel production configuration
-        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel pull --yes --environment=production
 
       - name: Build both Vercel services
-        run: vercel build --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel build --prod
 
-      - name: Deploy prebuilt application
+      - name: Reject stale release before staging
+        run: python scripts/check_release_head.py
+
+      - name: Stage prebuilt production application without changing live domains
         id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         shell: bash
         run: |
-          deployment_url="$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")"
+          set -euo pipefail
+          deployment_url="$(vercel deploy --prebuilt --prod --skip-domain)"
+          python -c 'import sys; from scripts.smoke_release import validate_target; validate_target(sys.argv[1])' "$deployment_url"
           echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
 
-      - name: Smoke-test frontend and API
+      - name: Smoke-test staged production deployment
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+        run: python scripts/smoke_release.py "$DEPLOYMENT_URL"
+
+      - name: Reject stale release before promotion
+        run: python scripts/check_release_head.py
+
+      - name: Promote the tested production deployment
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel promote "$DEPLOYMENT_URL" --yes
+
+      - name: Smoke-test stable production domain after promotion
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
         run: |
-          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 5 "$DEPLOYMENT_URL/health"
-          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 5 --head "$DEPLOYMENT_URL/"
+          python scripts/smoke_release.py "$DEPLOYMENT_URL" https://healthlink-sd.vercel.app
 
       - name: Publish deployment summary
         env:
@@ -203,6 +230,7 @@ jobs:
             echo "### HealthLink production deployment"
             echo ""
             echo "- Application: $DEPLOYMENT_URL"
+            echo "- Stable production: https://healthlink-sd.vercel.app/"
             echo "- Health check: $DEPLOYMENT_URL/health"
             echo "- API base: $DEPLOYMENT_URL/api/v1"
           } >> "$GITHUB_STEP_SUMMARY"

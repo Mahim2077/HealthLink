@@ -119,25 +119,25 @@ export type CitizenIdentitySearchFilters = {
 export async function searchCitizenIdentities(
   filters: CitizenIdentitySearchFilters,
 ): Promise<CitizenIdentitySummary[]> {
-  const params = new URLSearchParams();
+  const payload: CitizenIdentitySearchFilters = {};
   if (filters.nid_number && filters.nid_number.trim()) {
-    params.set("nid_number", filters.nid_number.trim());
+    payload.nid_number = filters.nid_number.trim();
   }
   if (filters.birth_certificate_number && filters.birth_certificate_number.trim()) {
-    params.set("birth_certificate_number", filters.birth_certificate_number.trim());
+    payload.birth_certificate_number = filters.birth_certificate_number.trim();
   }
   if (filters.email && filters.email.trim()) {
-    params.set("email", filters.email.trim());
+    payload.email = filters.email.trim();
   }
   if (filters.user_id && filters.user_id.trim()) {
-    params.set("user_id", filters.user_id.trim());
+    payload.user_id = filters.user_id.trim();
   }
   if (filters.limit) {
-    params.set("limit", String(filters.limit));
+    payload.limit = filters.limit;
   }
-  const query = params.toString();
-  return apiClient.get<CitizenIdentitySummary[]>(
-    `admin/citizen-identities/search${query ? `?${query}` : ""}`,
+  // Identity filters belong in the body, not browser URLs or access logs.
+  return apiClient.post<CitizenIdentitySummary[], CitizenIdentitySearchFilters>(
+    "admin/citizen-identities/search", payload,
   );
 }
 

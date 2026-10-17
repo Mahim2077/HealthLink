@@ -67,12 +67,19 @@ class DiagnosticsRepository:
             )
         ).one_or_none()
 
-    def list_for_citizen(self, citizen_id: uuid.UUID) -> list[DiagnosticTest]:
-        return list(self.db.scalars(select(DiagnosticTest).where(DiagnosticTest.citizen_id == citizen_id).order_by(DiagnosticTest.created_at.desc(), DiagnosticTest.id.desc())))
+    def list_for_citizen(self, citizen_id: uuid.UUID, page=1, page_size=50) -> list[DiagnosticTest]:
+        return list(self.db.scalars(select(DiagnosticTest).where(DiagnosticTest.citizen_id == citizen_id)
+            .order_by(DiagnosticTest.created_at.desc(), DiagnosticTest.id.desc())
+            .offset((page - 1) * page_size).limit(page_size + 1)))
 
-    def list_for_registration(self, registration_id: uuid.UUID, role_code: str) -> list[DiagnosticTest]:
+    def list_for_registration(self, registration_id: uuid.UUID, role_code: str, page=1, page_size=50, facility_id=None) -> list[DiagnosticTest]:
         field = DiagnosticTest.requested_by_role_registration_id if role_code == ProfessionalRoleCode.DOCTOR.value else DiagnosticTest.assigned_to_role_registration_id
-        return list(self.db.scalars(select(DiagnosticTest).where(field == registration_id).order_by(DiagnosticTest.created_at.desc(), DiagnosticTest.id.desc())))
+        statement = select(DiagnosticTest).where(field == registration_id)
+        if role_code == ProfessionalRoleCode.LAB_TECHNICIAN.value:
+            statement = statement.join(HealthcareFacility, HealthcareFacility.id == DiagnosticTest.facility_id).where(
+                DiagnosticTest.facility_id == facility_id, HealthcareFacility.is_active.is_(True))
+        return list(self.db.scalars(statement.order_by(DiagnosticTest.created_at.desc(), DiagnosticTest.id.desc())
+            .offset((page - 1) * page_size).limit(page_size + 1)))
 
     def names(self, tests: list[DiagnosticTest]) -> dict[uuid.UUID, str]:
         ids = {test.requested_by_role_registration_id for test in tests} | {test.assigned_to_role_registration_id for test in tests if test.assigned_to_role_registration_id}

@@ -43,7 +43,8 @@ def create_database_engine(
         Other database dialects ignore this PostgreSQL-specific option.
     """
 
-    options: dict[str, Any] = {}
+    # SQLAlchemy exception strings must not echo bound clinical/identity values.
+    options: dict[str, Any] = {"hide_parameters": True}
     if poolclass is None:
         # Only the production engine needs pre-ping; per-test engines
         # built on a fresh NullPool acquire a new connection every time

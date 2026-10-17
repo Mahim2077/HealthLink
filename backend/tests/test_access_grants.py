@@ -103,6 +103,40 @@ def test_citizen_grant_lifecycle_selector_and_audit(client, db_session, test_set
     assert [row.action for row in db_session.scalars(select(MedicalRecordAccessLog).order_by(MedicalRecordAccessLog.created_at))] == ["GRANT", "REVOKE"]
 
 
+@pytest.mark.parametrize("search", ["aYeShA kHaN", "  Ayesha   Khan  ", "Ayesha", "Khan", "Cardiologist"])
+def test_sharing_selector_matches_full_name_without_broadening_roles(client, db_session, test_settings, search):
+    facility = _facility(db_session)
+    doctor, role = _registration(db_session, facility, ProfessionalRoleCode.DOCTOR)
+    doctor.first_name, doctor.last_name = "Ayesha", "Khan"
+    role.designation = "Cardiologist"
+    for code, verified, active in [(ProfessionalRoleCode.DOCTOR, False, True),
+                                    (ProfessionalRoleCode.DOCTOR, True, False),
+                                    (ProfessionalRoleCode.LAB_TECHNICIAN, True, True)]:
+        excluded, excluded_role = _registration(db_session, facility, code, verified=verified)
+        excluded.first_name, excluded.last_name = "Ayesha", "Khan"
+        excluded.is_active = active
+        excluded_role.designation = "Cardiologist"
+    citizen_user, _ = _citizen(db_session, "Picker owner")
+    db_session.commit()
+    headers = _auth(_token(db_session, test_settings, citizen_user, Portal.CITIZEN))
+    response = client.get("/api/v1/citizens/me/access-grant-professionals", headers=headers, params={"search": search})
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()] == [str(role.id)]
+
+
+@pytest.mark.parametrize("search", ["%", "_", "\\", "Ayesha%Khan", "Ayesha_Khan"])
+def test_sharing_selector_escapes_sql_wildcards(client, db_session, test_settings, search):
+    facility = _facility(db_session)
+    doctor, _ = _registration(db_session, facility, ProfessionalRoleCode.DOCTOR)
+    doctor.first_name, doctor.last_name = "Ayesha", "Khan"
+    user, _ = _citizen(db_session, "Wildcard owner")
+    db_session.commit()
+    headers = _auth(_token(db_session, test_settings, user, Portal.CITIZEN))
+    response = client.get("/api/v1/citizens/me/access-grant-professionals", headers=headers, params={"search": search})
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_scoped_routes_exclude_drafts_and_grant_cannot_mutate(client, db_session, test_settings):
     facility = _facility(db_session)
     author, author_role = _registration(db_session, facility, ProfessionalRoleCode.DOCTOR)

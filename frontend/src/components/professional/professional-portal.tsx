@@ -7,9 +7,10 @@ import {
   ClipboardDocumentCheckIcon,
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { usePortalAuth } from "@/components/auth/auth-provider";
+import { ProfessionalCareOverview } from "@/components/dashboards/care-overview";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import { citizenErrorMessage } from "@/lib/citizen/presentation";
 import { loadProfessionalMe } from "@/lib/professional/api";
@@ -61,7 +62,7 @@ function ProfessionalGuard({ children }: { children: ReactNode }) {
       </main>
     );
   }
-  return children;
+  return <Fragment key={auth.claims?.sid}>{children}</Fragment>;
 }
 
 function StatusBadge({ status }: { status: ProfessionalMe["verification_status"] }) {
@@ -247,6 +248,9 @@ function ProfessionalPortalContent({
         </section>
       </div>
 
+      {verified && (record.role_code === "DOCTOR" || record.role_code === "LAB_TECHNICIAN") ? (
+        <ProfessionalCareOverview role={record.role_code} />
+      ) : null}
       {verified && record.role_code === "DOCTOR" && verifiedDoctorSlot ? (
         <div className="mt-6">{verifiedDoctorSlot}</div>
       ) : null}

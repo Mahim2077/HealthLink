@@ -48,6 +48,9 @@ class DiagnosticTestView(BaseModel):
 
 class DiagnosticTestListResponse(BaseModel):
     tests: list[DiagnosticTestView]
+    page: int = 1
+    page_size: int = 50
+    has_next: bool = False
 
 
 class DiagnosticTechnicianChoice(BaseModel):

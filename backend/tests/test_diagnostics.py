@@ -134,7 +134,7 @@ def test_transition_matrix_and_citizen_ownership(client: TestClient, db_session,
     owner = client.get("/api/v1/citizens/me/diagnostic-tests", headers=_auth(_token(db_session, test_settings, citizen_user, Portal.CITIZEN))).json()
     other = client.get("/api/v1/citizens/me/diagnostic-tests", headers=_auth(_token(db_session, test_settings, other_user, Portal.CITIZEN))).json()
     assert [row["id"] for row in owner["tests"]] == [test_id]
-    assert other == {"tests": []}
+    assert other == {"tests": [], "page": 1, "page_size": 50, "has_next": False}
     assert db_session.scalar(select(DiagnosticTest).where(DiagnosticTest.id == uuid.UUID(test_id))).status == "IN_PROGRESS"
 
 

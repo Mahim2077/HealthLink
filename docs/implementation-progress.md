@@ -1064,3 +1064,347 @@ Phases 15–21 are verified, committed, migrated, and live in production.
 - `.github/workflows/reminders.yml` is deleted from `main`, so no future scheduled
   `Deliver in-app reminders` workflow runs will be created. Existing reminder UI
   and stored reminder data remain unchanged.
+
+## Phase 22 — AI foundation — 2026-09-27, local only
+
+### Implemented
+
+- Added a backend-only, provider-neutral AI module with deterministic mock and
+  native Gemini adapters. The server chooses the provider, model, limits, and
+  enablement through non-public environment variables.
+- Added a citizen-self record-aware guidance endpoint. Each request requires an
+  authenticated Citizen portal session and explicit per-request permission to
+  use that citizen's records.
+- The context builder loads bounded finalized visits, finalized prescriptions,
+  finalized diagnostic reports, a coarse demographic profile, and the emergency
+  medical profile. It excludes direct identity, contacts, addresses, provider and
+  facility identities, database keys, draft records, and other citizens' data.
+- Common identifiers embedded in clinical text or the citizen's question are
+  redacted before provider transfer. All record and user text is treated as
+  untrusted prompt data.
+- Provider output must satisfy a strict Pydantic contract and a second safety
+  check that blocks diagnosis, prescribing, and treatment-change language. A
+  fixed non-diagnostic disclaimer is added by HealthLink, not the provider.
+- Record retrieval is captured as a metadata-only `AI_ACCESS` event. No raw
+  question, prompt, clinical text, or response is logged or persisted.
+- AI and record-context transfer remain disabled by default. CI explicitly uses
+  the disabled mock configuration and never calls or pays a real model.
+
+### Evidence
+
+- Focused AI/config suite: **18 passed**.
+- Complete backend suite: **297 passed, 38 PostgreSQL-only tests skipped** because
+  no dedicated local PostgreSQL test URL was configured.
+- Python bytecode compilation and `pip check` passed.
+- The installed `google-genai 1.75.0` accepted the production structured-output
+  configuration without making a network/model request.
+- No database schema changed, so Phase 22 requires no Alembic migration.
+
+### Release state
+
+Phase 22 is not committed, pushed, deployed, or enabled in production. Enabling
+real citizen-record transfer through a Gemini free-tier key requires an explicit
+privacy/data-use decision based on the provider's current terms. The safe default
+is `AI_ENABLED=false` and `AI_RECORD_CONTEXT_ENABLED=false`.
+
+## Phases 23–27 — AI features — 2026-10-02, local only
+
+### Implemented
+
+- Phase 23: authorized prescription explanations. The model produces explanatory
+  prose/questions, while recorded medicines and instructions remain server-owned.
+  Missing medicine purpose is not guessed. Citizen-owned draft read permissions
+  and professional read policy match the existing prescription workflow.
+- Phase 24: explanations of authorized finalized diagnostic reports. Each supplied
+  parameter must be explained exactly once; results, units, reference ranges and
+  flags come from source records. Missing ranges remain missing. Fixed a decimal
+  formatting edge case that incorrectly reduced integer `10` to `1`.
+- Phase 25: bounded, source-labelled medical-history summary for citizen self,
+  current-patient doctors, and valid full-history manual grants. It is temporary,
+  not a new clinical record. Citizen UI requires per-request record opt-in.
+- Phase 26: citizen AI assistant with explicit GENERAL and RECORD_AWARE modes.
+  GENERAL does not load clinical records. Record-aware scope is authenticated
+  citizen self, never caller-supplied IDs. No persistent chat history or browser
+  storage is introduced; each question is independently submitted.
+- Phase 27: structured educational symptom guidance without automatic record
+  loading. A narrow, source-backed safeguard returns emergency-evaluation wording
+  for explicit severe breathing/chest-pressure warning phrases without waiting
+  for a model. It is not comprehensive or medically validated triage.
+- Shared Groq/Gemini/mock provider boundary: strict schema revalidation,
+  timeouts, safe errors, rate-limit handling, provider HTTP deadline/no retries,
+  diagnosis/treatment/action-language rejection and fixed disclaimers. Server
+  safety rules use separate system instructions/messages from untrusted contents.
+- AI record access is audited as metadata only. Questions, prompts, clinical text
+  and responses are not logged or persisted. Source/category checks are defence
+  in depth, not proof that all generated claims are factually correct.
+- UI keeps authoritative records primary, resets consent after each record-aware
+  request, disables pending controls, clears obsolete context/results, and keys
+  sensitive components by session/record. Tool tabs support keyboard navigation.
+
+### Provider and release constraints
+
+All acceptance tests use synthetic data and deterministic mock generation, not
+real Gemini calls. No schema migration is added; head remains
+`0030_doctor_locations`. No commit, push, deploy or production enablement is
+authorized by this development turn.
+
+The [Gemini API terms](https://ai.google.dev/gemini-api/terms), reviewed 2026-10-02,
+prohibit submitting sensitive/confidential/personal information to unpaid services
+and prohibit clinical-practice/medical-advice use. Consent/identity reduction
+alone does not make a real-record free-tier rollout permissible. Paid-service
+data handling differs but medical-use and age restrictions still require review.
+Both AI enable flags remain off by default. See `docs/AI_LOCAL_DEVELOPMENT.md`.
+
+### GroqCloud provider configuration (2026-10-02)
+
+The owner explicitly selected GroqCloud after discussing Qwen 3.8. Added a
+direct HTTPX adapter using `qwen/qwen3.8-27b` as the environment-replaceable
+default, with both AI enable flags still disabled by default. Mock and native
+Gemini remain supported. No OpenAI API account or new SDK is needed.
+
+Strict schemas normalize required/nested/nullable properties without weakening
+server validators. Existing authorization, opt-in, source-grounding and
+non-diagnostic checks apply unchanged. Requests have separate system/user
+messages, HTTP/total deadlines, one output budget and no automatic retries,
+redirects, proxy inheritance, tools or provider fallback. Qwen thinking is off.
+429s/timeouts/refusals/truncation/invalid JSON map to safe errors.
+
+No live Groq request or real-key/model-access test has been made. Qwen remains
+a preview model and health-data/provider-terms review is required before real
+records or production enablement. See `docs/AI_LOCAL_DEVELOPMENT.md`.
+
+Next roadmap phase: **28 — dashboard + UX consolidation**, then Phases 29–31.
+
+### Final local verification (2026-10-02)
+
+- Complete backend suite: **437 passed, zero skipped** with isolated local
+  PostgreSQL 17.6. Focused Groq/config suite: **53 passed**; HTTP calls intercepted
+  in memory with synthetic data, including authenticated chat/consent integration.
+- Frontend: **55 files / 252 tests passed**, lint/typecheck/production build
+  passed before the backend-only Groq change. Migration head remains `0030`;
+  previous Alembic check found no metadata drift. No new models/migrations.
+- Dependency check, bytecode compilation and whitespace checks passed. Installed
+  the already-declared Google GenAI 1.75.0 dependency in the local virtual
+  environment to retain Gemini compatibility. One upstream Starlette/httpx
+  deprecation warning remains; it does not fail tests.
+- Synthetic browser acceptance passed general/record-aware chat, per-request
+  consent consumption, symptom guidance/emergency safeguard, optional history
+  summary, source-preserving prescription and finalized diagnostic explanations.
+  Metadata-only AI access was confirmed; no console errors or narrow-viewport
+  horizontal overflow was seen. The temporary port-3001 preview uses mock AI;
+  the normal backend defaults select Groq with both enable flags off.
+- **Zero live external model calls. No production data mutation, commit, push,
+  deployment or production AI enablement.** Groq key validity/model access/quota,
+  actual medical/Bangla output quality and health-data suitability are unverified.
+
+### Explanation-only AI policy hardening (2026-10-02)
+
+Owner clarified that AI is a medical-information assistant, never a prescriber
+or replacement for a doctor. Added shared server system policy for Groq/Gemini;
+task prompts distinguish recorded conditions, general medicine knowledge and
+unknown doctor intent. Prescription education is optional and mapped only to
+existing medicine items. Original record instructions are unchanged and labelled
+as such in the UI; actual doctor rationale is never guessed.
+
+Fixed the integrity probe that previously accepted a synthetic diagnosis plus
+medicine directive. Expanded field-local output checks and regression coverage
+for unfamiliar diseases/medicines, dose schedules, formatting evasions, Bangla
+examples and foreign/duplicate medicine indices. Prompts/regex checks remain
+defence in depth, not semantic guarantees or clinical validation.
+
+Fresh checks: **476 backend tests passed, zero skipped** on isolated local
+PostgreSQL; **55 frontend files / 252 tests passed**; lint, TypeScript, production
+build and whitespace checks passed. One upstream deprecation warning remains.
+Fresh browser acceptance is **pending**: controller timed out twice on the
+existing tab after restarting the synthetic mock preview. Earlier browser
+acceptance is historical, not evidence for this latest UI revision.
+No live model calls, production mutation, commit, push, deployment or enablement.
+
+## Phases 28–31 — local consolidation and release preparation — 2026-10-17
+
+The owner authorized continuing the remaining roadmap without replacing approved
+product features and explicitly said not to deploy yet. All work below is local.
+
+### Phase 28 — implemented local dashboard/UX consolidation
+
+- Added bounded, read-only citizen/doctor/lab/admin overview endpoints and cards
+  inside the existing portals. Counts/links come from real authorized database
+  records, not fake analytics or model generation.
+- Citizen self projection: upcoming booking, latest finalized prescription and
+  diagnostic result, saved emergency-profile status and existing reminder/
+  notification counts; privacy/history/AI links remain available.
+- Doctor projection: today's own chamber status, waiting/current serial metadata,
+  diagnostic workload and recent authored finalized prescription. Cancelled or
+  mismatched appointments and closed-session waiting rows are excluded.
+- Lab projection: exact active-role assignment and facility workload, draft and
+  finalized report counts, with no doctor chamber controls.
+- Admin projection: active-admin-only real application/facility/location counts.
+- Preserved modern location/specialty search, merged Diagnostic tests, atomic
+  consultation/prescription form, author-only editing, fresh private PDFs and
+  removed reminder scheduling. AI remains explanation-only and disabled by default.
+- Session-keyed UI, ignored late responses, accessible cards/loading/retry states,
+  and diagnostic previous/next pagination were added without a redesign.
+
+### Phase 29 — local security hardening and matrix
+
+- CURRENT authority now requires a BOOKED appointment and ACTIVE session with
+  matching doctor, facility and date. Dashboard counts follow coherent queue rows.
+- Diagnostic lists have stable ordering, bounded pagination and lab facility
+  scope. Admin UI identity search moved to a POST body; deprecated GET remains
+  backward compatible and requires infrastructure/access-log review.
+- Login/refresh cache-control, nosniff, validation-input redaction and hidden SQL
+  parameters reduce accidental credential/clinical-text exposure.
+- Added `docs/SECURITY_PERMISSION_MATRIX.md` mapping portal/role/current/grant/
+  immutable-record/AI/refresh constraints to regression coverage and input caps.
+- No global serverless rate-limiter claim, production-log certification or
+  guarantee of model semantic/medical safety is made.
+
+### Phase 30 — automated QA passed; browser sign-off pending
+
+- Complete backend suite: **514 passed, zero skipped**, with isolated loopback
+  PostgreSQL 17.6 and mock/in-memory model calls only.
+- Frontend: **56 files / 261 tests passed**; ESLint, TypeScript and optimized
+  production build passed on the existing Node 24 runtime.
+- Alembic head `0030_doctor_locations`; `alembic check`: no new upgrade operations.
+  `pip check`, Python bytecode compilation and whitespace checks passed.
+- Added a synthetic HTTP/database journey across unified consultation save,
+  diagnostic assignment/draft/finalize, citizen finalized result/trends, appointment
+  finish, correct dashboard links/counts, fresh PDF bytes with zero document rows,
+  authorized mock explanations and cross-citizen/wrong-portal denial.
+- The first backend run passed 513 tests but one temp fixture could not start
+  because of stale Windows permissions. A full rerun using a fresh ignored
+  workspace `PYTEST_DEBUG_TEMPROOT` passed all 514. No global ACL changes or data
+  deletion were used. One upstream Starlette/httpx deprecation warning remains.
+- Historical 2026-10-02 browser checks passed citizen overview/explanation,
+  doctor login/save/finish and lab login/queue/draft save. Lab finalization was
+  blocked at the native confirmation; admin acceptance was incomplete. This
+  session's browser runtime is unavailable. Full fresh Citizen/Doctor/Lab/Admin
+  journeys and mobile/tablet/desktop/wide acceptance remain **pending**.
+
+### Phase 31 — release preparation only, production held
+
+- Added `scripts/smoke_release.py` with offline regression tests. Future Actions
+  smoke checks both the generated URL and stable `healthlink-sd.vercel.app`:
+  healthy production process, frontend/sign-in HTML and anonymous API denials.
+  No credentials/model requests; origins, reads, timeouts and retries are bounded.
+- Added `docs/PHASES_28_31_RELEASE_READINESS.md` with exact phase state, pending
+  browser matrix, owner approval, configuration/migration/CI/smoke/log/rollback
+  gates. Updated the current handover and marked the old deployment snapshot as
+  historical. Production remains the previously released 15–21/improvements.
+- **No commit, push, production migration, deployment, live provider request,
+  real patient record transfer or AI enablement.** Phase 31 production release is
+  not complete and must not be described as such.
+
+### Fresh browser QA follow-up — 2026-10-17
+
+- Owner authorized headless Playwright after native computer-use failed. Real
+  Edge with local frontend/API/PostgreSQL and unique synthetic accounts ran:
+  **6 passed, 1 failed, zero skipped (46 seconds)**. Mock provider only.
+- Four-role care journey, lab confirmation/finalization, draft denial,
+  dashboard links, regenerated in-memory PDF, consent/history summary,
+  emergency escalation, grant create/revoke and portal/cross-citizen denial ran.
+- Dashboard/workspace/populated details across citizen/doctor/lab/admin had no
+  document overflow at 390/768/1366/1920px; screenshots and HTML report saved in
+  ignored `.runtime/browser-qa/`. This is focused acceptance, not exhaustive
+  accessibility, live GPS or cross-browser certification.
+- Confirmed two unfixed defects: start-chamber first-patient promotion flushes
+  after commit and is rolled back; sharing picker misses full doctor names.
+  Normal UI workarounds allow later checks, while the final case explicitly
+  fails on both regressions. No application code was changed in this test pass.
+- Reproducible harness: `scripts/browser-qa/`; full report/source evidence and
+  limitations: `docs/BROWSER_QA_2026_10_17.md`. The earlier runtime-unavailable
+  statement is superseded. Phase 30 remains open; production remains untouched.
+
+### Owner-authorized live Groq chatbot sample — 2026-10-17
+
+- Temporary process-environment key only, entered through no-echo input; no
+  key file, `.env`, command-line value or frontend exposure. Key-bearing backend
+  terminated after testing and original mock backend restored.
+- Real local UI/API/Groq requests with fresh synthetic records: authentication
+  and configured Qwen model availability passed; English education, Bangla
+  education, prescribing refusal and consented record-aware explanation returned
+  HTTP 200 and rendered. Reviewed outputs stayed educational and source-aware.
+- Fifth attempt received HTTP 429. Stopped without retries/quota bypass; injection
+  refusal and remaining live summary/record-explanation flows remain unverified.
+- Full evidence/limits: `docs/GROQ_LOCAL_LIVE_QA_2026_10_17.md`. No application
+  source changes, real patient transfer, production enablement or release action.
+
+### Remaining Groq cases — owner-requested follow-up — 2026-10-17
+
+- All five remaining cases attempted with fresh synthetic fixtures. Injection
+  refusal, finalized lab explanation and the deterministic emergency safeguard
+  passed; history summary and prescription explanation each returned a safety
+  rejection (HTTP 502). No further HTTP 429; paced requests, no guard bypass.
+- Across both runs: seven distinct cases passed, two failed. Six successful
+  cases used Groq; emergency escalation is a server-owned no-provider safeguard.
+  Failed summaries/explanations need synthetic-only field/rule investigation;
+  rejected model prose was not captured, so unsafe content versus false-positive
+  validation is not yet established.
+- Temporary key-bearing backend terminated and mock restored again. No key file,
+  application-source/safety-policy change, commit, push or deployment. Current
+  details and ignored evidence paths are in the live-QA report above.
+
+### Final local Phase 30 repairs / Phase 31 release readiness — 2026-10-17
+
+- Owner authorized development/fixes through Phase 31; external release remains
+  withheld. Repaired chamber atomic activation/promotion and idempotent reopening,
+  with cross-session/concurrent-open/rollback PostgreSQL regressions. Full-name
+  sharing search now normalizes whitespace/case and preserves role filters and
+  SQL wildcard escaping.
+- Synthetic-only live field/rule metadata identified generated schedule echoes
+  as the two AI failures. Removed structured medicine directions from summary/chat
+  and prescription explanation inputs; names/other authorized facts remain.
+  Strengthened canonical/task policy against repeating recorded schedules, while
+  retaining original server-owned instructions. Safety validators unchanged.
+- Added accessible prescription-page h1 and capability-preservation tests.
+- Complete fresh backend gate: **532 passed, zero skipped** (93.99 seconds);
+  frontend **57 files / 263 tests**, lint/typecheck/optimized build passed.
+  Alembic `0030_doctor_locations`/no drift, pip check and compilation passed.
+- Built-production-frontend Edge acceptance: **8 passed, zero failures/skips**
+  (29.6 seconds), actual isolated API/PostgreSQL, all four widths/roles, no prior
+  workarounds. Added synthetic schedule edit, facility contact update preserving
+  confirmed location/no coordinate DTOs, and admin application verification.
+- Final paced live AI/UI pass: **9/9 passed** (eight Groq generations and the
+  deterministic emergency safeguard); no rate limit or browser exceptions.
+  Key existed only in temporary process environment; that process terminated,
+  mock backend restored. Default AI flags remain false.
+- Current detailed report: `docs/PHASE_31_LOCAL_RELEASE_REPORT.md`. No new schema,
+  migration or dependency for the repairs; no commit, push, CI dispatch,
+  production migration, deployment or AI enablement. Phase 31 local preparation
+  complete, **production release not complete**. External/manual review gates and
+  the upstream Starlette/httpx deprecation warning remain explicit.
+
+### Independent integrity audit through Phase 31 — 2026-10-17
+
+- Verification-only request: **532 backend passed, zero skipped** (63.24 seconds),
+  **57 files / 263 frontend tests passed** (10.83 seconds), lint/typecheck and
+  optimized Next.js build passed. PostgreSQL-enabled; Alembic head `0030`/no drift,
+  dependency consistency, compilation and changed tracked whitespace passed.
+- Fresh production-build Edge acceptance: **8 passed, zero failed/skipped/flaky**
+  (31.54 seconds), four roles/four widths and synthetic end-to-end operations.
+  No live AI calls this audit; prior 9/9 evidence remains historical.
+- **P1 release blocker found:** migration/deployment job locks do not serialize a
+  complete Actions run or reject a stale commit. An older, slower run can deploy
+  after a newer release. Workflow source was not changed during this audit.
+- Detailed findings: `docs/PHASE_31_INTEGRITY_AUDIT_2026_10_17.md`. Phase 31 release
+  clearance requires CI ordering repair/verification and the existing owner gates.
+  Normal mock-only local development was restored; no application fix, commit,
+  push, Actions dispatch, production migration/deployment or AI enablement.
+
+### Authorized Phase 31 production release preparation — 2026-10-18
+
+- Owner authorized commit/push/deployment and private Groq production setup;
+  account allowlist is GitHub/Vercel Mahim2077 only. Exact existing Vercel project
+  and team verified; an explicit-team connector-filter 404 was resolved within
+  that account, without switching accounts or creating a project.
+- CI now holds one non-cancelling job lock across migration → staging → smoke →
+  promotion. Added stale-main checks at each mutation boundary and an exact
+  target allowlist. Removed token-bearing CLI arguments and broad token job env.
+- 12 new offline regressions; complete isolated backend **544 passed**, zero
+  skipped (89.86 seconds), frontend **263 passed**, lint/typecheck/build passed.
+  Local migration `0030`/no drift and dependencies passed. An earlier one-test
+  Windows temp-fixture permission error was resolved by an isolated temp path.
+- Production-only sensitive `AI_API_KEY` and Groq/model/enable flags configured
+  in Vercel, never written locally or to source. Runtime access/consent and
+  explanation-only safeguards remain unchanged. Actual release execution and
+  limitations are recorded in `docs/PRODUCTION_RELEASE_2026_10_18.md`.

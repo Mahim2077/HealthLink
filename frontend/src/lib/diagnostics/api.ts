@@ -2,8 +2,8 @@
 import { apiClient } from "@/lib/api/client";
 import type { DiagnosticStatus, DiagnosticTest, DiagnosticTestList, TechnicianChoice } from "./types";
 
-export const listCitizenDiagnostics = () => apiClient.get<DiagnosticTestList>("citizens/me/diagnostic-tests");
-export const listProfessionalDiagnostics = () => apiClient.get<DiagnosticTestList>("professionals/me/diagnostic-tests");
+export const listCitizenDiagnostics = (page = 1) => apiClient.get<DiagnosticTestList>(`citizens/me/diagnostic-tests?page=${page}&page_size=20`);
+export const listProfessionalDiagnostics = (page = 1) => apiClient.get<DiagnosticTestList>(`professionals/me/diagnostic-tests?page=${page}&page_size=20`);
 export const listDiagnosticTechnicians = (search = "", context?: { test_id?: string; visit_id?: string }) => {
   const params = new URLSearchParams({ search });
   if (context?.test_id) params.set("test_id", context.test_id);

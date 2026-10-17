@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict, field_validator
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.access.policy import ClinicalReadPolicy
@@ -57,8 +57,10 @@ def professionals(citizen: Citizen, db: Database, search: Annotated[str, Query(m
         ProfessionalRoleRegistration.verification_status == "VERIFIED", ProfessionalRole.is_active.is_(True),
         ProfessionalRole.code == "DOCTOR", User.is_active.is_(True))
     if search.strip():
-        pattern = "%" + search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        statement = statement.where(or_(User.first_name.ilike(pattern, escape="\\"), User.last_name.ilike(pattern, escape="\\"), ProfessionalRoleRegistration.designation.ilike(pattern, escape="\\")))
+        normalized = " ".join(search.split())
+        pattern = "%" + normalized.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        full_name = func.trim(User.first_name + " " + User.last_name)
+        statement = statement.where(or_(full_name.ilike(pattern, escape="\\"), User.first_name.ilike(pattern, escape="\\"), User.last_name.ilike(pattern, escape="\\"), ProfessionalRoleRegistration.designation.ilike(pattern, escape="\\")))
     return [{"id": role.id, "name": f"{user.first_name} {user.last_name}".strip(),
              "role": role.role.code, "designation": role.designation,
              "facility_name": role.facility.name if role.facility else role.facility_name_submitted}

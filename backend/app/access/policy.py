@@ -63,6 +63,8 @@ class ClinicalReadPolicy:
             .where(Appointment.citizen_id == citizen_id,
                    Appointment.doctor_role_registration_id == registration.id,
                    DoctorPracticeSession.doctor_role_registration_id == registration.id,
+                   Appointment.facility_id == DoctorPracticeSession.facility_id,
+                   Appointment.appointment_date == DoctorPracticeSession.session_date,
                    Appointment.status == "BOOKED", DoctorPracticeSession.status == "ACTIVE",
                    AppointmentQueueEntry.queue_status == "CURRENT").limit(1))
         if current:

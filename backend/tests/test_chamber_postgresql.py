@@ -44,6 +44,82 @@ from app.visits.models import MedicalVisit, VisitStatus
 POSTGRES_TEST_DATABASE_URL = os.getenv("HEALTHLINK_TEST_DATABASE_URL")
 
 
+@pytest.mark.skipif(not POSTGRES_TEST_DATABASE_URL, reason="Dedicated PostgreSQL URL required")
+@pytest.mark.parametrize("workers", [1, 2])
+def test_chamber_open_persists_first_patient_across_sessions(test_settings, workers):
+    """Start/reopen on fresh connections, including simultaneous HTTP-equivalent calls."""
+    from types import SimpleNamespace
+
+    engine = create_database_engine(POSTGRES_TEST_DATABASE_URL, poolclass=NullPool)
+    doctor_id, registration_id, facility_id, session_id, citizen_id, _ = _seed_chamber_fixture(engine)
+    try:
+        with Session(engine) as db:
+            practice = db.get(DoctorPracticeSession, session_id)
+            practice.status, practice.started_at = "NOT_STARTED", None
+            target = practice.session_date
+            db.commit()
+        barrier = Barrier(workers)
+
+        def open_chamber(synchronize=True):
+            with Session(engine, expire_on_commit=False) as db:
+                registration = db.get(ProfessionalRoleRegistration, registration_id)
+                if synchronize:
+                    barrier.wait(timeout=15)
+                view = AppointmentService(db, test_settings).start_session(
+                    SimpleNamespace(role_registration=registration), facility_id=facility_id, session_date=target)
+                return view.current.queue_id, view.started_at
+
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            results = [future.result(timeout=30) for future in [executor.submit(open_chamber) for _ in range(workers)]]
+        with Session(engine) as db:
+            current = list(db.scalars(select(AppointmentQueueEntry).where(
+                AppointmentQueueEntry.practice_session_id == session_id,
+                AppointmentQueueEntry.queue_status == "CURRENT")))
+            assert len(current) == 1
+            assert all(row[0] == current[0].id for row in results)
+            original_time = db.get(DoctorPracticeSession, session_id).started_at
+        # Repeated opening must retain the existing CURRENT and activation time.
+        reopened_id, reopened_time = open_chamber(synchronize=False)
+        assert reopened_id == current[0].id
+        assert reopened_time == original_time
+    finally:
+        _cleanup(engine, user_ids=[doctor_id, citizen_id], facility_ids=[facility_id])
+        engine.dispose()
+
+
+@pytest.mark.skipif(not POSTGRES_TEST_DATABASE_URL, reason="Dedicated PostgreSQL URL required")
+def test_chamber_activation_rolls_back_when_initial_promotion_fails(test_settings, monkeypatch):
+    from types import SimpleNamespace
+    from app.appointments.service import ChamberSessionStateError
+
+    engine = create_database_engine(POSTGRES_TEST_DATABASE_URL, poolclass=NullPool)
+    doctor_id, registration_id, facility_id, session_id, citizen_id, _ = _seed_chamber_fixture(engine)
+    try:
+        with Session(engine) as db:
+            practice = db.get(DoctorPracticeSession, session_id)
+            practice.status, practice.started_at = "NOT_STARTED", None
+            target = practice.session_date
+            db.commit()
+        with Session(engine) as db:
+            service = AppointmentService(db, test_settings)
+            promote = service._promote_lowest_waiting
+            def fail_after_promotion(practice_id):
+                promote(practice_id)
+                raise IntegrityError("synthetic promotion failure", None, Exception("synthetic"))
+            monkeypatch.setattr(service, "_promote_lowest_waiting", fail_after_promotion)
+            with pytest.raises(ChamberSessionStateError):
+                service.start_session(SimpleNamespace(role_registration=db.get(ProfessionalRoleRegistration, registration_id)),
+                    facility_id=facility_id, session_date=target)
+        with Session(engine) as db:
+            practice = db.get(DoctorPracticeSession, session_id)
+            assert practice.status == "NOT_STARTED" and practice.started_at is None
+            assert set(db.scalars(select(AppointmentQueueEntry.queue_status).where(
+                AppointmentQueueEntry.practice_session_id == session_id))) == {"WAITING"}
+    finally:
+        _cleanup(engine, user_ids=[doctor_id, citizen_id], facility_ids=[facility_id])
+        engine.dispose()
+
+
 def _seed_chamber_fixture(
     engine,
     *,

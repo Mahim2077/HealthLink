@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), rep
 vi.mock("@/lib/api/client", () => ({ apiClient: { get: mocks.get, post: mocks.post, put: mocks.put } }));
 vi.mock("@/lib/auth/actions", () => ({ replaceSession: mocks.replaceSession }));
 
-import { confirmFacilityLocation, createFacility, loadAdminMe, loadFacilities, loadProfessionalRegistration, loadProfessionalRegistrations, loginAdmin, rejectProfessionalRegistration, updateFacility, verifyProfessionalRegistration } from "./api";
+import { confirmFacilityLocation, createFacility, loadAdminMe, loadFacilities, loadProfessionalRegistration, loadProfessionalRegistrations, loginAdmin, rejectProfessionalRegistration, searchCitizenIdentities, updateFacility, verifyProfessionalRegistration } from "./api";
 
 describe("Admin API", () => {
   beforeEach(() => { mocks.get.mockReset(); mocks.post.mockReset(); mocks.put.mockReset(); mocks.replaceSession.mockReset(); });
@@ -28,6 +28,15 @@ describe("Admin API", () => {
     mocks.get.mockResolvedValue({ email: "admin@example.com" });
     await loadAdminMe();
     expect(mocks.get).toHaveBeenCalledWith("admin/me");
+  });
+
+  it("keeps private identity search values out of URLs", async () => {
+    mocks.post.mockResolvedValue([]);
+    await searchCitizenIdentities({ email: " synthetic@example.com ", nid_number: " 9900000000012 " });
+    expect(mocks.post).toHaveBeenCalledWith("admin/citizen-identities/search", {
+      email: "synthetic@example.com", nid_number: "9900000000012",
+    });
+    expect(mocks.get).not.toHaveBeenCalled();
   });
 
   it("uses the documented facility CRUD endpoints", async () => {

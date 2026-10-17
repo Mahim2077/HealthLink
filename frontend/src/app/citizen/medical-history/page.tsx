@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { usePortalAuth } from "@/components/auth/auth-provider";
+import { MedicalHistorySummary } from "@/components/ai/medical-history-summary";
 import { MedicalHistoryTimeline } from "@/components/medical-records/medical-history-timeline";
 import { EmptyState, LoadingState } from "@/components/ui/async-state";
 import { listCitizenMedicalHistory } from "@/lib/medical-records/api";
@@ -44,7 +45,10 @@ export default function CitizenMedicalHistoryPage() {
         <h1 className="mt-3 font-display text-3xl font-bold tracking-[-0.04em] text-slate-950 sm:text-4xl">My medical history</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Review your finalized clinical timeline across HealthLink facilities. Use the filters to find visits and prescriptions by date.</p>
       </header>
-      <div className="mt-8"><MedicalHistoryTimeline loadAction={listCitizenMedicalHistory} portal="citizen" /></div>
+      <div className="mt-8 space-y-8" key={auth.claims?.sid}>
+        <MedicalHistoryTimeline loadAction={listCitizenMedicalHistory} portal="citizen" />
+        <MedicalHistorySummary />
+      </div>
     </main>
   );
 }

@@ -51,13 +51,15 @@ def list_diagnostic_technicians(db: Annotated[Session, Depends(get_db)], doctor:
 
 
 @router.get("/citizens/me/diagnostic-tests", response_model=DiagnosticTestListResponse)
-def list_citizen_diagnostic_tests(db: Annotated[Session, Depends(get_db)], citizen: Annotated[CitizenContext, Depends(get_current_citizen)]) -> DiagnosticTestListResponse:
-    return DiagnosticTestListResponse(tests=DiagnosticsService(db).list_citizen(citizen.profile.id))
+def list_citizen_diagnostic_tests(db: Annotated[Session, Depends(get_db)], citizen: Annotated[CitizenContext, Depends(get_current_citizen)], page: Annotated[int, Query(ge=1, le=10000)] = 1, page_size: Annotated[int, Query(ge=1, le=100)] = 50) -> DiagnosticTestListResponse:
+    tests = DiagnosticsService(db).list_citizen(citizen.profile.id, page, page_size)
+    return DiagnosticTestListResponse(tests=tests[:page_size], page=page, page_size=page_size, has_next=len(tests) > page_size)
 
 
 @router.get("/professionals/me/diagnostic-tests", response_model=DiagnosticTestListResponse)
-def list_professional_diagnostic_tests(db: Annotated[Session, Depends(get_db)], professional: Annotated[ProfessionalAuthContext, Depends(require_verified_professional_role(ProfessionalRoleCode.DOCTOR, ProfessionalRoleCode.LAB_TECHNICIAN))]) -> DiagnosticTestListResponse:
-    result = DiagnosticTestListResponse(tests=DiagnosticsService(db).list_professional(professional.role_registration))
+def list_professional_diagnostic_tests(db: Annotated[Session, Depends(get_db)], professional: Annotated[ProfessionalAuthContext, Depends(require_verified_professional_role(ProfessionalRoleCode.DOCTOR, ProfessionalRoleCode.LAB_TECHNICIAN))], page: Annotated[int, Query(ge=1, le=10000)] = 1, page_size: Annotated[int, Query(ge=1, le=100)] = 50) -> DiagnosticTestListResponse:
+    tests = DiagnosticsService(db).list_professional(professional.role_registration, page, page_size)
+    result = DiagnosticTestListResponse(tests=tests[:page_size], page=page, page_size=page_size, has_next=len(tests) > page_size)
     for item in result.tests:
         AuditService(db).record(auth=professional.auth, citizen_id=item.citizen_id,
             resource_type="DIAGNOSTIC_TEST", resource_id=item.id, access_source="ASSIGNMENT" if professional.role_registration.role.code == "LAB_TECHNICIAN" else "AUTHOR", commit=False)

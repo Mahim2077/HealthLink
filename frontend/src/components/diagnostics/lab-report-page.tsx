@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePortalAuth } from "@/components/auth/auth-provider";
+import { LabReportExplanation } from "@/components/ai/lab-report-explanation";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import { useUnsavedChanges } from "@/components/ui/use-unsaved-changes";
 import { loadProfessionalMe } from "@/lib/professional/api";
@@ -110,7 +111,7 @@ function ReportLoader({ testId, portal }: { testId: string; portal: "CITIZEN" | 
   if (error) return <ErrorState title="Report unavailable" message={error} onAction={() => { setError(""); setVersion(v => v + 1); }} />;
   if (!loaded) return <LoadingState label="Loading lab report" />;
   if (loaded.canEdit) return <LabReportEditor testId={testId} initial={loaded.report} />;
-  return loaded.report ? <LabResults report={loaded.report} /> : <EmptyState title="Report not available" message="A finalized report is not available for this test." />;
+  return loaded.report ? <div className="space-y-5"><LabResults report={loaded.report} />{portal === "CITIZEN" && loaded.report.status === "FINALIZED" ? <LabReportExplanation reportId={loaded.report.id} /> : null}</div> : <EmptyState title="Report not available" message="A finalized report is not available for this test." />;
 }
 
 export function LabReportPage({ testId, portal }: { testId: string; portal: "CITIZEN" | "PROFESSIONAL" }) {
