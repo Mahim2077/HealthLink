@@ -1,8 +1,9 @@
-"""Read-only post-release probes. Never accepts credentials or calls a model."""
+"""Read-only release probes. Optional Vercel CLI auth; no app credentials/model calls."""
 from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
@@ -29,16 +30,50 @@ def validate_target(url: str) -> str:
     return url.rstrip("/")
 
 
-def probe(origin: str, path: str) -> None:
+def vercel_response(origin: str, path: str) -> tuple[int, str, bytes]:
+    """Use existing CLI authentication; never receive/print a bypass secret."""
+    validate_target(origin)
+    if path not in ("/health", *PUBLIC_PAGES, *PROTECTED_PATHS):
+        raise ValueError("Unsupported authenticated smoke path.")
+    marker = b"\nHEALTHLINK_SMOKE_META:"
+    try:
+        response = subprocess.run(
+            ["vercel", "curl", path, "--deployment", origin,
+             "--scope", "mahim2077s-projects", "--",
+             "--silent", "--max-time", "15", "--max-redirs", "0",
+             "--proto", "=https", "--max-filesize", str(MAX_RESPONSE_BYTES),
+             "--write-out", marker.decode() + "%{http_code}:%{url_effective}"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            check=True, timeout=45,
+        )
+        body, separator, metadata = response.stdout.rpartition(marker)
+        if not separator:
+            raise ValueError("Missing response metadata.")
+        raw_status, raw_url = metadata.split(b":", 1)
+        status, final_url = int(raw_status), raw_url.decode("utf-8")
+        if not 100 <= status <= 599:
+            raise ValueError("Invalid response status.")
+        if len(body) > MAX_RESPONSE_BYTES:
+            raise ValueError("Oversized response.")
+    except (OSError, subprocess.SubprocessError, ValueError, UnicodeError):
+        # CLI stderr may contain protection tokens or server output. Discard it.
+        raise RuntimeError("Authenticated staged smoke transport failed.") from None
+    return status, final_url, body if status < 400 else b""
+
+
+def probe(origin: str, path: str, *, vercel_auth: bool = False) -> None:
     expected = 401 if path in PROTECTED_PATHS else 200
     request = Request(origin + path, headers={"User-Agent": "HealthLink-release-smoke/1"})
-    try:
-        with urlopen(request, timeout=15) as response:
-            status, final_url = response.status, response.geturl()
-            body = response.read(MAX_RESPONSE_BYTES + 1)
-    except HTTPError as response:
-        status, final_url = response.code, response.geturl()
-        body = b""  # Never read or print an error/medical response body.
+    if vercel_auth:
+        status, final_url, body = vercel_response(origin, path)
+    else:
+        try:
+            with urlopen(request, timeout=15) as response:
+                status, final_url = response.status, response.geturl()
+                body = response.read(MAX_RESPONSE_BYTES + 1)
+        except HTTPError as response:
+            status, final_url = response.code, response.geturl()
+            body = b""  # Never read or print an error/medical response body.
     if status != expected or final_url != origin + path:
         raise RuntimeError(f"Smoke contract failed for {path}: expected status {expected} without redirect.")
     if len(body) > MAX_RESPONSE_BYTES:
@@ -51,12 +86,15 @@ def probe(origin: str, path: str) -> None:
         raise RuntimeError(f"Frontend HTML contract failed for {path}.")
 
 
-def smoke(url: str, attempts: int = 8) -> None:
+def smoke(url: str, attempts: int = 8, *, vercel_auth: bool = False) -> None:
     origin = validate_target(url)
     for path in ("/health", *PUBLIC_PAGES, *PROTECTED_PATHS):
         for attempt in range(attempts):
             try:
-                probe(origin, path)
+                if vercel_auth:
+                    probe(origin, path, vercel_auth=True)
+                else:
+                    probe(origin, path)
                 break
             except (HTTPError, URLError, RuntimeError, ValueError, TimeoutError):
                 if attempt + 1 == attempts:
@@ -69,6 +107,7 @@ def smoke(url: str, attempts: int = 8) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("urls", nargs="+", help="Deployment and stable production origins")
+    parser.add_argument("--vercel-auth", action="store_true", help="Use existing linked Vercel CLI identity for protected staging")
     args = parser.parse_args()
     for target in dict.fromkeys(args.urls):
-        smoke(target)
+        smoke(target, vercel_auth=args.vercel_auth)

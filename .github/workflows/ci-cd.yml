@@ -202,7 +202,10 @@ jobs:
       - name: Smoke-test staged production deployment
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
-        run: python scripts/smoke_release.py "$DEPLOYMENT_URL"
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: python scripts/smoke_release.py --vercel-auth "$DEPLOYMENT_URL"
 
       - name: Reject stale release before promotion
         run: python scripts/check_release_head.py
@@ -219,7 +222,7 @@ jobs:
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
         run: |
-          python scripts/smoke_release.py "$DEPLOYMENT_URL" https://healthlink-sd.vercel.app
+          python scripts/smoke_release.py https://healthlink-sd.vercel.app
 
       - name: Publish deployment summary
         env:
