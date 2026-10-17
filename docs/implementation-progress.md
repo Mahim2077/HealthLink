@@ -1408,3 +1408,49 @@ product features and explicitly said not to deploy yet. All work below is local.
   in Vercel, never written locally or to source. Runtime access/consent and
   explanation-only safeguards remain unchanged. Actual release execution and
   limitations are recorded in `docs/PRODUCTION_RELEASE_2026_10_18.md`.
+
+### Production attempt outcome — 2026-10-18
+
+- Committed and pushed `5de35ffb285b74535f2eece623a6c16310a3f68b` through the
+  approved Mahim2077 repository/account. No Groq key or secret/runtime files are
+  in the committed index; the key is a sensitive production-only Vercel variable.
+- Actions **39057721548** passed both Linux quality jobs, then failed before
+  establishing the production Alembic connection: Supabase shared pooler reports
+  **tenant/user not found**. No migration was applied or deployment promoted.
+- Stable alias still points to the previous READY `c8d2f26` application. Database
+  health and new live AI/browser behavior are not verified. No safety gate bypass,
+  alternate-account use, host guessing or replacement database was attempted.
+- Owner must check the existing Supabase project/current Connect pooler string
+  and privately correct the CI/Vercel connection settings as needed, then request
+  retry. Local mock development restored. This outcome checkpoint is local after
+  the application push and does not trigger another release.
+
+### Successful production retry / Phase 31 release — 2026-10-18
+
+- Owner resumed Supabase and requested retry. Confirmed remote main SHA before
+  rerunning the failed release. Production migration passed at `0030`; the staged
+  health probe then hit Vercel Authentication (302), not an app health response.
+  Promotion correctly stopped. No database/architecture/protection bypass.
+- Scoped CI follow-up **2bb55b8** adds `vercel curl` authenticated staging
+  transport using the existing approved CI identity, bounded reads/deadlines,
+  no credential arguments/log output and unchanged API-denial assertions. Stable
+  domain probes remain anonymous. Eleven new offline tests; focused gates 35/35.
+- Actions **39058877324** succeeded in 4m 41s: **555 backend passed** (77.67s),
+  **263 frontend tests**, lint/typecheck/build, migration, staged smoke, promotion
+  and stable-domain smoke. CI probes **18/18**; independent stable probes **9/9**.
+- Stable-origin lookup confirms READY production **dpl_AsYMM369iNxaNwbWdcij4zn4nQRA**,
+  URL `https://healthlink-76ct8g1ev-mahim2077s-projects.vercel.app`, app commit
+  `2bb55b827aec36f98fbf141493669c74f2bfec3d`. Both approved accounts only; Groq
+  key remains a sensitive production-only Vercel env value, absent from source.
+- Additional authenticated/browser/live-AI acceptance was not safely completed:
+  browser runtime and hidden-input path unavailable; weaker password input was
+  rejected and not applied. No real records sent. Owner General-mode confirmation
+  requested. Runtime count query returned 403; zero drains listed, so monitoring
+  and clean-log claims are explicitly withheld. Full receipt/limits:
+  `docs/PRODUCTION_RELEASE_2026_10_18.md`.
+
+- Additional credential-free production Edge check passed: public login controls
+  at 390/768/1366/1920px, no horizontal overflow or browser exceptions; public
+  screenshot inspected. The verifier's initial exact password-label mismatch
+  was corrected for the existing accessible `(required)` suffix; no app change.
+  This does not establish authenticated login or live production AI success.

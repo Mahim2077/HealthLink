@@ -3,6 +3,14 @@
 This guide deploys the existing HealthLink monorepo as one Vercel project named
 `healthlink-sd` through GitHub Actions.
 
+> **Current production — 2026-10-18:** application `2bb55b8`, READY deployment
+> `dpl_AsYMM369iNxaNwbWdcij4zn4nQRA`, successful Actions **39058877324** and
+> migration `0030_doctor_locations`. Protected staging smoke uses `vercel curl`
+> with existing CI authentication; stable smoke is anonymous. Eighteen CI probes
+> and nine independent stable-domain probes passed. Read
+> `PRODUCTION_RELEASE_2026_10_18.md` for scope and remaining limits. The earlier
+> local checkpoint and release hold below are historical.
+
 > **Latest local checkpoint: 2026-10-17.** The last verified released application
 > is `c8d2f26` (Phases 15–21 and approved product improvements), with migration
 > `0030_doctor_locations`. Later AI/dashboard/security changes remain local.

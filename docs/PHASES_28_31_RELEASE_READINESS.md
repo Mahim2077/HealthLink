@@ -1,8 +1,9 @@
 # Phases 28–31: local implementation and release gates
 
-Checkpoint: 2026-10-18. The owner now explicitly authorized commit, push and
-deployment, and private production Groq configuration. The previous hold below is
-historical. Current execution status: `PRODUCTION_RELEASE_2026_10_18.md`. This
+Checkpoint: 2026-10-18. **Released application `2bb55b8` is live.** The owner
+authorized commit, push, deployment and private production Groq configuration.
+The previous hold/blockers below are historical. Current verified execution and
+remaining limits: `PRODUCTION_RELEASE_2026_10_18.md`. This
 checklist does not authorize other accounts, projects or unrelated changes.
 
 ## Phase status
@@ -12,7 +13,7 @@ checklist does not authorize other accounts, projects or unrelated changes.
 | 28 — dashboard/UX consolidation | Implemented; real projections and fresh four-width/role acceptance passed | Specialist/manual accessibility checks are not certification claims |
 | 29 — security hardening | Local fixes and automated permission matrix implemented | Production log/infrastructure review belongs to the authorized release |
 | 30 — end-to-end QA | All four known issues repaired; 532 backend / 263 frontend tests, 8 production-build browser cases and 9 live AI/UI cases passed | Local scoped acceptance complete; external/manual limitations remain explicit |
-| 31 — final release | CI ordering repaired locally; 544 backend / 263 frontend tests and production build passed; owner authorized release | Commit/push, green Linux CI, staged deployment and production verification still required |
+| 31 — final release | Released `2bb55b8`; Actions 39058877324 passed, stable deployment READY; 555 backend / 263 frontend tests, 18 CI smoke and 9 independent stable probes passed | Authenticated production/live AI confirmation, runtime-log access and manual/provider/privacy review limits remain explicit |
 
 Do not report Phase 30 browser acceptance or Phase 31 production release complete
 based solely on passing unit/integration tests.
@@ -142,37 +143,38 @@ Services deployment. The final Linux Actions build remains a release gate.
 
 - [x] Finish scoped fresh browser/responsive acceptance above (8 cases passed).
 - [x] Correct and locally verify whole-release CI serialization plus stale-commit guards;
-  current separate job locks do not prevent an older run replacing a newer one.
-  See the current integrity audit. Do not cancel in-progress database migrations
+  earlier separate job locks were replaced with one release lifecycle job.
+  See the release receipt. Do not cancel in-progress database migrations
   or reuse a workflow lock group inside its own jobs.
 - [x] Obtain explicit owner approval for commit, push and production deployment (2026-10-18).
-- [ ] Review the full dirty tree, including untracked AI/dashboard/tests/scripts;
+- [x] Review the full dirty tree, including untracked AI/dashboard/tests/scripts;
   exclude `.runtime`, `.env`, keys, credentials and test/browser artifacts.
-- [ ] Verify repository/branch, intended commit, Vercel team/project and stable
+- [x] Verify repository/branch, intended commit, Vercel team/project and stable
   domain. Preserve Vercel Services, Supabase PostgreSQL and same-origin `/api/v1`.
 - [ ] Verify protected production environment/branch approvals, required CI gates,
   credential scoping and pinned CLI compatibility before triggering the workflow.
   Do not print secrets or copy pulled environment files into artifacts.
 - [ ] Both AI enable flags remain false unless a separately approved provider and
   health-data review permits activation. A key alone is not production sign-off.
-- [ ] Verify production Alembic head without exposing its connection URL. Local
+- [x] Verify production Alembic head without exposing its connection URL. Local
   changes add no migrations; expected head remains `0030_doctor_locations`.
   No stamp, downgrade, schema reset or data deletion is part of this release.
-- [ ] Run complete local gates, then review green GitHub Actions quality jobs.
-- [ ] Only after approval, push the reviewed commit. A push/manual run on `main`
+- [x] Run complete local gates, then review green GitHub Actions quality jobs.
+- [x] Only after approval, push the reviewed commit. A push/manual run on `main`
   can automatically migrate/deploy; do not use it merely to test local readiness.
-- [ ] Let existing Actions migration/build/prebuilt-deploy ordering run. Preserve
+- [x] Let existing Actions migration/build/prebuilt-deploy ordering run. Preserve
   the current architecture; do not substitute a direct deployment path silently.
-- [ ] Future Actions smoke invokes `scripts/smoke_release.py` for the generated
+- [x] Actions smoke invokes `scripts/smoke_release.py` for the generated
   deployment URL **and** `https://healthlink-sd.vercel.app`.
 - [ ] Verify authenticated synthetic production journeys, private PDFs, AI-off
   handling and a bounded, privacy-preserving runtime-log window after release.
-- [ ] Record commit, Actions run, deployment URL, stable alias, migration head,
+- [x] Record commit, Actions run, deployment URL, stable alias, migration head,
   exact test evidence and remaining limitations in the handover.
 
 The smoke script probes production `/health`, home/three sign-in pages and four
 anonymous-denial API boundaries. It uses HTTPS Vercel origins, bounded reads and
-no credentials/model calls. It rejects redirects, wrong health environments,
+no application credentials/model calls. Protected staging uses the existing
+Vercel CLI identity; stable-domain probes stay anonymous. It rejects redirects, wrong health environments,
 missing HealthLink HTML and unexpectedly public protected endpoints. A healthy
 process does not prove database health, user login, model availability or commit
 identity. Check those separately. Never weaken deployment protection to make a

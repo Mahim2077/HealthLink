@@ -13,12 +13,13 @@ Workspace:              D:\HealthLink_V_1
 Repository:             https://github.com/Mahim2077/HealthLink
 Production:             https://healthlink-sd.vercel.app/
 Branch:                 main
-Released app commit:    c8d2f26a836d39f3153b1af3e9ff9d4ac079ba9e
-GitHub Actions run:     34915012756 (successful, 4m 24s)
+Released app commit:    2bb55b827aec36f98fbf141493669c74f2bfec3d
+GitHub Actions run:     39058877324 (successful, 4m 41s)
 Released DB head:       0030_doctor_locations
-Released roadmap:       Phases 15–21 plus approved product improvements
-Local development:      Phases 22–31 candidate verified; CI ordering repaired locally; release authorized/in progress
-Next work:              Commit/push, observe Actions, verify the new production deployment; do not claim release until confirmed
+Released roadmap:       Through Phase 31, preserving approved product improvements
+Local development:      Application/CI changes committed, pushed and released; post-release limits recorded below
+Implementation commit:  5de35ffb285b74535f2eece623a6c16310a3f68b
+Next work:              Owner General-mode AI/login confirmation; resolve runtime-log access/monitoring and explicit manual review limits
 ```
 
 Relevant released commits:
@@ -28,12 +29,12 @@ fa07edf  feat(clinical): complete phases 15 through 17
 6ca19f6  feat(clinical): complete phases 18 through 21
 cb075e2  docs(phase-21): record production verification [skip ci]
 c8d2f26  feat(platform): modernize discovery and clinical workflows
+5de35ff  feat(platform): complete phases 22-31 with Groq AI and safe releases
+2bb55b8  fix(ci): authenticate protected staged deployment smoke checks
 ```
 
-The released baseline above was committed, pushed, migrated and verified on the
-stable domain at its release. It has not been re-inspected in production during
-the 2026-10-17 local continuation. The later AI/dashboard/security work remains
-unreleased at the start of this continuation. On 2026-10-18 the owner explicitly
+The earlier baseline was released before the 2026-10-17 local continuation. The
+later AI/dashboard/security work was unreleased at the start. On 2026-10-18 the owner explicitly
 authorized commit, push and deployment, supplied a production Groq key and
 requested private environment configuration. This supersedes the prior release
 hold for this release only. See `docs/PRODUCTION_RELEASE_2026_10_18.md` for status.
@@ -48,10 +49,35 @@ approved connection. An explicit-team connector query misleadingly returned 404;
 account-level lookup returned the exact same project and team. No account switch
 or replacement project was needed.
 
+### Latest release result — deployed successfully, bounded checks passed
+
+After the owner resumed Supabase, migration passed. The first staged smoke hit
+Vercel Authentication, correctly preventing promotion. CI-only fix `2bb55b8` uses
+the existing Vercel CLI identity for staged probes; the public stable-domain
+probes remain anonymous. No protection downgrade or alternate account was used.
+
+Actions **39058877324** succeeded: **555 backend tests**, **263 frontend tests**,
+lint/typecheck/build, production migration `0030`, staged smoke, promotion and
+stable smoke. Vercel stable-origin lookup confirms application `2bb55b8`, READY
+deployment **dpl_AsYMM369iNxaNwbWdcij4zn4nQRA**. CI smoke passed 18 probes and an
+independent stable-domain pass completed 9/9 probes. Source/log Groq-key-pattern
+scans were clean; no key file or frontend variable was introduced.
+Credential-free headless Edge also checked the public sign-in controls at four
+widths with zero document overflow/browser exceptions; screenshot inspected.
+
+Production-only Groq configuration is saved, but **authenticated production
+journeys/live AI remain unconfirmed automatically**: the browser runtime and
+secure-input path were unavailable. Do not weaken password input or transfer
+real records to get a test to pass. Owner manual General-mode confirmation was
+requested. Runtime-log access returned 403; zero drains were listed, so no clean
+log review or monitoring guarantee is claimed. See
+`docs/PRODUCTION_RELEASE_2026_10_18.md` for the receipt and exact limits. Earlier
+blocked/unreleased statements in later historical sections are superseded here.
+
 ## 2. Mandatory reading order
 
 1. This file.
-   Latest verification: `docs/PHASE_31_INTEGRITY_AUDIT_2026_10_17.md` (adds a release-ordering blocker; local gates passed). The preceding repair/live-AI evidence is in `docs/PHASE_31_LOCAL_RELEASE_REPORT.md`.
+   Latest release: `docs/PRODUCTION_RELEASE_2026_10_18.md`. The preceding audit/repair evidence is in `docs/PHASE_31_INTEGRITY_AUDIT_2026_10_17.md` and `docs/PHASE_31_LOCAL_RELEASE_REPORT.md`; their release blockers were corrected.
 2. `frontend/AGENTS.md`.
 3. `AGENTIC_IMPLEMENTATION_HANDOFF_PHASES_0_TO_14.md` for the historical base.
 4. The end of `docs/implementation-progress.md` for Phases 15–21 and the latest
