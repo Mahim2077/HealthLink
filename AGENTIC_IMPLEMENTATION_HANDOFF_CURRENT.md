@@ -13,14 +13,14 @@ Workspace:              D:\HealthLink_V_1
 Repository:             https://github.com/Mahim2077/HealthLink
 Production:             https://healthlink-sd.vercel.app/
 Branch:                 main
-Released app commit:    2bb55b827aec36f98fbf141493669c74f2bfec3d
-GitHub Actions run:     39058877324 (successful, 4m 41s)
-Released DB head:       0030_doctor_locations
+Released app commit:    21e94a5372f6cbf29d71f12fa85e4fa069930ea1
+GitHub Actions run:     39398090813 (successful, 4m 29s)
+Released DB head:       0031_ai_conversations
 Released roadmap:       Through Phase 31, preserving approved product improvements
-Current release:        Owner authorized commit/push/deploy on 2026-10-20; chat release preflight in progress
+Current release:        Modern chat + private history committed, pushed and deployed to stable production
 Local QA DB head:       0031_ai_conversations (synthetic loopback database only)
 Implementation commit:  5de35ffb285b74535f2eece623a6c16310a3f68b
-Next work:              Release via existing GitHub Actions migration/stage/smoke/promotion gates; verify stable domain
+Next work:              Runtime-log access/monitoring gap; owner review; no numbered development phase remains
 ```
 
 Relevant released commits:
@@ -31,11 +31,14 @@ wide transcript / compact records control and explicitly requested private
 account persistence with delete controls. This changes the earlier no-chat-storage
 decision for the conversation UI only. Provider architecture, explanation-only
 safety, finalized-record authorization and per-request consent remain unchanged.
-Migration `0031_ai_conversations` has NOT been applied to production. The earlier
-release approval did not authorize releasing this new work. The owner's separate
-2026-10-20 “okay, proceed” now authorizes this chat release. See
-`docs/PRODUCTION_CHAT_RELEASE_2026_10_20.md` for the current release checkpoint;
-do not mark it deployed until CI promotion and stable-domain verification succeed.
+The owner's separate 2026-10-20 “okay, proceed” authorized this release.
+Migration `0031_ai_conversations`, staging, protected smoke, promotion and stable
+smoke all passed. Modern chat is live at the stable production origin. A real
+citizen login, two General-mode Groq answers, history after refresh/reopen, and
+New conversation were verified without reading/sending personal medical records.
+The provided Doctor and Admin logins and role dashboards also passed; no clinical
+or administrative records were changed during those checks.
+See `docs/PRODUCTION_CHAT_RELEASE_2026_10_20.md` for exact evidence and limits.
 
 ```text
 fa07edf  feat(clinical): complete phases 15 through 17

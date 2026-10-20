@@ -1,9 +1,9 @@
 # HealthLink AI: local development
 
-The earlier Phases 22–31 AI work has been released; current production status is
-recorded in `AGENTIC_IMPLEMENTATION_HANDOFF_CURRENT.md`. The approved modern-chat
-upgrade is new **local, unreleased** work. Saved conversations require migration
-`0031_ai_conversations`, applied only to the synthetic local QA database so far.
+Phases 22–31 and the modern-chat upgrade have been released; current production
+status is recorded in `AGENTIC_IMPLEMENTATION_HANDOFF_CURRENT.md` and
+`PRODUCTION_CHAT_RELEASE_2026_10_20.md`. Saved conversations require migration
+`0031_ai_conversations`, now applied to production and the synthetic local QA database.
 See `AI_CONVERSATIONS_2026_10_19.md` for ownership, retention and consent details.
 
 ## Safe end-to-end development

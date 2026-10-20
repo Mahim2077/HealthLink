@@ -4,6 +4,8 @@
 > production deployment. The local-only statements below describe the original
 > implementation checkpoint. Follow `PRODUCTION_CHAT_RELEASE_2026_10_20.md` for
 > current migration/deployment status; preserve the standard CI release gates.
+> Release completed successfully: application `21e94a5`, production migration
+> `0031_ai_conversations`, Actions `39398090813`. The original local hold is historical.
 
 The owner approved the revised hybrid chat design and explicitly selected
 account-private saved conversations with delete controls. This supersedes the

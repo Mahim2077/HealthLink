@@ -1,5 +1,57 @@
 # Modern AI chat production release — 2026-10-20
 
+> **Released successfully.** Commit `21e94a5` is READY and serves
+> `https://healthlink-sd.vercel.app/`. Migration, staging, protected smoke,
+> promotion and stable-domain smoke all passed. Preflight text below is historical.
+
+## Final release receipt
+
+- Application commit: `21e94a5372f6cbf29d71f12fa85e4fa069930ea1`.
+- [GitHub Actions 39398090813](https://github.com/Mahim2077/HealthLink/actions/runs/39398090813):
+  **success**, 4m 29s, authorized `main` commit and approved Vercel target.
+- Deployment: `dpl_VJY17uPWnJQ1yKotXvTSv76SkCvs`, READY / production.
+- Generated origin: `https://healthlink-4gjsbw4vw-mahim2077s-projects.vercel.app`.
+- Stable origin: `https://healthlink-sd.vercel.app/`; deployment lookup of this
+  origin returned the same deployment and application SHA after promotion.
+- Production schema: **`0031_ai_conversations`**; CI migration logs confirmed head.
+- Linux backend CI: **564 passed**, zero skipped. Frontend CI: **57 files / 266
+  tests**, lint, typecheck and optimized build passed.
+- Release smoke: **18 passed** (9 staged authenticated transport + 9 stable
+  anonymous probes). Independent workstation stable-domain smoke: **9/9 passed**.
+
+## Production acceptance and limits
+
+The provided citizen test account signed in successfully. The new chat displayed
+its sidebar, private history and compact records-off control. Two real Groq
+General-mode questions about laboratory reference ranges returned educational,
+non-diagnostic answers, including a context-dependent follow-up. A full page
+refresh restored the session; reopening the saved conversation showed both
+questions and answers. New conversation cleared the transcript/composer while
+preserving previous saved history and defaulting to records off.
+
+One harmless, two-turn conversation beginning “Release check:” remains in the
+provided test account. No existing conversation was deleted. Production deletion
+was not exercised; confirmation/ownership/hard-delete paths passed local synthetic
+tests. No real clinical record was created/changed or sent to Groq, and no
+record-aware model request was made during release verification.
+
+The in-app browser supplied authenticated visual/AX evidence; the earlier release's
+browser initialization limitation is no longer a blocker for this citizen check.
+This limited sample does not certify clinical accuracy or provider privacy/terms.
+
+The provided Doctor and Admin accounts also signed in successfully and rendered
+their role-specific dashboards (Today's care overview / Operational overview).
+No consultation, schedule, facility, verification, identity or access-grant change
+was made. Test sessions were signed out after checks. This is production login /
+dashboard acceptance, not a fresh production execution of the full clinical journey.
+
+Runtime-log counts remain unavailable: the approved Vercel connection returned
+**403** for a bounded error/fatal grouped query. Its project-scoped CLI fallback
+stalled and was stopped after verifying exact approved project/team arguments;
+no login, permission or account change was attempted. Project-scoped drain
+inventory returned **zero drains**. No clean runtime-log scan or active external
+error monitor is claimed; no new paid integration/alert was provisioned.
+
 ## Authority and target
 
 The owner authorized proceeding with the remaining release/verification work
