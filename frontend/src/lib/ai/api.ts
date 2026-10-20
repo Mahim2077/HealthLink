@@ -5,6 +5,10 @@ import { apiClient } from "@/lib/api/client";
 import type {
   AiChatResponse,
   ChatMode,
+  ConversationDetail,
+  ConversationPage,
+  ConversationSendRequest,
+  ConversationSendResponse,
   LabReportExplanation,
   MedicalHistorySummary,
   PrescriptionExplanation,
@@ -38,3 +42,12 @@ export const requestSymptomGuidance = (symptoms: string) =>
     "ai/symptom-guidance",
     { symptoms },
   );
+
+export const listConversations = (offset = 0, signal?: AbortSignal) =>
+  apiClient.get<ConversationPage>(`ai/conversations?offset=${offset}`, { cache: "no-store", signal });
+export const loadConversation = (id: string, signal?: AbortSignal) =>
+  apiClient.get<ConversationDetail>(`ai/conversations/${encodeURIComponent(id)}`, { cache: "no-store", signal });
+export const deleteConversation = (id: string) =>
+  apiClient.delete<void>(`ai/conversations/${encodeURIComponent(id)}`);
+export const sendConversationMessage = (payload: ConversationSendRequest, signal?: AbortSignal) =>
+  apiClient.post<ConversationSendResponse, ConversationSendRequest>("ai/conversation-messages", payload, { signal });

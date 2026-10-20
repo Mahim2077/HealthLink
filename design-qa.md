@@ -325,3 +325,106 @@ No actionable P0, P1, or P2 differences remain.
 - [x] No Phase 15 feature introduced.
 
 final result: passed
+
+---
+
+# Approved modern AI chat — 2026-10-19 local implementation
+
+## Source and rendered evidence
+
+- Source visual truth: `C:/Users/User/.codex/generated_images/01a09161-a544-7292-8a25-323ccc9166b8/exec-68a89dfa-1d2c-41f2-a96b-92573beb9fb1.png`.
+  An unchanged local QA copy is `D:/HealthLink_V_1/.runtime/chat-design-qa/approved-reference.png`.
+- Implementation: `http://127.0.0.1:3001/citizen/ai-assistant`, optimized Next
+  build behind the existing loopback Services proxy; synthetic PostgreSQL and mock AI only.
+- Final desktop capture: `D:/HealthLink_V_1/.runtime/chat-design-qa/implementation-desktop.png`.
+- Full-view combined comparison: `D:/HealthLink_V_1/.runtime/chat-design-qa/full-comparison.png`.
+- Focused composer combined comparison: `D:/HealthLink_V_1/.runtime/chat-design-qa/composer-comparison.png`.
+- Additional evidence: `D:/HealthLink_V_1/.runtime/chat-design-qa/implementation-mobile-320.png`
+  and `D:/HealthLink_V_1/.runtime/chat-design-qa/record-consent.png`.
+- Desktop CSS viewport: 1487 × 1058; deviceScaleFactor 1. Source: 1487 × 1058 px.
+  Full-page implementation: 1487 × 1059 px (one extra page-layout pixel).
+  Both are 1× density; contact sheets scale each image equally to fit 890 × 635
+  without stretching. Composer crops use corresponding content regions at equal scale.
+- State: authenticated citizen, collapsed existing portal rail, two real synthetic
+  general question/answer turns, empty composer, records off. Source has seven
+  illustrative conversations and short fictional answers; implementation has one
+  genuine saved conversation and the existing mock's deliberately generic answer
+  plus clinician questions. No fake history was inserted to copy the mock.
+- Responsive captures: 320, 390, 768 and 1280 px at height 900. Broader portal
+  regression also covers 1366 and 1920 px.
+
+## Comparison history / findings and fixes
+
+### First visual pass — blocked pending adjustments
+
+- [P2] The history column was 44 px narrower than the reference, shifting the chat
+  start from approximately x418 to x374 and making history titles too cramped.
+  Fixed desktop sidebar width from 290 to 334 px; retain narrower tablet rules.
+- [P2] Transcript/composer text and send affordance were undersized compared with
+  the reference. Increased desktop transcript to 17 px, composer input to 16 px,
+  context chip to 14 px, heading to 28 px and send target to 52 px. Mobile retains
+  appropriate compact spacing and a minimum 44 px send target.
+- [P2] Send glyph used an upward arrow rather than the reference's paper-plane
+  affordance. Replaced it with the existing Heroicons paper-plane asset.
+- Initial evidence was the first dev capture opened in this turn; the first
+  combined contact sheet confirmed the undersized composer before the second
+  typography/icon adjustment. Final paths above contain the revised captures.
+
+### Final visual pass — passed
+
+Opened the final full-view and focused composer contact sheets together with
+the final mobile and consent captures. No actionable P0/P1/P2 difference remains.
+
+Required fidelity surfaces:
+
+- **Fonts/typography:** existing locally bundled Inter retained, with strong compact
+  heading hierarchy and readable transcript/input sizes. Long questions wrap,
+  sidebar titles clamp instead of widening the layout, and small timestamps stay
+  secondary. The compact context utility no longer dominates the chat.
+- **Spacing/layout:** final history/chat boundary aligns with the reference;
+  white transcript, right-aligned pale-teal user bubbles, unboxed assistant text,
+  and bottom composer follow the approved hierarchy. Longer structured answers
+  scroll inside the message region; earlier bubbles may be above the current
+  scroll position, not discarded. Existing portal header is approximately 14 px
+  taller than the illustrative reference and is intentionally preserved.
+- **Colors/tokens:** existing #00695f / #0f766e teal, #f8fbfa neutral surface,
+  #dbe6e3 borders and dark foreground are preserved. Selected history and user
+  bubbles use restrained pale teal. Disabled send is deliberately muted, unlike
+  the mock's active-looking empty send button.
+- **Image quality/assets:** no raster artwork is called for. Existing HealthLink
+  brand and Heroicons are reused; no generated decorative assets, hand-drawn SVG,
+  emoji substitutes or placeholder artwork were introduced.
+- **Copy/content:** real account data replaces illustrative identity/history.
+  Conversation titles are first-question-derived without an extra model call.
+  Original structured clinician questions, source labels and safety reminders are
+  preserved instead of hiding product information to imitate short mock answers.
+  A small provider-processing warning and private-history/delete notice are
+  intentional safety additions. AI remains explanation-only.
+
+## Interaction and implementation checklist
+
+- [x] Actual send → authenticated API → PostgreSQL persistence → transcript rendering.
+- [x] Two-turn transcript, reload/reopen, New conversation and delete confirmation.
+- [x] One-request record consent, reset after editing/sending, General default.
+- [x] Pending controls, failed-question preservation and idempotent retry covered.
+- [x] Mobile history drawer, keyboard input, bounded internal scrolling, visible
+  composer and no horizontal viewport overflow at tested sizes.
+- [x] Symptom guidance and existing citizen/doctor/lab/admin journeys preserved.
+- [x] Browser console/page exceptions, unexpected API failures and external browser
+  requests checked by the acceptance harness: none in the final passing run.
+- [x] Full backend 564 tests; frontend 57 files / 266 tests; lint, TypeScript and
+  optimized build passed. Final optimized-build Edge browser suite: 9/9 passed.
+- [x] Local migration upgrade and Alembic schema-drift check passed.
+- [x] Separate release approval required; no commit, push or deployment performed.
+
+## Expected differences and remaining limits
+
+The existing portal chrome, real history count, dynamic content, optional
+clinician questions and safety/privacy disclosures explain the remaining layout
+differences. These are intentional product constraints, not missing mock content.
+The in-app browser could not reconnect to loopback; the previously authorized
+local Edge harness supplied authenticated rendered evidence. Live-provider answer
+quality and production authenticated behavior were not retested in this UI task.
+No P3 refinement is required before local owner review.
+
+final result: passed

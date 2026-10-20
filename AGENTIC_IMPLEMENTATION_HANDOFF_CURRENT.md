@@ -1,6 +1,6 @@
 # HealthLink current agentic implementation handoff
 
-> **Status date:** 2026-10-18
+> **Status date:** 2026-10-20
 > **Read this file first.** It is the authoritative operational checkpoint for
 > the current workspace. Older implementation prompts and handoffs remain useful
 > for architecture/history, but this file supersedes their phase-start, storage,
@@ -17,12 +17,25 @@ Released app commit:    2bb55b827aec36f98fbf141493669c74f2bfec3d
 GitHub Actions run:     39058877324 (successful, 4m 41s)
 Released DB head:       0030_doctor_locations
 Released roadmap:       Through Phase 31, preserving approved product improvements
-Local development:      Application/CI changes committed, pushed and released; post-release limits recorded below
+Current release:        Owner authorized commit/push/deploy on 2026-10-20; chat release preflight in progress
+Local QA DB head:       0031_ai_conversations (synthetic loopback database only)
 Implementation commit:  5de35ffb285b74535f2eece623a6c16310a3f68b
-Next work:              Owner General-mode AI/login confirmation; resolve runtime-log access/monitoring and explicit manual review limits
+Next work:              Release via existing GitHub Actions migration/stage/smoke/promotion gates; verify stable domain
 ```
 
 Relevant released commits:
+
+**Latest local continuation:** see `docs/AI_CONVERSATIONS_2026_10_19.md` and the
+latest `design-qa.md` entry. The owner approved the hybrid conversation sidebar /
+wide transcript / compact records control and explicitly requested private
+account persistence with delete controls. This changes the earlier no-chat-storage
+decision for the conversation UI only. Provider architecture, explanation-only
+safety, finalized-record authorization and per-request consent remain unchanged.
+Migration `0031_ai_conversations` has NOT been applied to production. The earlier
+release approval did not authorize releasing this new work. The owner's separate
+2026-10-20 “okay, proceed” now authorizes this chat release. See
+`docs/PRODUCTION_CHAT_RELEASE_2026_10_20.md` for the current release checkpoint;
+do not mark it deployed until CI promotion and stable-domain verification succeed.
 
 ```text
 fa07edf  feat(clinical): complete phases 15 through 17
@@ -498,8 +511,10 @@ reported one upstream Starlette/httpx deprecation warning, not a test failure.
 - Phase 27: `POST /api/v1/ai/symptom-guidance` loads no clinical records and
   returns structured informational guidance/red flags/next steps/urgency.
   It is not a diagnostic or medically validated triage tool.
-- AI responses stay in component memory only: no database chat history,
-  localStorage/sessionStorage, stored PDF, or automatic clinical writes.
+- At this historical checkpoint AI responses were component-memory only.
+  The separately approved 2026-10-19 chat upgrade now stores conversations
+  privately in the database with delete controls. It still introduces no browser
+  chat storage, stored PDF or automatic clinical write.
 - UI places AI explanations below authoritative prescription/lab content;
   optional summary stays secondary to the medical-history timeline.
 - Deterministic schema/safety checks are defence in depth, not proof of clinical

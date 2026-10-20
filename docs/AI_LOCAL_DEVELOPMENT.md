@@ -1,7 +1,10 @@
-# HealthLink AI: local development through Phase 27
+# HealthLink AI: local development
 
-Phases 22–27 are local work, not a production release. No AI schema migration is
-required; Alembic head remains `0030_doctor_locations`.
+The earlier Phases 22–31 AI work has been released; current production status is
+recorded in `AGENTIC_IMPLEMENTATION_HANDOFF_CURRENT.md`. The approved modern-chat
+upgrade is new **local, unreleased** work. Saved conversations require migration
+`0031_ai_conversations`, applied only to the synthetic local QA database so far.
+See `AI_CONVERSATIONS_2026_10_19.md` for ownership, retention and consent details.
 
 ## Safe end-to-end development
 
@@ -119,9 +122,12 @@ age/access rules, privacy requirements and product scope with the owner.
   loading health records automatically. Do not wait for AI in an emergency.
 
 Requests have bounded inputs/outputs. Authenticated responses use private/no-store
-cache headers. No prompt/response/chat history is persisted; metadata-only
-`AI_ACCESS` logs capture record retrieval. GENERAL and symptom modes do not create
-clinical context or record-read audits.
+cache headers. The approved conversation interface now saves questions and
+validated answers privately to the citizen's account, with delete controls.
+No browser chat persistence is used. Other explanations remain transient;
+metadata-only `AI_ACCESS` logs capture record retrieval. GENERAL and symptom
+modes do not create clinical context or record-read audits. General follow-ups
+never resend prior record-aware history without fresh record consent.
 
 ## Accuracy and privacy limitations
 

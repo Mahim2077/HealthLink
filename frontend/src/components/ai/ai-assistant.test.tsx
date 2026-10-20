@@ -1,91 +1,131 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ ask: vi.fn(), symptoms: vi.fn() }));
-vi.mock("@/lib/ai/api", () => ({ askAi: mocks.ask, requestSymptomGuidance: mocks.symptoms }));
-
+const mocks = vi.hoisted(() => ({ list: vi.fn(), load: vi.fn(), send: vi.fn(), remove: vi.fn(), symptoms: vi.fn() }));
+vi.mock("@/lib/ai/api", () => ({ listConversations: mocks.list, loadConversation: mocks.load, sendConversationMessage: mocks.send, deleteConversation: mocks.remove, requestSymptomGuidance: mocks.symptoms }));
 import { AiAssistant } from "./ai-assistant";
 
-describe("AiAssistant", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("requires explicit consent before record-aware chat", async () => {
-    mocks.ask.mockResolvedValue({ answer: "Bring your recent reports.", record_observations: [], questions_for_clinician: [], disclaimer: "Informational only.", records_used: {} });
-    render(<AiAssistant />);
-    fireEvent.click(screen.getByText("Use my records"));
-    fireEvent.change(screen.getByLabelText("Your question"), { target: { value: "What should I discuss?" } });
-    expect(screen.getByRole("button", { name: "Ask HealthLink AI" })).toBeDisabled();
-    fireEvent.click(screen.getByText(/I allow HealthLink AI/));
-    fireEvent.click(screen.getByRole("button", { name: "Ask HealthLink AI" }));
-    await waitFor(() => expect(mocks.ask).toHaveBeenCalledWith({ mode: "RECORD_AWARE", message: "What should I discuss?", use_my_health_records: true }));
-    expect(await screen.findByText("Bring your recent reports.")).toBeInTheDocument();
+const summary = { id: "chat-one", title: "What is a reference range?", created_at: "2026-10-18T12:00:00Z", updated_at: "2026-10-18T12:00:00Z" };
+const response = { answer: "A range is a guide, not a diagnosis.", record_observations: [], questions_for_clinician: ["How does this relate to my history?"], disclaimer: "Not a diagnosis or prescription.", records_used: {} };
+const turn = { id: "turn-one", message: summary.title, mode: "GENERAL", created_at: summary.created_at, response };
+const input = () => screen.getByRole("textbox", { name: "Your question" });
+const send = () => screen.getByRole("button", { name: "Send message" });
+async function records() {
+  fireEvent.click(screen.getByRole("button", { name: /General · Records off/ }));
+  fireEvent.click(screen.getByRole("radio", { name: "Use my records" }));
+}
+describe("Saved AI conversations", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.list.mockResolvedValue({ items: [], next_offset: null });
+    mocks.send.mockResolvedValue({ conversation: summary, turn });
+    mocks.remove.mockResolvedValue(undefined);
+    mocks.load.mockResolvedValue({ ...summary, turns: [turn] });
   });
 
-  it("shows red flags and urgency without requesting records", async () => {
-    mocks.symptoms.mockResolvedValue({ symptom_summary: "A brief summary.", general_information: ["Rest if able."], red_flags: ["Trouble breathing"], suggested_next_step: "Contact a clinician.", urgency_category: "PROMPT_CLINICAL_REVIEW", disclaimer: "Not a diagnosis." });
+  it("keeps a transcript across questions and starts a clean conversation", async () => {
     render(<AiAssistant />);
-    fireEvent.click(screen.getByRole("tab", { name: /symptom guidance/i }));
+    fireEvent.change(input(), { target: { value: summary.title } });
+    fireEvent.click(send());
+    expect(await screen.findByText(response.answer)).toBeInTheDocument();
+    expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ mode: "GENERAL", message: summary.title, use_my_health_records: false, conversation_id: null, client_request_id: expect.any(String) }), expect.any(AbortSignal));
+    fireEvent.change(input(), { target: { value: "Explain more simply." } });
+    expect(screen.getByText(response.answer)).toBeInTheDocument();
+    mocks.send.mockResolvedValue({ conversation: summary, turn: { ...turn, id: "turn-two", message: "Explain more simply.", response: { ...response, answer: "Here is a simpler explanation." } } });
+    fireEvent.click(send());
+    expect(await screen.findByText("Here is a simpler explanation.")).toBeInTheDocument();
+    expect(screen.getByText(response.answer)).toBeInTheDocument();
+    expect(mocks.send.mock.calls[1][0].conversation_id).toBe(summary.id);
+    fireEvent.click(screen.getByRole("button", { name: "New conversation" }));
+    expect(screen.queryByText(response.answer)).not.toBeInTheDocument();
+    expect(input()).toHaveValue("");
+    expect(screen.getByRole("button", { name: /General · Records off/ })).toBeInTheDocument();
+  });
+
+  it("requires fresh records consent and defaults back to General after sending", async () => {
+    mocks.send.mockResolvedValue({ conversation: summary, turn: { ...turn, mode: "RECORD_AWARE" } });
+    render(<AiAssistant />);
+    fireEvent.change(input(), { target: { value: summary.title } });
+    await records();
+    expect(send()).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.change(input(), { target: { value: summary.title + " please" } });
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(send());
+    expect(await screen.findByText(response.answer)).toBeInTheDocument();
+    expect(mocks.send.mock.calls[0][0]).toMatchObject({ mode: "RECORD_AWARE", use_my_health_records: true });
+    expect(screen.getByRole("button", { name: /General · Records off/ })).toBeInTheDocument();
+  });
+
+  it("preserves failed questions and reuses the retry ID without retaining consent", async () => {
+    mocks.send.mockRejectedValueOnce(new Error("Temporarily unavailable"));
+    render(<AiAssistant />);
+    fireEvent.change(input(), { target: { value: summary.title } });
+    await records();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(send());
+    expect(await screen.findByRole("alert")).toHaveTextContent("Temporarily unavailable");
+    expect(input()).toHaveValue(summary.title);
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    expect(send()).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(send());
+    expect(await screen.findByText(response.answer)).toBeInTheDocument();
+    expect(mocks.send.mock.calls[0][0].client_request_id).toBe(mocks.send.mock.calls[1][0].client_request_id);
+  });
+
+  it("loads history and confirms deletion before removing it", async () => {
+    mocks.list.mockResolvedValue({ items: [summary], next_offset: null });
+    render(<AiAssistant />);
+    const history = screen.getByRole("complementary", { name: "Conversation history" });
+    fireEvent.click(await within(history).findByRole("button", { name: /^What is a reference range/ }));
+    expect(await screen.findByText(response.answer)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Delete conversation:/ }));
+    expect(mocks.remove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Delete conversation:/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete permanently" }));
+    await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith(summary.id));
+    await waitFor(() => expect(screen.queryByText(response.answer)).not.toBeInTheDocument());
+  });
+
+  it("preserves chat when opening and closing symptom guidance", async () => {
+    mocks.symptoms.mockResolvedValue({ symptom_summary: "A brief summary.", general_information: [], red_flags: ["Trouble breathing"], suggested_next_step: "Contact a clinician.", urgency_category: "PROMPT_CLINICAL_REVIEW", disclaimer: "Not a diagnosis." });
+    render(<AiAssistant />);
+    fireEvent.change(input(), { target: { value: summary.title } });
+    fireEvent.click(send());
+    await screen.findByText(response.answer);
+    fireEvent.click(screen.getByRole("button", { name: "Symptom guidance" }));
     fireEvent.change(screen.getByLabelText("Describe your symptoms"), { target: { value: "Cough for two days" } });
     fireEvent.click(screen.getByRole("button", { name: "Get general guidance" }));
     expect(await screen.findByText("Trouble breathing")).toBeInTheDocument();
-    expect(screen.getByText("Prompt clinician review")).toBeInTheDocument();
     expect(mocks.symptoms).toHaveBeenCalledWith("Cough for two days");
+    fireEvent.click(screen.getByRole("button", { name: "Back to chat" }));
+    expect(screen.getByText(response.answer)).toBeInTheDocument();
   });
 
-  it("consumes consent on failed requests and disables pending context changes", async () => {
-    let reject!: (reason: Error) => void;
-    mocks.ask.mockImplementation(() => new Promise((_, rejectRequest) => { reject = rejectRequest; }));
-    render(<AiAssistant />);
-    fireEvent.click(screen.getByText("Use my records"));
-    fireEvent.change(screen.getByLabelText("Your question"), { target: { value: "What should I ask?" } });
-    const consent = screen.getByRole("checkbox");
-    fireEvent.click(consent);
-    fireEvent.click(screen.getByRole("button", { name: "Ask HealthLink AI" }));
-    expect(consent).not.toBeChecked();
-    expect(consent).toBeDisabled();
-    expect(screen.getByLabelText("Your question")).toBeDisabled();
-    screen.getAllByRole("radio").forEach((radio) => expect(radio).toBeDisabled());
-    reject(new Error("Temporarily unavailable"));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Temporarily unavailable");
-    expect(consent).not.toBeChecked();
-    expect(screen.getByRole("button", { name: "Ask HealthLink AI" })).toBeDisabled();
+  it("disables context/navigation during generation and ignores unmounted responses", async () => {
+    let resolve!: (value: unknown) => void;
+    mocks.send.mockImplementation(() => new Promise(done => { resolve = done; }));
+    const view = render(<AiAssistant />);
+    fireEvent.change(input(), { target: { value: summary.title } });
+    fireEvent.click(send());
+    expect(input()).toBeDisabled();
+    expect(screen.getByRole("button", { name: "New conversation" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /General · Records off/ })).toBeDisabled();
+    view.unmount();
+    await act(async () => resolve({ conversation: summary, turn }));
   });
 
-  it("clears previous responses on question and context changes", async () => {
-    mocks.ask.mockResolvedValue({ answer: "A temporary answer", record_observations: [], questions_for_clinician: [], disclaimer: "Informational only.", records_used: {} });
+  it("retries history loading and rejects short whitespace-only questions", async () => {
+    mocks.list.mockRejectedValueOnce(new Error("History unavailable"));
     render(<AiAssistant />);
-    const input = screen.getByLabelText("Your question");
-    fireEvent.change(input, { target: { value: "First question" } });
-    fireEvent.click(screen.getByRole("button", { name: "Ask HealthLink AI" }));
-    expect(await screen.findByText("A temporary answer")).toBeInTheDocument();
-    fireEvent.change(input, { target: { value: "Second question" } });
-    expect(screen.queryByText("A temporary answer")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Ask HealthLink AI" }));
-    expect(await screen.findByText("A temporary answer")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Use my records"));
-    expect(screen.queryByText("A temporary answer")).not.toBeInTheDocument();
-  });
-
-  it("supports keyboard tabs and requires three trimmed input characters", () => {
-    render(<AiAssistant />);
-    fireEvent.change(screen.getByLabelText("Your question"), { target: { value: " a " } });
-    expect(screen.getByRole("button", { name: "Ask HealthLink AI" })).toBeDisabled();
-    const chat = screen.getByRole("tab", { name: /ask healthlink ai/i });
-    fireEvent.keyDown(chat, { key: "End" });
-    const symptoms = screen.getByRole("tab", { name: /symptom guidance/i });
-    expect(symptoms).toHaveFocus();
-    expect(symptoms).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", symptoms.id);
-    expect(symptoms.getAttribute("aria-controls")).toBe(screen.getByRole("tabpanel").id);
-    expect(screen.getByText(/Do not wait for an AI response/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Describe your symptoms"), { target: { value: "ab" } });
-    expect(screen.getByRole("button", { name: "Get general guidance" })).toBeDisabled();
-    fireEvent.keyDown(symptoms, { key: "ArrowRight" });
-    expect(chat).toHaveFocus();
-    expect(chat).toHaveAttribute("aria-selected", "true");
-    fireEvent.keyDown(chat, { key: "ArrowLeft" });
-    expect(symptoms).toHaveFocus();
-    fireEvent.keyDown(symptoms, { key: "Home" });
-    expect(chat).toHaveFocus();
+    expect(await screen.findByRole("alert")).toHaveTextContent("History unavailable");
+    fireEvent.click(screen.getByRole("button", { name: "Retry history" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    fireEvent.change(input(), { target: { value: " a " } });
+    expect(send()).toBeDisabled();
   });
 });

@@ -43,6 +43,30 @@ export type MedicalHistorySummary = {
 
 export type ChatMode = "GENERAL" | "RECORD_AWARE";
 
+export type ConversationSummary = {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+};
+export type ConversationTurn = {
+  id: string;
+  mode: ChatMode;
+  message: string;
+  response: AiChatResponse;
+  created_at: string;
+};
+export type ConversationDetail = ConversationSummary & { turns: ConversationTurn[] };
+export type ConversationPage = { items: ConversationSummary[]; next_offset: number | null };
+export type ConversationSendRequest = {
+  conversation_id: string | null;
+  client_request_id: string;
+  mode: ChatMode;
+  message: string;
+  use_my_health_records: boolean;
+};
+export type ConversationSendResponse = { conversation: ConversationSummary; turn: ConversationTurn };
+
 export type AiChatResponse = {
   answer: string;
   record_observations: Array<{

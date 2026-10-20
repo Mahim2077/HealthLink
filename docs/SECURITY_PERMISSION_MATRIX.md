@@ -74,6 +74,11 @@ queues; review their consumers before changing their contracts.
   infrastructure access-log redaction before real-data release.
 - Clinical audits contain metadata, not prompts, chat messages, raw clinical
   records or model responses. AI identity reduction is not anonymization.
+- The separately approved modern-chat upgrade stores questions and validated
+  responses privately under citizen ownership, with hard-delete controls.
+  This is application data, not an audit log or clinical record. No browser chat
+  storage is used; General requests do not resend record-aware conversation
+  history without fresh consent. See `AI_CONVERSATIONS_2026_10_19.md`.
 - No process-local limiter is presented as a global serverless rate limiter.
   Provider 429 handling exists; shared/platform abuse controls need a separate
   deployment-level decision if required.

@@ -8,6 +8,7 @@ from sqlalchemy.engine import Connection, Engine
 
 from app.core.config import get_settings
 from app.db.base import Base
+from app.ai import conversation_models  # noqa: F401
 from app.emergency import models as emergency_models  # noqa: F401
 from app.reminders import models as reminder_models  # noqa: F401
 from app.clinical_audit import models as clinical_audit_models  # noqa: F401

@@ -266,25 +266,86 @@ test('Citizen → Doctor → Lab → Citizen: real local care journey', async ({
   await expect(other.locator('main')).not.toContainText('Medicine A');
 });
 
+test('Modern AI chat: saved transcript, new conversation, private history and responsive composer', async ({ browser }, info) => {
+  const page = await actor(browser, 'citizen', 1487);
+  await page.setViewportSize({ width: 1487, height: 1058 });
+  const collapse = page.getByRole('button', { name: 'Collapse navigation', exact: true });
+  if (await collapse.isVisible()) await collapse.click();
+  await page.goto('/citizen/ai-assistant');
+  await expect(page.getByRole('heading', { name: 'What would you like to understand?', exact: true })).toBeVisible();
+  await snapshot(page, info, 'modern-chat-empty-desktop');
+  const question = 'What does a laboratory reference range mean?';
+  const input = page.getByRole('textbox', { name: 'Your question', exact: true });
+  await input.fill(question);
+  await input.press('Enter');
+  await expect(page.getByRole('article', { name: 'Question and answer' })).toHaveCount(1);
+  await input.fill('What should I ask my doctor?');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(page.getByRole('article', { name: 'Question and answer' })).toHaveCount(2);
+  await snapshot(page, info, 'modern-chat-transcript-desktop');
+  await page.reload();
+  const history = page.getByRole('complementary', { name: 'Conversation history', exact: true });
+  await history.getByRole('button', { name: /^What does a laboratory reference range mean/ }).click();
+  await expect(page.getByRole('article', { name: 'Question and answer' })).toHaveCount(2);
+  await page.getByRole('button', { name: 'New conversation', exact: true }).click();
+  await expect(page.getByRole('article', { name: 'Question and answer' })).toHaveCount(0);
+  await history.getByRole('button', { name: /^What does a laboratory reference range mean/ }).click();
+  for (const width of [320, 390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeVisible();
+    const dimensions = await page.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width + 1);
+    const composer = await page.getByRole('button', { name: 'Send message', exact: true }).boundingBox();
+    expect(composer.y + composer.height).toBeLessThanOrEqual(900);
+    if (width < 768) {
+      await page.getByRole('button', { name: 'Conversations', exact: true }).click();
+      await expect(history.getByRole('button', { name: 'New conversation', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Conversations', exact: true }).click();
+    }
+    await snapshot(page, info, 'modern-chat-responsive-' + width);
+  }
+  await page.setViewportSize({ width: 1487, height: 1058 });
+  await input.fill('Explain the recorded history for education.');
+  await page.getByRole('button', { name: 'General · Records off', exact: true }).click();
+  await page.getByRole('radio', { name: 'Use my records', exact: true }).check();
+  const consent = page.getByRole('checkbox', { name: /I allow HealthLink AI/ });
+  await consent.check();
+  await input.fill('Explain my recorded history without diagnosing.');
+  await expect(consent).not.toBeChecked();
+  await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeDisabled();
+  await snapshot(page, info, 'modern-chat-record-consent');
+  await consent.check();
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(page.getByRole('article', { name: 'Question and answer' })).toHaveCount(3);
+  await expect(page.getByRole('button', { name: 'General · Records off', exact: true })).toBeVisible();
+  await history.getByRole('button', { name: /^Delete conversation:/ }).click();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('article', { name: 'Question and answer' })).toHaveCount(3);
+  // Only this test's own newly-created synthetic conversation is deleted.
+  await history.getByRole('button', { name: /^Delete conversation:/ }).click();
+  await page.getByRole('button', { name: 'Delete permanently', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'What would you like to understand?', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(history.getByRole('button', { name: /^What does a laboratory reference range mean/ })).toHaveCount(0);
+});
+
 test('AI consent, history, saved reminders and privacy remain functional', async ({ browser }, info) => {
   const f = fixture();
   const page = await actor(browser, 'citizen');
   await page.goto('/citizen/ai-assistant');
   await page.getByRole('textbox', { name: 'Your question', exact: true }).fill('What does a medical reference range mean?');
-  await page.getByRole('button', { name: 'Ask HealthLink AI', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'HealthLink AI response', exact: true })).toBeVisible();
-  await page.getByRole('radio', { name: /Use my records/ }).check();
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(page.getByRole('article', { name: 'Question and answer' })).toHaveCount(1);
   await page.getByRole('textbox', { name: 'Your question', exact: true }).fill('Explain what my recorded results contain.');
+  await page.getByRole('button', { name: 'General · Records off', exact: true }).click();
+  await page.getByRole('radio', { name: /Use my records/ }).check();
   const consent = page.getByRole('checkbox', { name: /I allow HealthLink AI/ });
-  await expect(page.getByRole('button', { name: 'Ask HealthLink AI', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeDisabled();
   await consent.check();
-  await page.getByRole('button', { name: 'Ask HealthLink AI', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'HealthLink AI response', exact: true })).toBeVisible();
-  await expect(consent).not.toBeChecked();
-  await page.getByRole('tab', { name: 'Symptom guidance', exact: true }).click();
-  await page.keyboard.press('ArrowLeft');
-  await expect(page.getByRole('tab', { name: 'Ask HealthLink AI', exact: true })).toBeFocused();
-  await page.getByRole('tab', { name: 'Symptom guidance', exact: true }).click();
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(page.getByRole('article', { name: 'Question and answer' })).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'General · Records off', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Symptom guidance', exact: true }).click();
   const symptoms = page.getByRole('textbox');
   await symptoms.fill('I cannot breathe and have severe chest pressure.');
   await page.getByRole('button', { name: /guidance/i }).click();
