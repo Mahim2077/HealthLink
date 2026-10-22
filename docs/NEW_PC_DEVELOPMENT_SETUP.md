@@ -1,14 +1,24 @@
 # HealthLink development setup on a new PC
 
+> Current continuation is [Phase 32](PHASE_32_POST_ROADMAP_UPGRADES.md). Check its
+> [release receipt](PRODUCTION_PHASE_32_RELEASE_2026_10_22.md) before assuming all
+> local changes are available in the remote clone. Earlier commit lists are history.
+
 This guide sets up a Windows development workstation while keeping local work
 isolated from HealthLink production.
+
+Dependency instructions updated 2026-10-22. Use the
+[current handoff](../AGENTIC_IMPLEMENTATION_HANDOFF_CURRENT.md) for release state
+and unreleased work; historical commit lists below are not the current resume
+point. The hashed dependency/security changes must be included in the clone or
+transferred working copy before using these updated commands.
 
 ## 1. Install prerequisites
 
 Install:
 
 - Git
-- Python 3.13 or newer
+- Python 3.13 (tested runtime)
 - Node.js 24.15 or newer within the Node 24 release line; do not use Node 25
 - PostgreSQL 17 or newer
 - A code editor such as Visual Studio Code
@@ -98,8 +108,7 @@ From the repository root:
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+.\.venv\Scripts\python.exe -m pip install --require-hashes --only-binary=:all: -r backend\requirements-dev.txt
 Copy-Item backend\.env.example backend\.env
 ```
 
@@ -121,11 +130,12 @@ not needed for normal development.
 
 Never commit `backend\.env`.
 
-The local Phase-22–27 AI implementation now supports GroqCloud, mock and Gemini.
+The Phase-22–31 AI implementation supports GroqCloud, mock and Gemini.
 Groq/Qwen 3.8 is the selected (disabled) default. Follow
 `docs/AI_LOCAL_DEVELOPMENT.md` for synthetic-data testing, server-only key setup
-and provider restrictions. The frontend does not need an AI API key. Uncommitted
-local AI work must be transferred separately until an approved release includes it.
+and provider restrictions. The frontend does not need an AI API key. Check the
+current handoff and Git status before moving any unreleased local work; never
+include secret environment files in a source transfer.
 
 ## 6. Apply database migrations
 
@@ -139,7 +149,7 @@ Set-Location ..
 The current result should report:
 
 ```text
-0030_doctor_locations (head)
+0031_ai_conversations (head)
 ```
 
 Do not run local migration commands against the production database.
@@ -195,6 +205,8 @@ Backend dependency and test checks from the repository root:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m pip_audit --strict --disable-pip --require-hashes -s pypi -r backend/requirements.txt
+.\.venv\Scripts\python.exe -m pip_audit --strict --disable-pip --require-hashes -s pypi -r backend/requirements-dev.txt
 .\.venv\Scripts\python.exe -m pytest backend\tests
 ```
 
@@ -211,6 +223,8 @@ Frontend checks:
 
 ```powershell
 Set-Location frontend
+npm run test:security
+npm run audit:security
 npm run lint
 npm run typecheck
 npm test -- --run

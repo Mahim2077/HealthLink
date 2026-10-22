@@ -1,5 +1,9 @@
 # HealthLink public landing page — design QA
 
+> Phase designation update, 2026-10-22: post–Phase 31 entries for saved chat,
+> Settings/interface cleanup and Light/Dark/System are **Phase 32** evidence.
+> Earlier entries keep their original scope; see `docs/PHASE_32_POST_ROADMAP_UPGRADES.md`.
+
 ## Comparison target
 
 - Approved source mock: `C:/Users/User/.codex/generated_images/019fe7ac-e181-7140-b244-712ee417dcef/exec-12fca598-ef03-4d02-ac3b-4ae69d9ef5d6.png` (`1487 × 1058`).
@@ -426,5 +430,203 @@ The in-app browser could not reconnect to loopback; the previously authorized
 local Edge harness supplied authenticated rendered evidence. Live-provider answer
 quality and production authenticated behavior were not retested in this UI task.
 No P3 refinement is required before local owner review.
+
+final result: passed
+
+---
+
+# Role-aware Settings and shared UI cleanup — 2026-10-20 (local, unreleased)
+
+## Source, target and evidence
+
+User asked to inspect the entire app, plan Settings, then implement it. The target
+is an evolution of the existing HealthLink application, not a new visual identity
+or pixel-identical clone. User approved local automated Edge/Playwright QA using
+synthetic records; no production record changes or release were requested.
+
+Fresh source truth: `.runtime/ui-settings-audit/before/manifest.json`, 38 numbered
+routes at desktop/mobile sizes. Numbered audit and plan:
+`docs/UI_SETTINGS_AUDIT_2026_10_20.md`. Current-run clinical source evidence came
+from the 9/9 baseline browser journeys before UI edits. Initial admin detail
+capture was blocked by a real async-params bug; its saved error screen is in
+`before-detail/`. It was not accepted as a healthy detail screen.
+
+Implementation evidence:
+
+- `.runtime/ui-settings-audit/after/manifest.json`: 53 route states / 106 captures.
+- `.runtime/ui-settings-audit/after-final/manifest.json`: 14 final Settings states.
+- `.runtime/ui-settings-audit/after-final-dashboard/manifest.json`: four dashboards.
+- `.runtime/browser-qa/results/`: final optimized-build care/Settings journeys,
+  including doctor consultation, lab editing/finalization, mobile large-text menu,
+  cross-session revocation and repaired admin detail. Browser report/result JSON
+  under `.runtime/browser-qa/` is generated/ignored, not a release artifact.
+
+Opened and inspected saved contact sheets and focused full-size screens. Source
+and implementation were put together in the same comparison inputs, not compared
+from memory:
+
+- `comparisons/doctor-desktop.png`: full-view top region, daily work hierarchy.
+- `comparisons/account-mobile.png`: mobile account navigation/form hierarchy.
+- `comparisons/privacy-desktop.png`: existing access history vs reorganized section.
+- `comparisons/citizen-header.png`: shared navigation/header proportions.
+- `comparisons/navigation-focused.png`: unscaled, readable navigation detail.
+
+All comparison paths above are under `.runtime/ui-settings-audit/`. Raw files are
+local synthetic QA evidence only. Account names, IDs, fixture counts and activity
+timestamps differ between isolated seed runs; they are not fidelity targets.
+
+### Dimensions and normalization
+
+Desktop CSS viewport 1440×1000, mobile 390×844, device scale factor 1. Full-page
+source profile mobile: 390×2282; final profile mobile: 390×2390. Source doctor
+dashboard: 1440×1944; final: 1440×1207 (practice configuration intentionally moved).
+Final display desktop: 1440×1000; security mobile: 390×1163.
+Full-view comparisons crop equal 1440×1000 or 390×844 top regions before equal
+downsampling (desktop to 720 px wide; mobile remains 390 px). Focused navigation
+uses identical x=84..1200, y=0..145 crops without downsampling, stacked together.
+Production-build captures omit Next's development indicator; that is not a
+product difference. Full-page modal screenshots can show content below the
+viewport; actual modal focus/scroll locking was checked in the 390×844 viewport.
+
+## Iteration history and findings
+
+### Initial pass — blocked pending refinements
+
+- [P2] Mobile Settings/account header repeated the citizen eyebrow and explanatory
+  copy, pushing editable fields too far down. Evidence: first `after/24-...-mobile`
+  capture versus source `before/22-...-mobile`. Removed repeated eyebrow/copy and
+  redundant Back to dashboard button in embedded mode, compacted mobile heading
+  spacing, retained visible email and Add a professional role. Post-fix evidence:
+  `after-final/01-citizen-settings-mobile.png` and final `account-mobile.png`.
+- [P2] All-session revocation initially looked like a neutral action because
+  utility classes lost to the shared button rule. Added an explicit danger style.
+  Evidence: `after/25-citizen-settings-security-mobile.png` versus
+  `after-final/02-citizen-settings-security-mobile.png`.
+- [P2] Doctor overview still said "schedule below" after moving that editor.
+  Changed the sentence to link directly to Settings → Practice hours. Final
+  evidence: `after-final-dashboard/02-doctor-dashboard-desktop.png` and combined
+  `doctor-desktop.png`; daily clinical actions remain in the workspace.
+- [P2] Wide result columns lacked an explicit mobile scroll cue/keyboard region.
+  Added a mobile hint and focusable labelled report/trend scroll regions. Final
+  care journey/table tests pass and final citizen report capture was inspected.
+- [P1, functional audit] Admin identity detail requested `undefined` due to
+  synchronous access to async Next.js params. Awaited params; final synthetic
+  identity detail renders correctly and has a browser regression.
+
+### Final comparison — passed
+
+Reopened the combined source/final comparison inputs, final Settings sheets and
+individual mobile/desktop/clinical captures after fixes. No actionable P0/P1/P2
+visual finding remains in the tested states.
+
+Required fidelity surfaces:
+
+- Fonts/typography: existing locally bundled Inter retained; clear h1/section/
+  field hierarchy, readable labels, wrapping email and responsive section names.
+  Larger text is functional and does not hide controls at tested widths.
+- Spacing/layout: slimmed shared chrome from 136 to 120 CSS px on desktop;
+  preserved icon rail, resizing and familiar text navigation. Settings uses an
+  anchored desktop section list and wrapping mobile grid. Mobile account header
+  is intentionally compact; doctor dashboard is shorter without removing tools.
+- Colors/tokens: existing citizen teal, professional blue, admin indigo, neutral
+  surfaces and border tokens retained. Selected sections use role-tinted surfaces;
+  destructive session revocation is visibly distinct. Screenshot review does not
+  assert full contrast/WCAG compliance.
+- Image quality/assets: existing brand/hero assets and Heroicons remain. No new
+  raster art was needed; no custom SVG, emoji or CSS-art replacements were added.
+- Copy/content: no fictitious password/2FA/notification features. Display settings
+  explicitly say browser-only/shared-device scope. Session revocation clearly
+  includes this session/other portals. AI remains an explainer, never a diagnosis
+  or prescription; records require explicit per-request consent in the chat.
+
+## Interaction and verification checklist
+
+- [x] Settings entry from account header and navigation in citizen/doctor/lab/admin.
+- [x] Existing profile saves, masked identity and irreversible NID confirmation retained.
+- [x] Legacy profile/privacy URLs redirect; existing verification route remains usable.
+- [x] Verified-doctor-only practice editor; lab/pending/rejected role denial covered.
+- [x] Existing schedule saves/reloads, with an unsaved-edits warning on navigation.
+- [x] Display allowlist, corrupt/blocked storage, cross-tab updates, reset and reload.
+- [x] Mobile focus containment, inert background, scroll locking, Escape and focus restore.
+- [x] Current/all-session sign-out confirmation/error handling; two same-account
+  sessions revoked while another synthetic account remains signed in.
+- [x] Key clinical workflows, AI history/delete/consent, on-demand PDFs, manual
+  Bangladesh area/nearest search and admin facility-coordinate privacy preserved.
+- [x] Final backend 564 tests; frontend 60 files / 291 tests; lint, typecheck and
+  optimized build passed. Final optimized Edge suite: 12/12 passed (53.2 s).
+- [x] No unexpected API/console errors, external browser requests or document
+  overflow in asserted states. Settings widths 320/390/768/1366; portal regression
+  matrix also 1920; larger-text smoke includes main citizen care/AI screens.
+- [x] Changed-file secret-pattern scan and `git diff --check` clean. No commit,
+  push, deployment, production database write, schema migration or API-key change.
+
+Limits: synthetic local data, mock AI and bounded viewport/keyboard testing only;
+not a screen-reader certification, all-browser guarantee, live-provider evaluation
+or production QA. Existing production runtime-log access gap is unchanged.
+No required P3 refinement remains for local review. Fresh approval required before
+any release operation.
+
+final result: passed
+
+---
+
+# Light/Dark/System theme follow-up — 2026-10-20 (local only)
+
+Requested addition: Color theme in Settings → Display & accessibility. This is
+an extension of the existing approved Settings layout, not a new visual direction.
+Light remains the default; Dark and Use system setting are persisted on this
+browser only. OS changes and other-tab changes update live. Static trusted head
+initialization applies the saved theme before body paint; missing/corrupt/blocked
+storage safely falls back to Light. Hydration suppression is limited to the html
+attributes intentionally changed by that bootstrap.
+
+Evidence from this follow-up's actual optimized Edge run:
+
+- `.runtime/browser-qa/results/healthlink-Light-dark-Syst-8c363-hanges-and-synchronize-tabs/`:
+  `settings-dark-desktop.png`, `settings-dark-mobile.png`,
+  `settings-light-mobile.png` and dark public/auth/validation captures.
+- `.runtime/browser-qa/results/healthlink-Dark-portal-mat-a56c8-records-chat-and-workspaces/`:
+  desktop/mobile dark Settings, dashboards, medical history, diagnostics, doctor
+  discovery, AI transcript/composer, practice editor and admin registries.
+- The complete citizen → doctor → lab → citizen care journey now also runs in
+  Dark: clinical editing, previous prescriptions, PDFs, lab draft/finalize and
+  result/AI explanation. Those captures remain in the care-journey result folder.
+- `.runtime/theme-qa/themes-1.jpg` through `themes-4.jpg`: current-run review sheets.
+- `.runtime/theme-qa/light-dark-mobile.png`: Light and Dark together at identical
+  390×844 CSS-pixel viewport crops, scale factor 1, no resampling, with a 40-pixel
+  label strip. Both states use the same fixture/layout; only selected theme differs.
+  Desktop Settings uses 1366×900 viewport/full-page capture. Long clinical and
+  registry pages have additional full-page evidence; review sheets crop top regions.
+
+Opened the saved combined comparison, all four review sheets, full desktop
+Settings, AI transcript/composer and consultation captures. Readability fixes from
+the first pass: stronger native-field boundaries, retained pink invalid-field
+borders/feedback, transparent inactive navigation borders and original role-brand
+fills under the white logo mark. No image inversion or replacement artwork.
+
+Fidelity surfaces:
+
+- Typography: same Inter, weights, hierarchy, wrapping and layout in both modes.
+- Spacing: color-only adaptation; theme selector uses the existing setting row.
+- Tokens: dark canvas #0b111b, raised surfaces #131e2c, readable neutral text,
+  teal/blue/indigo role links and distinct semantic warning/error/success surfaces.
+  Solid action fills keep white text; original brand contrast is preserved.
+- Assets: original logo/hero/Heroicons retained without invert filters.
+- Copy: Light/Dark/Use system setting labels, device-only scope and privacy notices
+  remain explicit. AI consent and medical behavior are unchanged.
+
+Verification: **61 frontend files / 298 tests**, lint/typecheck/optimized build and
+**14/14 browser journeys** passed. Coverage includes saved theme at first body
+insertion (before hydration), refresh, live OS changes, cross-tab updates,
+explicit-theme precedence, corrupt/blocked storage, error-field focus, print media,
+all four roles and mobile overflow. Dark styling is screen-only; printing remains
+light and generated PDFs/API/provider behavior are untouched. Browser harness
+readiness was tightened to await hydrated legacy redirects and observable viewport/
+media settling; no auth policy or production setting was weakened.
+
+Backend source unchanged from the preceding 564-test baseline. All evidence is
+synthetic/local and ignored; no live-provider or production claim. No exhaustive
+WCAG/screen-reader certification. No commit, push or deployment; fresh release
+approval still required.
 
 final result: passed

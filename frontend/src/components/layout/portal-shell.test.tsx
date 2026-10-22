@@ -66,6 +66,8 @@ function renderShell() {
 
 describe("PortalShell", () => {
   beforeEach(() => {
+    window.localStorage.clear();
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
     accessTokenStore.clear();
     mocks.loadCitizenMe.mockReset();
     mocks.loadCitizenMe.mockResolvedValue({
@@ -93,22 +95,35 @@ describe("PortalShell", () => {
     await waitFor(() => expect(screen.getByText("Amina Rahman")).toBeInTheDocument());
     expect(screen.getByRole("link", { name: /Amina Rahman/ })).toHaveAttribute(
       "href",
-      "/citizen/profile",
+      "/citizen/settings",
     );
   });
 
-  it("opens and closes the mobile navigation", () => {
+  it("contains mobile focus, locks scrolling and restores the opener", () => {
     renderShell();
     expect(
       screen.getAllByRole("navigation", { name: "citizen navigation" }),
     ).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
+    const opener = screen.getByRole("button", { name: "Open navigation" });
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    expect(document.body.style.overflow).toBe("hidden");
+    const controls = dialog.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)');
+    controls[controls.length - 1].focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(controls[0]).toHaveFocus();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(controls[controls.length - 1]).toHaveFocus();
     expect(
       screen.getAllByRole("navigation", { name: "citizen navigation" }),
     ).toHaveLength(2);
 
     fireEvent.keyDown(document, { key: "Escape" });
+    expect(document.body.style.overflow).toBe("");
+    expect(opener).toHaveFocus();
     expect(
       screen.getAllByRole("navigation", { name: "citizen navigation" }),
     ).toHaveLength(1);

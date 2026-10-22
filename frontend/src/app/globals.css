@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./themes.css";
 
 @theme inline {
   --font-sans: "Inter Variable", "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
@@ -91,6 +92,44 @@ textarea {
 
 :focus-visible {
   scroll-margin: 7rem;
+  outline: 2px solid var(--portal-accent, var(--healthlink-teal));
+  outline-offset: 3px;
+}
+
+html[data-text-size="large"] { font-size: 112.5%; }
+
+.hl-scrollbar { scrollbar-width: thin; scrollbar-color: #94a3b8 transparent; }
+@media (max-width: 639px) {
+  .hl-settings-page { padding-top: 1.75rem; }
+  .hl-settings-page > .hl-page-header { padding-bottom: 1.25rem; }
+}
+
+.hl-settings-card {
+  border: 1px solid var(--healthlink-border);
+  border-radius: 1rem;
+  background: var(--healthlink-surface);
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+.hl-section-title { font-size: 1.375rem; font-weight: 700; line-height: 1.35; letter-spacing: -0.025em; color: var(--foreground); }
+.hl-section-description { margin-top: 0.5rem; font-size: 0.875rem; line-height: 1.65; color: var(--text-secondary); max-width: 42rem; }
+.hl-setting-row { display: flex; flex-direction: column; align-items: flex-start; gap: 1rem; padding-block: 1.25rem; font-size: 0.875rem; }
+.hl-setting-help { display: block; margin-top: 0.25rem; font-size: 0.8125rem; line-height: 1.6; color: var(--text-secondary); }
+.hl-settings-select { min-height: 2.75rem; width: 100%; border: 1px solid var(--input-border); border-radius: 0.625rem; padding: 0.625rem 0.75rem; background: var(--healthlink-surface); color: var(--foreground); }
+.hl-button-primary, .hl-button-secondary { display: inline-flex; min-height: 2.75rem; align-items: center; justify-content: center; gap: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.75rem; padding: 0.625rem 1rem; font-size: 0.875rem; font-weight: 600; text-align: center; line-height: 1.4; }
+.hl-button-secondary { background: var(--healthlink-surface); color: var(--text-secondary); }
+.hl-button-secondary:hover:not(:disabled) { background: var(--surface-subtle); border-color: #94a3b8; }
+.hl-button-danger { border-color: var(--danger-border); color: var(--danger-ink); }
+.hl-button-danger:hover:not(:disabled) { border-color: #fda4af; background: var(--danger-soft); }
+.hl-button-primary { border-color: var(--portal-accent, #0f766e); background: var(--portal-accent, #0f766e); color: white; }
+.hl-button-primary:disabled, .hl-button-secondary:disabled { cursor: wait; opacity: 0.6; }
+@media (min-width: 768px) {
+  .hl-setting-row { flex-direction: row; align-items: center; justify-content: space-between; }
+  .hl-setting-row > :first-child { min-width: 0; max-width: 32rem; }
+  .hl-settings-select { width: 12rem; flex-shrink: 0; }
+}
+html[data-motion="reduced"] { scroll-behavior: auto; }
+html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.01ms !important;
 }
 
 ::selection {
@@ -135,18 +174,18 @@ textarea {
 .hl-card {
   border: 1px solid var(--healthlink-border);
   border-radius: 1.25rem;
-  background: rgb(255 255 255 / 0.96);
+  background: var(--healthlink-surface);
   box-shadow: 0 16px 36px -32px rgb(15 23 42 / 0.35);
 }
 
 .hl-field {
   min-height: 3rem;
   width: 100%;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--input-border);
   border-radius: 0.75rem;
-  background: white;
+  background: var(--healthlink-surface);
   padding-inline: 0.875rem;
-  color: #0f172a;
+  color: var(--foreground);
   outline: none;
   transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
 }
@@ -157,7 +196,7 @@ textarea {
 
 .hl-field:focus {
   border-color: #0f766e;
-  box-shadow: 0 0 0 4px rgb(204 251 241 / 0.8);
+  box-shadow: 0 0 0 4px var(--accent-soft);
 }
 
 .hl-field[aria-invalid="true"] {

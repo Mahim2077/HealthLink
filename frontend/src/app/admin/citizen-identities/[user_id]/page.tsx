@@ -2,6 +2,7 @@ import { CitizenIdentityDetail } from "@/components/admin/citizen-identity-detai
 
 type Params = { user_id: string };
 
-export default function AdminCitizenIdentityDetailPage({ params }: { params: Params }) {
-  return <CitizenIdentityDetail userId={params.user_id} />;
+export default async function AdminCitizenIdentityDetailPage({ params }: { params: Promise<Params> }) {
+  const { user_id } = await params;
+  return <CitizenIdentityDetail userId={user_id} />;
 }

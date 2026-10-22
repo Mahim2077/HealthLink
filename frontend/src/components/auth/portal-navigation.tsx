@@ -7,14 +7,13 @@ import {
   CalendarDaysIcon,
   ChatBubbleBottomCenterTextIcon,
   ChatBubbleLeftRightIcon,
-  ClipboardDocumentCheckIcon,
+  Cog6ToothIcon,
   ClipboardDocumentListIcon,
   HomeIcon,
   IdentificationIcon,
   MagnifyingGlassIcon,
   QueueListIcon,
   ShieldCheckIcon,
-  UserCircleIcon,
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -42,8 +41,7 @@ const links: Record<Portal, NavigationItem[]> = {
     { href: "/citizen/ai-assistant", icon: ChatBubbleLeftRightIcon, label: "AI assistant" },
     { href: "/citizen/emergency-profile", icon: IdentificationIcon, label: "Emergency profile" },
     { href: "/citizen/reminders", icon: CalendarDaysIcon, label: "Reminders" },
-    { href: "/citizen/privacy", icon: ShieldCheckIcon, label: "Privacy & access" },
-    { href: "/citizen/profile", icon: UserCircleIcon, label: "My profile" },
+    { href: "/citizen/settings", icon: Cog6ToothIcon, label: "Settings" },
   ],
   PROFESSIONAL: [
     { href: "/professional/dashboard", icon: HomeIcon, label: "My workspace" },
@@ -51,13 +49,14 @@ const links: Record<Portal, NavigationItem[]> = {
     { href: "/professional/visits", icon: ChatBubbleBottomCenterTextIcon, label: "Consultations", roles: ["DOCTOR"] },
     { href: "/professional/access-grants", icon: ShieldCheckIcon, label: "Shared records", roles: ["DOCTOR"] },
     { href: "/professional/diagnostics", icon: BeakerIcon, label: "Diagnostics", roles: ["DOCTOR", "LAB_TECHNICIAN"] },
-    { href: "/professional/status", icon: ClipboardDocumentCheckIcon, label: "Role status" },
+    { href: "/professional/settings", icon: Cog6ToothIcon, label: "Settings" },
   ],
   ADMIN: [
     { href: "/admin/dashboard", icon: HomeIcon, label: "Overview" },
     { href: "/admin/professional-registrations", icon: ShieldCheckIcon, label: "Verification queue" },
     { href: "/admin/facilities", icon: BuildingOffice2Icon, label: "Facilities" },
     { href: "/admin/citizen-identities", icon: IdentificationIcon, label: "Citizen records" },
+    { href: "/admin/settings", icon: Cog6ToothIcon, label: "Settings" },
   ],
 };
 
@@ -79,6 +78,8 @@ function useNavigationItems(portal: Portal): NavigationItem[] {
 
 function isActivePath(pathname: string, href: string): boolean {
   if (pathname === href || pathname.startsWith(`${href}/`)) return true;
+  if (href === "/citizen/settings" && ["/citizen/profile", "/citizen/privacy", "/citizen/access-grants"].includes(pathname)) return true;
+  if (href === "/professional/settings" && pathname === "/professional/status") return true;
   return href === "/citizen/doctors/search" && pathname.startsWith("/citizen/doctors/");
 }
 
@@ -89,15 +90,15 @@ export function PortalTextNavigation({ portal }: { portal: Portal }) {
   return (
     <nav
       aria-label={`${portal.toLowerCase()} page navigation`}
-      className="hidden min-h-14 items-stretch overflow-x-auto border-t border-slate-100 px-5 sm:px-8 lg:flex lg:px-10"
+      className="hl-scrollbar hidden min-h-12 items-stretch overflow-x-auto border-t border-slate-100 px-5 sm:px-8 lg:flex lg:px-10"
     >
-      <div className="flex min-w-max items-stretch gap-7">
+      <div className="flex min-w-max items-stretch gap-5 xl:gap-6">
         {navigationItems.map(({ href, label }) => {
           const active = isActivePath(pathname, href);
           return (
             <Link
               aria-current={active ? "page" : undefined}
-              className={`relative inline-flex min-h-14 items-center whitespace-nowrap text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-[var(--portal-accent)] ${
+              className={`relative inline-flex min-h-12 items-center whitespace-nowrap text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-[var(--portal-accent)] ${
                 active
                   ? "text-[var(--portal-strong)] after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-[var(--portal-accent)]"
                   : "text-slate-600 hover:text-[var(--portal-strong)]"
@@ -151,7 +152,7 @@ export function PortalNavigation({
       aria-label={`${portal.toLowerCase()} navigation`}
       className="flex min-h-0 flex-1 flex-col px-3 pb-5"
     >
-      <div className="space-y-1.5">
+      <div className="min-h-0 space-y-1.5 overflow-y-auto pb-4">
         {navigationItems.map(({ href, icon: Icon, label }) => {
           const active = isActivePath(pathname, href);
           return (

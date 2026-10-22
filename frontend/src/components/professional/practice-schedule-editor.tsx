@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
+import { useUnsavedChanges } from "@/components/ui/use-unsaved-changes";
 import {
   createPracticeSchedule,
   deletePracticeSchedule,
@@ -128,6 +129,8 @@ export function PracticeScheduleEditor({ deps }: { deps?: Partial<ScheduleEditor
   const [errors, setErrors] = useState<FormErrors>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  useUnsavedChanges(dirty || submitting);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -164,6 +167,7 @@ export function PracticeScheduleEditor({ deps }: { deps?: Partial<ScheduleEditor
   }, [refresh]);
 
   const beginEdit = useCallback((entry: PracticeScheduleEntry) => {
+    setDirty(false);
     setEditingId(entry.id);
     setSubmitError(null);
     setErrors({});
@@ -178,6 +182,7 @@ export function PracticeScheduleEditor({ deps }: { deps?: Partial<ScheduleEditor
   }, []);
 
   const cancelEdit = useCallback(() => {
+    setDirty(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
     setErrors({});
@@ -186,6 +191,7 @@ export function PracticeScheduleEditor({ deps }: { deps?: Partial<ScheduleEditor
 
   const handleChange = useCallback(
     <K extends keyof FormState>(key: K, value: FormState[K]) => {
+      setDirty(true);
       setForm((current) => ({ ...current, [key]: value }));
     },
     [],

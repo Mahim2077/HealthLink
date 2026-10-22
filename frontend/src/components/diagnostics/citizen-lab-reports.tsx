@@ -10,7 +10,7 @@ export function LabTrendTables({ points }: { points: LabTrendPoint[] }) {
     const key = JSON.stringify([point.parameter_name, point.unit]);
     groups.set(key, [...(groups.get(key) ?? []), point]);
   }
-  return <div className="space-y-4">{[...groups].map(([key, values]) => <section className="hl-card overflow-x-auto p-4" key={key}>
+  return <div className="space-y-4">{[...groups].map(([key, values]) => <section aria-label={`${values[0].parameter_name} trend table`} tabIndex={0} className="hl-card hl-scrollbar overflow-x-auto p-4" key={key}>
     <table className="w-full text-left text-sm">
       <caption className="mb-3 text-left font-bold">{values[0].parameter_name} — {values[0].unit ?? "Unit not recorded"}</caption>
       <thead><tr><th scope="col" className="p-2">Report date</th><th scope="col" className="p-2">Numeric result</th><th scope="col" className="p-2">Unit</th></tr></thead>

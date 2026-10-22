@@ -31,9 +31,12 @@ async function login(page, role) {
   await expect(page.getByText('Overview unavailable', { exact: true })).toHaveCount(0);
 }
 
-async function actor(browser, role, width = 1366) {
+async function actor(browser, role, width = 1366, theme = 'light') {
   const context = await browser.newContext({ baseURL: 'http://127.0.0.1:3001', viewport: { width, height: 900 },
     locale: 'en-GB', timezoneId: 'Asia/Dhaka', reducedMotion: 'reduce' });
+  if (theme === 'dark') await context.addInitScript(() => {
+    localStorage.setItem('healthlink.interface.v1', JSON.stringify({ theme: 'dark' }));
+  });
   await context.route('**/*', route => {
     const url = new URL(route.request().url());
     if (['data:', 'blob:'].includes(url.protocol) || (url.hostname === '127.0.0.1' && url.port === '3001')) return route.continue();
@@ -73,7 +76,7 @@ test.afterEach(async ({}, info) => {
 
 test('Citizen → Doctor → Lab → Citizen: real local care journey', async ({ browser }, info) => {
   const f = fixture();
-  const citizen = await actor(browser, 'citizen');
+  const citizen = await actor(browser, 'citizen', 1366, 'dark');
   await expect(citizen.getByRole('link', { name: /Latest diagnostic result Historical synthetic CBC/ })).toBeVisible();
   await citizen.getByRole('link', { name: /Recent prescription Your latest/ }).click();
   await expect(citizen.getByRole('heading', { name: 'Medicine A', exact: true })).toBeVisible();
@@ -138,7 +141,7 @@ test('Citizen → Doctor → Lab → Citizen: real local care journey', async ({
   await citizen.getByRole('button', { name: 'Save emergency profile', exact: true }).click();
   await expect(citizen.getByRole('status')).toContainText(/saved/i);
 
-  const doctor = await actor(browser, 'doctor');
+  const doctor = await actor(browser, 'doctor', 1366, 'dark');
   await doctor.goto('/professional/chamber');
   const facilitySelect = doctor.getByRole('combobox', { name: 'Facility', exact: true });
   if (await facilitySelect.count()) await facilitySelect.selectOption(f.facility_id);
@@ -187,6 +190,9 @@ test('Citizen → Doctor → Lab → Citizen: real local care journey', async ({
   expect(requested.status()).toBe(201);
   shared.diagnostic = await requested.json();
   await snapshot(doctor, info, 'doctor-unified-consultation');
+  await doctor.setViewportSize({ width: 390, height: 844 });
+  await snapshot(doctor, info, 'doctor-unified-consultation-mobile');
+  await doctor.setViewportSize({ width: 1366, height: 900 });
   await doctor.getByRole('button', { name: 'Finish Appointment', exact: true }).click();
   await expect(doctor.getByRole('heading', { name: 'No active patient', exact: true })).toBeVisible();
   await doctor.goto('/professional/dashboard');
@@ -197,7 +203,7 @@ test('Citizen → Doctor → Lab → Citizen: real local care journey', async ({
   await doctor.getByRole('button', { name: 'Update consultation & prescription', exact: true }).click();
   await expect(doctor.getByText('Consultation and prescription saved', { exact: true })).toBeVisible();
 
-  const lab = await actor(browser, 'lab');
+  const lab = await actor(browser, 'lab', 1366, 'dark');
   await expect(lab.getByRole('link', { name: 'Chamber', exact: true })).toHaveCount(0);
   await expect(lab.getByRole('link', { name: 'Consultations', exact: true })).toHaveCount(0);
   await snapshot(lab, info, 'lab-dashboard');
@@ -216,6 +222,10 @@ test('Citizen → Doctor → Lab → Citizen: real local care journey', async ({
   await expect(lab.getByRole('button', { name: 'Finalize report', exact: true })).toBeDisabled();
   await lab.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect(lab.getByRole('status')).toContainText('Draft saved');
+  await snapshot(lab, info, 'lab-report-draft');
+  await lab.setViewportSize({ width: 390, height: 844 });
+  await snapshot(lab, info, 'lab-report-draft-mobile');
+  await lab.setViewportSize({ width: 1366, height: 900 });
   await lab.getByRole('textbox', { name: 'Summary', exact: true }).fill('Synthetic browser corrected draft');
   await expect(lab.getByRole('button', { name: 'Finalize report', exact: true })).toBeDisabled();
   await lab.getByRole('button', { name: 'Save draft', exact: true }).click();
@@ -241,7 +251,7 @@ test('Citizen → Doctor → Lab → Citizen: real local care journey', async ({
   await expect(citizen.getByRole('link', { name: /Latest diagnostic result/ })).toContainText(shared.testName);
   await expect(citizen.getByRole('link', { name: /Recent prescription/ })).toHaveAttribute('href', `/citizen/prescriptions/${shared.prescription.id}`);
 
-  const admin = await actor(browser, 'admin');
+  const admin = await actor(browser, 'admin', 1366, 'dark');
   await snapshot(admin, info, 'admin-dashboard');
   await admin.goto('/admin/citizen-identities');
   await admin.getByLabel('Email', { exact: true }).fill(f.citizen_email);
@@ -437,6 +447,8 @@ for (const [name, width] of [['mobile', 390], ['tablet', 768], ['desktop', 1366]
 test('Synthetic operations: schedule edit, facility update and admin verification', async ({ browser }, info) => {
   const f = fixture();
   const doctor = await actor(browser, 'doctor');
+  await doctor.getByRole('link', { name: 'Manage practice hours', exact: true }).click();
+  await expect(doctor).toHaveURL(/\/professional\/settings\/practice$/);
   await doctor.getByRole('button', { name: 'Edit', exact: true }).click();
   await doctor.getByRole('spinbutton', { name: 'Max patients', exact: true }).fill('21');
   const savingSchedule = doctor.waitForResponse(response => response.request().method() === 'PUT' && new URL(response.url()).pathname.endsWith('/' + f.schedule_id));
@@ -467,6 +479,216 @@ test('Synthetic operations: schedule edit, facility update and admin verificatio
   await admin.getByRole('button', { name: 'Verify and link facility', exact: true }).click();
   await expect(admin.getByRole('heading', { name: 'Decision recorded: VERIFIED', exact: true })).toBeVisible();
   await snapshot(admin, info, 'synthetic-admin-verification');
+});
+
+test('Settings matrix: role-aware sections, legacy links, privacy and admin identity detail', async ({ browser }, info) => {
+  const f = fixture();
+  for (const role of ['citizen', 'doctor', 'lab', 'admin']) {
+    const page = await actor(browser, role);
+    const portal = role === 'doctor' || role === 'lab' ? 'professional' : role;
+    await page.getByRole('link', { name: /: Open settings$/ }).click();
+    await expect(page).toHaveURL(new RegExp(`/${portal}/settings$`));
+    const nav = page.getByRole('navigation', { name: 'Settings sections', exact: true });
+    await expect(nav.getByRole('link', { name: /^Account/ })).toBeVisible();
+    await expect(nav.getByRole('link', { name: /^Practice hours/ })).toHaveCount(role === 'doctor' ? 1 : 0);
+    await expect(nav.getByRole('link', { name: /^Privacy & sharing/ })).toHaveCount(role === 'citizen' ? 1 : 0);
+    await expect(page.getByRole('main')).toHaveCount(1);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+    for (const width of [320, 390, 768, 1366]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(nav).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    }
+    if (role === 'citizen') {
+      await expect(page.getByRole('link', { name: 'Add a professional role', exact: true })).toBeVisible();
+      await page.goto('/citizen/profile');
+      await expect(page).toHaveURL(/\/citizen\/settings$/);
+      // The server redirect changes the URL before session/profile hydration.
+      // Do not abort an in-flight refresh with another artificial hard navigation.
+      await expect(page.getByRole('heading', { name: 'Profile and identity', exact: true })).toBeVisible();
+      await page.goto('/citizen/privacy');
+      await expect(page).toHaveURL(/\/citizen\/settings\/privacy$/);
+      await expect(page.getByRole('link', { name: 'Manage access grants', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Privacy and access history', exact: true })).toBeVisible();
+      await expect(page.getByText(/Records stay off unless/)).toBeVisible();
+    }
+    if (role === 'lab') {
+      await page.goto('/professional/settings/practice');
+      await expect(page.getByRole('heading', { name: 'Verified doctor access required', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Publish window', exact: true })).toHaveCount(0);
+    }
+    if (role === 'admin') {
+      await page.goto('/admin/citizen-identities/' + f.citizen_user_id);
+      await expect(page.getByRole('heading', { name: f.citizen_name, exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Record a correction', exact: true })).toBeVisible();
+      await snapshot(page, info, 'admin-identity-detail-fixed');
+    } else await snapshot(page, info, role + '-settings');
+  }
+});
+
+test('Display preferences persist without medical data; mobile menu traps and restores focus', async ({ browser }, info) => {
+  const page = await actor(browser, 'citizen');
+  await page.goto('/citizen/settings/appearance');
+  await page.getByRole('combobox', { name: /^Text size/ }).selectOption('large');
+  await page.getByRole('combobox', { name: /^Motion/ }).selectOption('reduced');
+  await page.getByRole('combobox', { name: /^Desktop sidebar/ }).selectOption('expanded');
+  await expect(page.getByRole('status')).toContainText('saved on this device');
+  await page.reload();
+  await expect(page.getByRole('combobox', { name: /^Text size/ })).toHaveValue('large');
+  await expect(page.locator('html')).toHaveAttribute('data-text-size', 'large');
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduced');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('healthlink.interface.v1')))).toEqual({ textSize: 'large', motion: 'reduced', navigation: 'expanded', theme: 'light' });
+  for (const width of [320, 390, 768, 1366]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  const opener = page.getByRole('button', { name: 'Open navigation', exact: true });
+  await opener.click();
+  const dialog = page.getByRole('dialog', { name: 'Citizen portal navigation', exact: true });
+  await expect(dialog).toBeVisible();
+  expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
+  await dialog.getByRole('button', { name: 'Sign out', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('link', { name: 'HealthLink', exact: true })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(dialog.getByRole('button', { name: 'Sign out', exact: true })).toBeFocused();
+  await snapshot(page, info, 'settings-mobile-menu-large-text');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
+  await snapshot(page, info, 'settings-display-large-mobile');
+  for (const path of ['/citizen/doctors/search', '/citizen/medical-history', '/citizen/diagnostic-tests', '/citizen/ai-assistant', '/citizen/emergency-profile']) {
+    await page.goto(path);
+    await page.waitForLoadState('networkidle');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), path + ' supports larger text').toBe(true);
+  }
+  await page.goto('/citizen/settings/appearance');
+  await page.getByRole('button', { name: 'Reset display preferences', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-text-size', 'standard');
+});
+
+test('Security Settings confirms all-session revocation and leaves another account signed in', async ({ browser }, info) => {
+  const current = await actor(browser, 'citizen');
+  const secondSession = await actor(browser, 'citizen');
+  const otherAccount = await actor(browser, 'other');
+  await current.goto('/citizen/settings/security');
+  const revoke = current.getByRole('main').getByRole('button', { name: 'Sign out all sessions', exact: true });
+  current.once('dialog', dialog => dialog.dismiss());
+  await revoke.click();
+  await expect(revoke).toBeEnabled();
+  await expect(current).toHaveURL(/\/citizen\/settings\/security$/);
+  await snapshot(current, info, 'settings-security');
+  current.once('dialog', dialog => dialog.accept());
+  const revoking = current.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/auth/logout-all');
+  await revoke.click();
+  expect((await revoking).status()).toBe(204);
+  await expect(current).toHaveURL(/\/citizen\/login$/);
+  await secondSession.reload();
+  await expect(secondSession.getByRole('heading', { name: 'Sign in to continue', exact: true })).toBeVisible();
+  await otherAccount.reload();
+  await expect(otherAccount.getByRole('heading', { name: 'Your care at a glance', exact: true })).toBeVisible();
+});
+
+test('Light/dark/System themes persist before paint, follow OS changes and synchronize tabs', async ({ browser }, info) => {
+  const page = await actor(browser, 'citizen');
+  await page.goto('/citizen/settings/appearance');
+  const theme = page.getByRole('combobox', { name: /^Color theme/ });
+  await expect(theme).toHaveValue('light');
+  await theme.selectOption('dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe('dark');
+  await page.addInitScript(() => {
+    const observer = new MutationObserver(() => {
+      if (document.body) {
+        window.__themeAtFirstBody = document.documentElement.dataset.theme;
+        observer.disconnect();
+      }
+    });
+    observer.observe(document, { childList: true, subtree: true });
+  });
+  await page.reload();
+  await expect(theme).toHaveValue('dark');
+  expect(await page.evaluate(() => window.__themeAtFirstBody)).toBe('dark');
+  await snapshot(page, info, 'settings-dark-desktop');
+  const otherTab = await page.context().newPage();
+  await otherTab.goto('/citizen/settings/appearance');
+  await expect(otherTab.getByRole('combobox', { name: /^Color theme/ })).toHaveValue('dark');
+  await theme.selectOption('light');
+  await expect(otherTab.locator('html')).toHaveAttribute('data-theme', 'light');
+  await otherTab.close();
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await theme.selectOption('system');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.reload();
+  await expect(theme).toHaveValue('system');
+  expect(await page.evaluate(() => window.__themeAtFirstBody)).toBe('dark');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await snapshot(page, info, 'settings-dark-mobile');
+  await page.emulateMedia({ media: 'print' });
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(248, 251, 250)');
+  await page.emulateMedia({ media: 'screen' });
+  for (const path of ['/', '/citizen/login', '/professional/register', '/admin/login']) {
+    await page.goto(path);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    const expectedBrand = path.startsWith('/admin') ? 'rgb(67, 56, 202)' : path.startsWith('/professional') ? 'rgb(3, 105, 161)' : 'rgb(15, 118, 110)';
+    expect(await page.locator('[data-brand-mark]').first().evaluate(el => getComputedStyle(el).color)).toBe(expectedBrand);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    if (path === '/citizen/login') {
+      await page.getByRole('button', { name: 'Sign in to Citizen Portal', exact: true }).click();
+      const email = page.getByRole('textbox', { name: /Email address/ });
+      await expect(email).toHaveAttribute('aria-invalid', 'true');
+      await email.focus();
+      await expect.poll(() => email.evaluate(el => getComputedStyle(el).borderColor)).toBe('rgb(253, 164, 175)');
+    }
+    await snapshot(page, info, 'dark-public-' + (path.split('/').filter(Boolean).join('-') || 'home'));
+  }
+  await page.goto('/citizen/settings/appearance');
+  await theme.selectOption('light');
+  await snapshot(page, info, 'settings-light-mobile');
+});
+
+test('Dark portal matrix: readable settings, dashboards, records, chat and workspaces', async ({ browser }, info) => {
+  for (const role of ['citizen', 'doctor', 'lab', 'admin']) {
+    const page = await actor(browser, role);
+    const portal = role === 'doctor' || role === 'lab' ? 'professional' : role;
+    await page.goto(`/${portal}/settings/appearance`);
+    await page.getByRole('combobox', { name: /^Color theme/ }).selectOption('dark');
+    const routes = role === 'citizen'
+      ? ['/citizen/settings', '/citizen/settings/privacy', '/citizen/dashboard', '/citizen/medical-history', '/citizen/diagnostic-tests', '/citizen/doctors/search', '/citizen/ai-assistant']
+      : role === 'doctor' ? ['/professional/dashboard', '/professional/chamber', '/professional/visits', '/professional/settings/practice']
+      : role === 'lab' ? ['/professional/dashboard', '/professional/diagnostics', '/professional/settings']
+      : ['/admin/dashboard', '/admin/facilities', '/admin/professional-registrations', '/admin/settings'];
+    for (const route of routes) {
+      await page.goto(route);
+      await page.waitForLoadState('networkidle');
+      if (route.endsWith('ai-assistant')) {
+        await page.getByRole('textbox', { name: 'Your question', exact: true }).fill('What is a laboratory reference range?');
+        await page.getByRole('button', { name: 'Send message', exact: true }).click();
+        await expect(page.getByRole('article', { name: 'Question and answer' })).toHaveCount(1);
+      }
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+      const colors = await page.evaluate(() => ({
+        body: getComputedStyle(document.body).backgroundColor,
+        heading: getComputedStyle(document.querySelector('main h1')).color,
+      }));
+      expect(colors.body).toBe('rgb(11, 17, 27)');
+      expect(colors.heading).toBe('rgb(232, 239, 248)');
+      const name = route.split('/').filter(Boolean).join('-');
+      await snapshot(page, info, 'dark-' + role + '-' + name);
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), { message: route + ' settles without mobile overflow' }).toBe(true);
+      if (route.endsWith('ai-assistant') || route.endsWith('practice') || route.endsWith('facilities')) await snapshot(page, info, 'dark-mobile-' + role + '-' + name);
+      await page.setViewportSize({ width: 1366, height: 900 });
+    }
+  }
 });
 
 test('Regression guard: chamber persistence and full-name sharing search', async () => {

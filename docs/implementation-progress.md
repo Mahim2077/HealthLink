@@ -1454,3 +1454,80 @@ product features and explicitly said not to deploy yet. All work below is local.
   screenshot inspected. The verifier's initial exact password-label mismatch
   was corrected for the existing accessible `(required)` suffix; no app change.
   This does not establish authenticated login or live production AI success.
+
+### Local Settings and shared UI upgrade — 2026-10-20 (unreleased)
+
+- Owner requested inspect → plan → implement, and approved automated local Edge QA
+  with synthetic data. Production and release credentials were not used/changed.
+- Audited public entry and citizen/doctor/lab/admin surfaces at desktop/mobile,
+  then added role-aware Settings: Account, Security, Display & accessibility;
+  citizen Privacy & sharing; verified-doctor Practice hours.
+- Reused profile/identity safeguards, grants/access history, schedule APIs and
+  session revocation. Preserved current clinical, AI consent/history/delete,
+  specialist/nearest search, facility-location privacy and PDF regeneration flows.
+- Slimmed shared navigation, clarified account Settings access, improved mobile
+  focus/scroll behavior and result-table keyboard scrolling. Display choices are
+  explicitly device-only and contain no identity/medical data. No fake unsupported
+  password/2FA/notification settings or automatic AI record consent were added.
+- Fixed the audited admin identity-detail route's async Next.js params; added
+  browser coverage. Practice edits now warn before navigation.
+- Final gates: **564 backend tests**, **60 frontend files / 291 tests**,
+  lint/typecheck/optimized build and **12/12 optimized-build browser journeys**.
+  Backend retains one pre-existing Starlette/httpx deprecation warning.
+- Full audit/plan/evidence: `docs/UI_SETTINGS_AUDIT_2026_10_20.md`, current handoff
+  and latest `design-qa.md`. Raw synthetic screenshots remain local/ignored.
+- **No commit, push or deployment. Fresh owner release approval is required.**
+
+### Light/Dark/System appearance setting — 2026-10-20 (local follow-up)
+
+- Added Color theme under Settings → Display & accessibility for all portals.
+  Light is the legacy-compatible default; Dark and live System following are
+  available, persisted only as an allowlisted browser preference.
+- Added pre-paint static initialization, cross-tab synchronization and themed
+  public/auth/clinical/admin/chat surfaces. No image inversion, new dependency,
+  backend permission change, clinical behavior change or database migration.
+- Native controls and validation states retain readable contrast. Dark styles
+  are screen-only; printing stays light and generated prescription PDFs remain
+  unchanged. No medical/identity content is stored with display choices.
+- Final local checks: **61 frontend files / 298 tests**, lint/typecheck/build and
+  **14 browser journeys**, including the full care journey in dark mode and
+  startup/persistence/OS/tab/print checks. Backend source unchanged from the
+  preceding 564-test baseline. No commit, push or deployment.
+
+### Dependency integrity/security remediation — 2026-10-22 (local, unreleased)
+
+- Addressed the full-project audit's fixable dependency findings: Next.js and
+  matching lint config 16.4.2, patched frontend transitives, and Python CA/JWT/
+  image/HTTP/template/test/installer dependencies. Unaffected direct runtime
+  packages retain their tested versions; existing product/clinical/AI/UI work is
+  preserved. No application feature-logic edit or migration.
+- Added separate runtime/development inputs and complete hash-locked outputs,
+  generated with CI's uv 0.12.7. CI enforces lock freshness, hash-checked binary
+  installs and Python/npm advisory gates; actions are SHA-pinned and checkouts
+  do not persist credentials. Existing serialized release safety remains intact.
+- Python runtime/dev scans passed; OSV found zero matches across 103 installed
+  packages. Frontend production audit has zero findings. One unpatched upstream
+  dev-only `braces@3.0.3` advisory remains under an exact-version exception through
+  2026-11-21. It is not a package fix or a fully clean raw npm audit; new findings,
+  production exposure, invalid/expired policy and scan failures block the gate.
+- Verified: 567 backend tests, 298 frontend tests, 10 security-gate tests,
+  lint/typecheck/optimized build and all 14 browser journeys. Final security/
+  release contracts also passed separately (15 tests). Locks regenerate exactly;
+  Linux runtime resolution passed as a dry run; Alembic remains 0031/no drift.
+- See `docs/DEPENDENCY_REMEDIATION_2026_10_22.md` and
+  `docs/DEPENDENCY_SECURITY.md`. Existing TestClient deprecation warning and
+  production assurance gaps remain explicit. No commit, push or deployment.
+
+### Phase 32 consolidation and release authorization — 2026-10-22
+
+- The owner designated all post–Phase 31 continuation as **Phase 32**: production
+  hardening/verification, modern saved AI chat, Settings/shared UI/themes,
+  dependency/CI security, QA, handoffs and portability updates. Earlier phase
+  features, dated receipts and migration IDs remain unchanged; no duplicate chat
+  migration or new clinical behavior is introduced by this classification.
+- The owner explicitly authorized documentation, commit, push and production
+  deployment for this increment. This supersedes older local release holds, not
+  approved-account restrictions, the dev-only advisory policy or release safeguards.
+- Canonical scope: `PHASE_32_POST_ROADMAP_UPGRADES.md`. Actual release state:
+  `PRODUCTION_PHASE_32_RELEASE_2026_10_22.md`. Production completion must be backed
+  by exact CI/deployment/stable-origin evidence rather than a successful push alone.

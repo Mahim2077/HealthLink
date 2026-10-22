@@ -1,0 +1,7 @@
+# Constrain development/test tools to the exact runtime dependency set.
+-c requirements.txt
+-r requirements.in
+pytest==9.0.3
+pip-audit==2.10.1
+# Pin the installer too; it is deliberately absent from the runtime lock.
+pip==26.2.2

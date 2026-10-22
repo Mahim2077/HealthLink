@@ -1,6 +1,6 @@
 # HealthLink current agentic implementation handoff
 
-> **Status date:** 2026-10-20
+> **Status date:** 2026-10-22
 > **Read this file first.** It is the authoritative operational checkpoint for
 > the current workspace. Older implementation prompts and handoffs remain useful
 > for architecture/history, but this file supersedes their phase-start, storage,
@@ -16,16 +16,121 @@ Branch:                 main
 Released app commit:    21e94a5372f6cbf29d71f12fa85e4fa069930ea1
 GitHub Actions run:     39398090813 (successful, 4m 29s)
 Released DB head:       0031_ai_conversations
-Released roadmap:       Through Phase 31, preserving approved product improvements
+Released roadmap:       Original Phases 0-31; earlier Phase 32 saved-chat increment released
 Current release:        Modern chat + private history committed, pushed and deployed to stable production
 Local QA DB head:       0031_ai_conversations (synthetic loopback database only)
 Implementation commit:  5de35ffb285b74535f2eece623a6c16310a3f68b
-Next work:              Runtime-log access/monitoring gap; owner review; no numbered development phase remains
+Local release scope:    Phase 32: Settings/themes + dependency/CI security + post-31 documentation
+Release authority:      Owner explicitly authorized document/commit/push/deploy on 2026-10-22
+Next work:              Complete authorized Phase 32 CI release and stable-origin verification
 ```
 
-Relevant released commits:
+## Phase 32 designation and release authority
 
-**Latest local continuation:** see `docs/AI_CONVERSATIONS_2026_10_19.md` and the
+The owner designated **all post–Phase 31 continuation as Phase 32**: earlier
+saved-chat/history, Settings/UI/themes, dependency/CI hardening, QA and handoff/
+portability updates. See `docs/PHASE_32_POST_ROADMAP_UPGRADES.md`. Preserve dated
+history and migration identifiers; `0031_ai_conversations` must not be renamed.
+
+The same 2026-10-22 instruction authorizes this Phase 32 commit, push and release,
+superseding earlier local holds below for this release only. Account restrictions,
+clinical-data safety and CI safeguards remain mandatory. Release is pending until
+confirmed in `docs/PRODUCTION_PHASE_32_RELEASE_2026_10_22.md`; push is not deployment.
+
+Recent local and historical release context:
+
+### Latest local continuation — dependency integrity fixes (unreleased)
+
+After the full integrity audit, the owner authorized careful fixes, not a
+release. See `docs/DEPENDENCY_REMEDIATION_2026_10_22.md` and
+`docs/DEPENDENCY_SECURITY.md` for current commands and exact limits.
+
+- Next.js/matching lint config now 16.4.2; Vitest 4.1.12, jsdom 30.1.3 and
+  affected transitive packages updated. React and existing feature logic remain
+  unchanged. Actual frontend verification used Node 24.20.0.
+- Python runtime and development/tooling inputs/locks are separated. Both
+  generated locks pin all versions and SHA-256 hashes with universal platform
+  markers. The generator is uv 0.12.7, matching CI. Unaffected direct dependencies
+  retain the tested versions; security floors patch certifi/PyJWT/Pillow/Mako/
+  urllib3 and development pytest/pip. Runtime excludes test/security tools.
+- Python runtime/dev advisory scans passed; an independent OSV check of all
+  103 locally installed packages found zero matches. Frontend production audit
+  has zero advisories. **The full npm scan is not completely clean:** one
+  unpatched upstream dev-only `braces@3.0.3` advisory remains, inherited by five
+  package entries. Its exact-version exception expires 2026-11-21. Do not call
+  it patched or silently extend the exception. Production receives no exception.
+- CI now verifies lock freshness, hash-enforced installs and fail-closed Python/
+  npm advisory gates. Actions are immutable SHA-pinned; all checkouts disable
+  persisted Git credentials. Release ordering, stale-head/account guards and
+  non-cancelling migration-to-promotion lock are unchanged. No scheduled workflow.
+- Fresh local QA: **567 backend tests**, **298 frontend tests**, **10 security-gate
+  tests**, lint/typecheck/optimized build and **14/14 browser journeys**. Final
+  release/security contracts also passed separately (15 tests). Migration head
+  remains `0031_ai_conversations`, no schema drift. One pre-existing TestClient
+  deprecation warning remains. Linux-target runtime resolution passed as a dry run.
+- Prior Settings/theme/chat/clinical work is preserved. No migration, live AI
+  call, production mutation, commit, push or deployment. GitHub Actions itself
+  has not run on these local changes. Previous production operational assurance
+  gaps remain gaps, not failures proved or fixed by dependency upgrades.
+
+### Latest local continuation — Settings and UI upgrade (unreleased)
+
+The owner requested a portal-wide UI inspection, Settings plan and implementation,
+then explicitly approved automated Edge/Playwright QA with synthetic local data.
+No release authorization was given for this new work. Do not interpret earlier
+chat-release approval as permission to commit, push or deploy these changes.
+
+- Citizen, professional and admin Settings now have Account, Security and Display
+  sections. Citizen-only Privacy & sharing reuses existing grants/access history;
+  verified doctors get Practice hours. Lab/pending/rejected roles cannot open the
+  schedule editor. No permission expansion, new schema or migration.
+- Citizen profile/identity and one-time NID confirmation remain intact inside
+  Settings. `/citizen/profile` and `/citizen/privacy` redirect to their Settings
+  sections. Professional verification status remains accessible from Account.
+- Practice editor moved from the daily doctor dashboard, with a clear shortcut,
+  corrected overview copy and an unsaved-changes guard.
+- Settings exposes existing current/all-session sign-out with confirmations and
+  retry feedback. Existing backend revocation remains authoritative.
+- Display choices (Light/Dark/System theme, larger text, reduced motion, default desktop sidebar) are
+  allowlisted, non-sensitive browser-only preferences, not account-synced. No
+  medical records/tokens/identity drafts are persisted in browser storage.
+- Shared header/navigation is slimmer; mobile menu now traps/restores focus,
+  makes its background inert and locks scrolling. Result tables are keyboard
+  scrollable; wide report tables have a mobile scrolling hint.
+- Audit found/fixed the admin citizen-identity detail route's synchronous use of
+  Next.js async params. Browser regression now loads the correct synthetic user.
+- AI chat, saved history/delete, explicit per-request record consent, specialist/
+  nearby doctor search, hidden facility coordinates, merged diagnostics and
+  generated-on-demand PDFs are preserved. No scheduled workflow was reintroduced.
+
+Verified locally: **564 backend tests** (prior unchanged-backend baseline),
+**61 frontend files / 298 tests**, lint/typecheck/optimized build, and
+**14/14 optimized-build browser journeys**, including the full care journey in dark mode.
+Baseline audit captured 38 screens at desktop/mobile sizes, followed by 53
+post-change screens, final Settings/dashboard recaptures, and clinical editing
+captures. Tested widths include 320/390/768/1366/1920 where applicable; larger text,
+storage failures, role gates and all-session revocation have regression coverage.
+No unexpected API/console errors or external browser requests in the final suite.
+One pre-existing Starlette/httpx deprecation warning remains in backend tests.
+
+The owner additionally requested light/dark mode. Settings → Display & accessibility
+now provides **Light / Dark / Use system setting**. Light remains the compatible
+default for existing users. Theme choice uses the same versioned browser-only
+allowlist; saved theme is applied by a static trusted head bootstrap before body
+paint. System mode follows live OS changes; other tabs synchronize through storage
+events. Shared surfaces, role colors, statuses, native fields, validation and AI
+chat are themed without image inversion or changing clinical behavior. Screen-only
+dark styling leaves printing light; generated PDFs and APIs are unchanged.
+
+Read `docs/UI_SETTINGS_AUDIT_2026_10_20.md` and the latest `design-qa.md` entry.
+Raw synthetic screenshots/review sheets are ignored under
+`.runtime/ui-settings-audit/`; browser results under `.runtime/browser-qa/`.
+The optimized local preview uses Next on 3003 plus the loopback Services proxy on
+3001 and mock API on 8001. The API uses QA PostgreSQL on 55433, not production.
+Production remains the released modern-chat commit above. The pre-existing
+production runtime-log/monitoring gap remains unresolved and out of this task.
+
+**Released modern-chat continuation:** see `docs/AI_CONVERSATIONS_2026_10_19.md` and the
 latest `design-qa.md` entry. The owner approved the hybrid conversation sidebar /
 wide transcript / compact records control and explicitly requested private
 account persistence with delete controls. This changes the earlier no-chat-storage

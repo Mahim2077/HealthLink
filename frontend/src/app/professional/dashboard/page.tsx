@@ -5,7 +5,6 @@ import {
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
 
-import { PracticeScheduleEditor } from "@/components/professional/practice-schedule-editor";
 import { ProfessionalPortal } from "@/components/professional/professional-portal";
 
 export default function ProfessionalDashboardPage() {
@@ -15,7 +14,10 @@ export default function ProfessionalDashboardPage() {
       verifiedDoctorSlot={
         <div className="space-y-8">
           <ProfessionalActions />
-          <PracticeScheduleEditor />
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-sky-100 bg-white p-5">
+            <div><h2 className="font-semibold text-slate-950">Your weekly practice hours</h2><p className="mt-1 text-sm text-slate-600">Keep patient-facing availability up to date in Settings.</p></div>
+            <Link className="hl-button-secondary" href="/professional/settings/practice">Manage practice hours</Link>
+          </div>
         </div>
       }
     />

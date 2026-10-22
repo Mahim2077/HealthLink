@@ -11,7 +11,7 @@ type HistoryPage = { page: number; has_next: boolean; items: {
 }[] };
 const readable = (value: string) => value.toLowerCase().replaceAll("_", " ");
 
-function History() {
+export function AccessHistoryPanel() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<HistoryPage | null>(null);
   const [error, setError] = useState("");
@@ -44,6 +44,6 @@ export function AccessHistoryPage() {
     <h1 className="text-3xl font-bold">Privacy and access history</h1>
     <p className="text-sm text-slate-600">See who accessed your medical information and manage the access you have shared. Activity is recorded from the introduction of this feature.</p>
     <Link className="inline-block min-h-11 font-semibold text-sky-800 underline" href="/citizen/access-grants">Manage access grants</Link>
-    <LabPortalGate portal="CITIZEN"><History /></LabPortalGate>
+    <LabPortalGate portal="CITIZEN"><AccessHistoryPanel /></LabPortalGate>
   </main>;
 }

@@ -1,5 +1,9 @@
 # Private AI conversations — local implementation
 
+> **Phase 32 classification (2026-10-22):** part of
+> [Phase 32](PHASE_32_POST_ROADMAP_UPGRADES.md). Original dated checkpoints below
+> are preserved; the migration is not renumbered.
+
 > Release update, 2026-10-20: the owner separately authorized commit, push and
 > production deployment. The local-only statements below describe the original
 > implementation checkpoint. Follow `PRODUCTION_CHAT_RELEASE_2026_10_20.md` for

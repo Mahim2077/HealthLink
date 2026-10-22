@@ -33,7 +33,8 @@ export function LabResults({ report }: { report: LabReport }) {
     <h2 className="text-xl font-bold">{report.test_name}</h2>
     <p className="text-sm text-slate-600">{report.report_date} · {report.facility_name ?? "Facility not recorded"} · {report.status}</p>
     {report.summary ? <p className="whitespace-pre-wrap">{report.summary}</p> : null}
-    <div className="overflow-x-auto"><table className="w-full text-left text-sm">
+    <p className="text-xs leading-5 text-slate-600 sm:hidden">Swipe or scroll sideways to view all result columns.</p>
+    <div aria-label="Lab report results table" role="region" tabIndex={0} className="hl-scrollbar overflow-x-auto rounded-lg"><table className="w-full text-left text-sm">
       <caption className="sr-only">Lab report results</caption>
       <thead><tr>{["Parameter", "Result", "Numeric result", "Unit", "Reference range", "Flag"].map(label => <th scope="col" className="p-3" key={label}>{label}</th>)}</tr></thead>
       <tbody>{report.items.map((item, index) => <tr className="border-t border-slate-200" key={index}>

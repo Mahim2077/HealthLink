@@ -44,6 +44,17 @@ describe("PracticeScheduleEditor", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
+  it("warns before navigating away from changed practice hours", async () => {
+    const { deps } = buildDeps();
+    render(<><PracticeScheduleEditor deps={deps} /><a href="/professional/settings">Account settings</a></>);
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Max patients"), { target: { value: "25" } });
+    vi.mocked(window.confirm).mockReturnValue(false);
+    fireEvent.click(screen.getByRole("link", { name: "Account settings" }));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("unsaved changes"));
+    expect(screen.getByLabelText("Max patients")).toHaveValue(25);
+  });
+
   it("renders an empty state when no schedule rows exist", async () => {
     const { deps } = buildDeps({ loadSchedule: vi.fn().mockResolvedValue([]) });
     render(<PracticeScheduleEditor deps={deps} />);

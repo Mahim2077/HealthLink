@@ -7,6 +7,7 @@ export function HealthLinkMark({
   return (
     <svg
       aria-hidden="true"
+      data-brand-mark="healthlink"
       className={className}
       fill="none"
       viewBox="0 0 48 48"

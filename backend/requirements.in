@@ -1,0 +1,19 @@
+# Runtime and migration inputs. Deployments install the generated, hashed
+# requirements.txt. See docs/DEPENDENCY_SECURITY.md before changing these.
+# Keep unaffected direct dependencies at the previously tested versions.
+fastapi[standard]==0.141.1
+SQLAlchemy==2.0.51
+alembic==1.19.1
+pydantic==2.13.4
+pydantic-settings==2.15.0
+psycopg[binary]==3.3.4
+PyJWT==2.15.1
+pwdlib[argon2]==0.3.0
+httpx==0.28.1
+google-genai==1.75.0
+reportlab==5.0.0
+# Security floors for transitive dependencies from the 2026-10-22 audit.
+certifi>=2026.10.19
+pillow>=13.0.0
+urllib3>=2.8.0,<3.0
+Mako>=1.4.2,<2.0

@@ -69,10 +69,11 @@ describe("PortalNavigation", () => {
       "/citizen/ai-assistant",
     );
     expect(screen.queryByRole("link", { name: "Lab reports" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "My profile" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
       "href",
-      "/citizen/profile",
+      "/citizen/settings",
     );
+    expect(screen.queryByRole("link", { name: "Privacy & access" })).not.toBeInTheDocument();
   });
 
   it("signs out from the shared portal navigation", async () => {

@@ -1,2 +1,2 @@
-import { AccessHistoryPage } from "@/components/privacy/access-history";
-export default function Page() { return <AccessHistoryPage />; }
+import { redirect } from "next/navigation";
+export default function Page() { redirect("/citizen/settings/privacy"); }

@@ -1,5 +1,9 @@
 # Modern AI chat production release — 2026-10-20
 
+> Retrospectively the saved-chat increment of [Phase 32](PHASE_32_POST_ROADMAP_UPGRADES.md).
+> This dated receipt remains intact; see the
+> [subsequent Phase 32 release](PRODUCTION_PHASE_32_RELEASE_2026_10_22.md) for Settings/theme/security.
+
 > **Released successfully.** Commit `21e94a5` is READY and serves
 > `https://healthlink-sd.vercel.app/`. Migration, staging, protected smoke,
 > promotion and stable-domain smoke all passed. Preflight text below is historical.

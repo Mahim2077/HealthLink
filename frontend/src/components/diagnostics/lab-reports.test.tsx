@@ -41,6 +41,7 @@ describe("Lab reports", () => {
     expect(await screen.findByText("Finalized report — read only.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save draft" })).not.toBeInTheDocument();
     expect(screen.getByRole("table", { name: "Lab report results" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Lab report results table" })).toHaveAttribute("tabindex", "0");
     confirm.mockRestore();
   });
   it("keeps incompatible units in separate accessible tables", () => {
@@ -49,6 +50,7 @@ describe("Lab reports", () => {
       { report_id: "two", report_date: "2026-01-02", parameter_name: "Haemoglobin", value: "132", unit: "g/L" },
     ]} />);
     expect(screen.getAllByRole("table")).toHaveLength(2);
+    expect(screen.getAllByRole("region", { name: "Haemoglobin trend table" })).toHaveLength(2);
     expect(within(screen.getByRole("table", { name: "Haemoglobin — g/dL" })).queryByText("132")).toBeNull();
   });
   it("does not mount private content for the wrong portal", () => {

@@ -2,7 +2,7 @@
 
 import {
   Bars3Icon,
-  ChevronDownIcon,
+  Cog6ToothIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   EllipsisVerticalIcon,
@@ -30,6 +30,7 @@ import { loadAdminMe } from "@/lib/admin/api";
 import type { Portal } from "@/lib/auth/types";
 import { loadCitizenMe } from "@/lib/citizen/api";
 import { loadProfessionalMe } from "@/lib/professional/api";
+import { useInterfacePreferences } from "@/lib/settings/interface-preferences";
 
 const MIN_SIDEBAR_WIDTH = 224;
 const MAX_SIDEBAR_WIDTH = 340;
@@ -46,8 +47,8 @@ const portalConfig: Record<
   }
 > = {
   CITIZEN: {
-    accountHref: "/citizen/profile",
-    accountLabel: "Manage profile",
+    accountHref: "/citizen/settings",
+    accountLabel: "Settings",
     background: "bg-[#f8fbfa]",
     eyebrow: "Citizen portal",
     footer: [
@@ -56,8 +57,8 @@ const portalConfig: Record<
     ],
   },
   PROFESSIONAL: {
-    accountHref: "/professional/status",
-    accountLabel: "Role details",
+    accountHref: "/professional/settings",
+    accountLabel: "Settings",
     background: "bg-[#f7fafc]",
     eyebrow: "Professional portal",
     footer: [
@@ -66,8 +67,8 @@ const portalConfig: Record<
     ],
   },
   ADMIN: {
-    accountHref: "/admin/dashboard",
-    accountLabel: "Admin account",
+    accountHref: "/admin/settings",
+    accountLabel: "Settings",
     background: "bg-[#fafafd]",
     eyebrow: "Admin portal",
     footer: [
@@ -113,6 +114,7 @@ function PortalAccount({ portal }: { portal: Portal }) {
 
   return (
     <Link
+      aria-label={(displayName || "Your account") + ": Open settings"}
       className="group flex min-h-12 items-center gap-3 rounded-xl px-1.5 py-1 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--portal-accent)] sm:px-2"
       href={config.accountHref}
     >
@@ -127,9 +129,9 @@ function PortalAccount({ portal }: { portal: Portal }) {
           {config.accountLabel}
         </span>
       </span>
-      <ChevronDownIcon
+      <Cog6ToothIcon
         aria-hidden="true"
-        className="hidden size-4 text-slate-400 transition group-hover:translate-y-0.5 sm:block"
+        className="size-4 shrink-0 text-slate-500 group-hover:text-[var(--portal-accent)]"
       />
     </Link>
   );
@@ -171,20 +173,45 @@ function PublicShell({ children, portal }: { children: ReactNode; portal: Portal
 export function PortalShell({ children, portal }: { children: ReactNode; portal: Portal }) {
   const auth = usePortalAuth(portal);
   const config = portalConfig[portal];
-  const [collapsed, setCollapsed] = useState(true);
+  const preferences = useInterfacePreferences();
+  const [collapsedOverride, setCollapsed] = useState<boolean | null>(null);
+  const collapsed = collapsedOverride ?? preferences.navigation === "compact";
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(260);
   const dragOrigin = useRef<{ pointerX: number; width: number } | null>(null);
+  const backgroundRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
   const authenticated = auth.status === "authenticated" && auth.isRequiredPortal;
 
   useEffect(() => {
-    if (!mobileOpen) return;
+    if (!mobileOpen || !authenticated) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    const background = backgroundRef.current;
+    if (background) background.inert = true;
+    document.body.style.overflow = "hidden";
+    const focusable = () => Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled), [tabindex="0"]') ?? []);
+    focusable()[0]?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileOpen(false);
+      if (event.key === "Escape") { event.preventDefault(); setMobileOpen(false); }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      const first = items[0]; const last = items.at(-1);
+      if (event.shiftKey && (document.activeElement === first || !dialogRef.current?.contains(document.activeElement))) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && (document.activeElement === last || !dialogRef.current?.contains(document.activeElement))) { event.preventDefault(); first?.focus(); }
     };
+    const wide = window.matchMedia("(min-width: 1024px)");
+    const closeWide = () => { if (wide.matches) setMobileOpen(false); };
+    wide.addEventListener("change", closeWide);
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [mobileOpen]);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      wide.removeEventListener("change", closeWide);
+      if (background) background.inert = false;
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [mobileOpen, authenticated]);
 
   const stopResizing = useCallback(() => {
     dragOrigin.current = null;
@@ -234,7 +261,7 @@ export function PortalShell({ children, portal }: { children: ReactNode; portal:
 
   return (
     <div className={"min-h-screen " + config.background} data-portal={portal.toLowerCase()}>
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen" ref={backgroundRef}>
         <aside
           aria-label={config.eyebrow + " sidebar"}
           className="relative z-40 hidden h-screen shrink-0 flex-col overflow-visible bg-[var(--portal-sidebar)] text-white shadow-[14px_0_40px_-32px_rgba(15,23,42,0.7)] transition-[width] duration-200 lg:sticky lg:top-0 lg:flex"
@@ -264,7 +291,7 @@ export function PortalShell({ children, portal }: { children: ReactNode; portal:
             aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
             aria-expanded={!collapsed}
             className="absolute -right-4 top-8 z-20 flex size-9 items-center justify-center rounded-full border border-white/15 bg-[var(--portal-control)] text-white shadow-lg shadow-slate-950/20 transition hover:bg-[var(--portal-control-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--portal-soft)]"
-            onClick={() => setCollapsed((value) => !value)}
+            onClick={() => setCollapsed(!collapsed)}
             title={collapsed ? "Expand navigation" : "Collapse navigation"}
             type="button"
           >
@@ -303,7 +330,7 @@ export function PortalShell({ children, portal }: { children: ReactNode; portal:
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/94 backdrop-blur-xl">
-            <div className="flex min-h-20 items-center justify-between gap-4 px-5 sm:px-8 lg:px-10">
+            <div className="flex min-h-18 items-center justify-between gap-3 px-5 sm:px-8 lg:px-10">
               <div className="flex min-w-0 items-center gap-3">
                 <button
                   aria-expanded={mobileOpen}
@@ -337,6 +364,7 @@ export function PortalShell({ children, portal }: { children: ReactNode; portal:
             type="button"
           />
           <aside
+            ref={dialogRef}
             aria-label={config.eyebrow + " navigation"}
             aria-modal="true"
             className="relative flex h-full w-[min(20rem,calc(100vw-2rem))] flex-col bg-[var(--portal-sidebar)] text-white shadow-2xl"

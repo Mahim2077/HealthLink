@@ -75,7 +75,7 @@ export function ProfessionalCareOverview({ role, load = loadProfessionalOverview
           <p className="mt-2 text-sm text-slate-600">{chamber.status === "ACTIVE" ? "In progress" : chamber.status === "COMPLETED" ? "Closed for today" : "Not started"} · {chamber.waiting_count} waiting · {chamber.current_serial === null ? "No current patient" : `Current serial ${chamber.current_serial}`}</p>
           <Link className="mt-2 inline-flex min-h-11 items-center font-bold text-sky-700" href="/professional/chamber">Open chamber queue</Link>
         </article>
-      )) : <p className="text-sm text-slate-600">No chamber session for {data.today}. Review your schedule below or open the chamber to start eligible practice.</p>}
+      )) : <p className="text-sm text-slate-600">No chamber session for {data.today}. Review practice hours in <Link className="font-semibold text-sky-800 underline underline-offset-2" href="/professional/settings/practice">Settings</Link> or open the chamber to start eligible practice.</p>}
       {data.chambers_has_more ? <p className="text-sm text-slate-600">Showing the first 10 chambers. Open the chamber workspace for other sessions.</p> : null}</div> : null}
       <OverviewCards cards={cards} />
     </>;

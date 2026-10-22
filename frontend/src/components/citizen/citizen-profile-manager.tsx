@@ -270,20 +270,25 @@ function ProfileContent({
   initial,
   saveAction,
   addAction,
+  embedded = false,
 }: {
   initial: CitizenDashboardData;
   saveAction: (request: CitizenProfileUpdateRequest) => Promise<CitizenProfile>;
   addAction: (request: CitizenAddNidRequest) => Promise<CitizenIdentity>;
+  embedded?: boolean;
 }) {
   const [profile, setProfile] = useState(initial.profile);
   const [identity, setIdentity] = useState(initial.identity);
+  const Frame = embedded ? "div" : "main";
+  const Heading = embedded ? "h2" : "h1";
   return (
-    <main className="hl-page" id="main-content">
-      <div className="flex flex-col gap-5 border-b border-slate-200 pb-8 sm:flex-row sm:items-end sm:justify-between">
+    <Frame className={embedded ? "space-y-6" : "hl-page"} id={embedded ? undefined : "main-content"}>
+      <div className={embedded ? "flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between" : "flex flex-col gap-5 border-b border-slate-200 pb-8 sm:flex-row sm:items-end sm:justify-between"}>
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">Citizen account</p>
-          <h1 className="mt-3 font-display text-3xl font-bold tracking-[-0.04em] text-slate-950 sm:text-4xl">Profile and identity</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Manage editable profile details and review your protected identity.</p>
+          {!embedded ? <p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">Citizen account</p> : null}
+          <Heading className={embedded ? "hl-section-title" : "mt-3 font-display text-3xl font-bold tracking-[-0.04em] text-slate-950 sm:text-4xl"}>Profile and identity</Heading>
+          {!embedded ? <p className="mt-2 text-sm leading-6 text-slate-600">Manage editable profile details and review your protected identity.</p> : null}
+          {embedded ? <p className="mt-2 break-words text-sm text-slate-600">{profile.email}</p> : null}
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <Link
@@ -293,19 +298,19 @@ function ProfileContent({
             <PlusIcon aria-hidden="true" className="size-5" />
             Add a professional role
           </Link>
-          <Link
+          {!embedded ? <Link
             className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-slate-400 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
             href="/citizen/dashboard"
           >
             Back to dashboard
-          </Link>
+          </Link> : null}
         </div>
       </div>
-      <div className="mt-8 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <div className={embedded ? "grid gap-6" : "mt-8 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]"}>
         <ProfileEditor onSaved={setProfile} profile={profile} saveAction={saveAction} />
         <IdentityManager addAction={addAction} identity={identity} onAdded={setIdentity} />
       </div>
-    </main>
+    </Frame>
   );
 }
 
@@ -313,10 +318,12 @@ export function CitizenProfileManager({
   loadAction = loadCitizenDashboard,
   saveAction = updateCitizenProfile,
   addAction = addCitizenNid,
+  embedded = false,
 }: {
   loadAction?: () => Promise<CitizenDashboardData>;
   saveAction?: (request: CitizenProfileUpdateRequest) => Promise<CitizenProfile>;
   addAction?: (request: CitizenAddNidRequest) => Promise<CitizenIdentity>;
+  embedded?: boolean;
 }) {
   const auth = usePortalAuth("CITIZEN");
   const authStatus = auth.status;
@@ -325,6 +332,7 @@ export function CitizenProfileManager({
   const [hydration, setHydration] = useState<"pending" | "failed" | "succeeded">("pending");
   const [version, setVersion] = useState(0);
   const [state, setState] = useState<LoadState>({ status: "loading" });
+  const Frame = embedded ? "div" : "main";
 
   useEffect(() => {
     if (authStatus === "authenticated") return;
@@ -353,7 +361,7 @@ export function CitizenProfileManager({
     return <Guard kind="signed-out" />;
   }
   if (!isRequiredPortal) return <Guard kind="wrong-portal" />;
-  if (state.status === "loading") return <main className="flex flex-1 items-center px-5 py-12 sm:px-8" id="main-content"><LoadingState description="Loading your editable profile and protected identity." label="Loading profile" /></main>;
-  if (state.status === "error") return <main className="flex flex-1 items-center px-5 py-12 sm:px-8" id="main-content"><ErrorState message={state.message} onAction={() => { setState({ status: "loading" }); setVersion((value) => value + 1); }} title="Profile unavailable" /></main>;
-  return <ProfileContent addAction={addAction} initial={state.data} saveAction={saveAction} />;
+  if (state.status === "loading") return <Frame className="flex flex-1 items-center py-8" id={embedded ? undefined : "main-content"}><LoadingState description="Loading your editable profile and protected identity." label="Loading profile" /></Frame>;
+  if (state.status === "error") return <Frame className="flex flex-1 items-center py-8" id={embedded ? undefined : "main-content"}><ErrorState message={state.message} onAction={() => { setState({ status: "loading" }); setVersion((value) => value + 1); }} title="Profile unavailable" /></Frame>;
+  return <ProfileContent key={auth.claims?.sid} embedded={embedded} addAction={addAction} initial={state.data} saveAction={saveAction} />;
 }

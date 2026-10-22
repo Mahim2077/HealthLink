@@ -1,5 +1,5 @@
-import { CitizenProfileManager } from "@/components/citizen/citizen-profile-manager";
+import { redirect } from "next/navigation";
 
 export default function CitizenProfilePage() {
-  return <CitizenProfileManager />;
+  redirect("/citizen/settings");
 }

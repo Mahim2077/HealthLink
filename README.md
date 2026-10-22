@@ -2,15 +2,17 @@
 
 > **Agentic continuation:** read
 > [`AGENTIC_IMPLEMENTATION_HANDOFF_CURRENT.md`](AGENTIC_IMPLEMENTATION_HANDOFF_CURRENT.md)
-> before changing the repository. Phases 15–21 and the post-Phase-21 doctor
-> discovery, diagnostics, and consultation improvements are released. The
-> older baseline descriptions below remain historical
-> context and must not be used to discard or recreate current work.
+> before changing the repository. The original roadmap through Phase 31 is
+> implemented. Subsequent continuation is designated
+> [Phase 32](docs/PHASE_32_POST_ROADMAP_UPGRADES.md); follow its
+> [release receipt](docs/PRODUCTION_PHASE_32_RELEASE_2026_10_22.md) for actual
+> deployment state. Older prompts/receipts are historical, not a restart point.
 
 HealthLink is a modular healthcare information platform with separate Citizen,
 Professional, and Admin portal contexts. This repository implements the
-documented roadmap sequentially through Phase 21, followed by verified product
-improvements to doctor discovery, diagnostics, and consultation workflows.
+documented roadmap through Phase 31. Phase 32 consolidates modern saved AI
+conversations, portal Settings/UI/themes, dependency/CI security and post-roadmap
+QA/handoff improvements while preserving existing clinical workflows.
 
 The production application is available at
 [healthlink-sd.vercel.app](https://healthlink-sd.vercel.app/). It is deployed as
@@ -27,7 +29,7 @@ prescription PDFs are regenerated in memory from authorized structured records.
 The three Markdown files at the repository root are the governing project
 documents and are preserved under their attached filenames.
 
-## Implemented product through Phase 21
+## Implemented product and preserved foundations
 
 - Citizen registration, authentication, profile and protected identity
   management, verified-doctor discovery, appointment booking/cancellation,
@@ -45,6 +47,12 @@ documents and are preserved under their attached filenames.
 - Specialty-first doctor discovery with private admin-confirmed facility
   location logic, one citizen Diagnostic tests area, and a unified doctor
   consultation/prescription editor with on-demand PDF rendering.
+- Configurable explanation-only Groq AI with explicit record consent and
+  account-private conversation history/new/delete controls.
+- Role-aware account/security/display/privacy/practice Settings and browser-only
+  Light/Dark/System/accessibility preferences.
+- Hash-locked Python runtime/dev dependencies and fail-closed CI security gates,
+  with the documented development-only upstream advisory exception.
 
 ## Current interface
 
@@ -58,14 +66,14 @@ documents and are preserved under their attached filenames.
   indigo/purple. Emerald success, amber warning, rose error, and slate neutral
   treatments remain semantic status indicators rather than portal branding.
 - Citizen Overview is reserved for care discovery and appointments. The
-  `Add a professional role` account action lives in Citizen Profile alongside
-  profile and identity management.
+  `Add a professional role` action lives in Settings → Account alongside profile
+  and identity management; legacy profile/privacy URLs remain compatible.
 - National identifiers remain absent from Citizen Overview and are shown only
   inside the authorized Profile and identity workflow.
 
 ## Local prerequisites
 
-- Python 3.13+
+- Python 3.13 (tested runtime)
 - Node.js 24.15+
 - PostgreSQL 17+ (or a Neon PostgreSQL connection)
 
@@ -73,7 +81,7 @@ documents and are preserved under their attached filenames.
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+.\.venv\Scripts\python.exe -m pip install --require-hashes --only-binary=:all: -r backend\requirements-dev.txt
 Copy-Item backend\.env.example backend\.env
 # Set DATABASE_URL and a 32+ character JWT_SECRET_KEY in backend/.env.
 Set-Location backend
@@ -87,7 +95,7 @@ The API health check is available at `http://localhost:8000/health`.
 
 ```powershell
 Set-Location frontend
-npm.cmd install
+npm.cmd ci --ignore-scripts
 Copy-Item .env.example .env.local
 npm.cmd run dev
 ```
@@ -98,7 +106,11 @@ The web application is available at `http://localhost:3000`.
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest backend\tests
+.\.venv\Scripts\python.exe -m pip_audit --strict --disable-pip --require-hashes -s pypi -r backend\requirements.txt
+.\.venv\Scripts\python.exe -m pip_audit --strict --disable-pip --require-hashes -s pypi -r backend\requirements-dev.txt
 Set-Location frontend
+npm.cmd run test:security
+npm.cmd run audit:security
 npm.cmd run lint
 npm.cmd run typecheck
 npm.cmd test -- --run
@@ -108,9 +120,14 @@ npm.cmd run build
 See [implementation progress](docs/implementation-progress.md) for phase-by-phase
 status and verification evidence.
 
+Runtime and development dependencies are separately hash-locked. See
+[dependency security](docs/DEPENDENCY_SECURITY.md) for safe updates and the one
+temporary, development-only upstream advisory exception.
+
 Future agents should begin with the
-[Phase 0–14 implementation handoff](AGENTIC_IMPLEMENTATION_HANDOFF_PHASES_0_TO_14.md).
-It records the exact Phase 14 boundary and the rules for starting Phase 15.
+[current implementation handoff](AGENTIC_IMPLEMENTATION_HANDOFF_CURRENT.md).
+The [Phase 0–14 handoff](AGENTIC_IMPLEMENTATION_HANDOFF_PHASES_0_TO_14.md)
+is historical context, not the current resume point.
 
 For production CI/CD and Vercel setup, see the
 [GitHub Actions and Vercel deployment guide](docs/VERCEL_GITHUB_ACTIONS_DEPLOYMENT.md).
