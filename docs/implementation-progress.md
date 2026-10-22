@@ -1531,3 +1531,18 @@ product features and explicitly said not to deploy yet. All work below is local.
 - Canonical scope: `PHASE_32_POST_ROADMAP_UPGRADES.md`. Actual release state:
   `PRODUCTION_PHASE_32_RELEASE_2026_10_22.md`. Production completion must be backed
   by exact CI/deployment/stable-origin evidence rather than a successful push alone.
+
+### Phase 32 production release — 2026-10-22
+
+- Application `6649931e29bdf19a9b085ec2b0641a79f97777b7` committed and pushed to
+  approved `Mahim2077/HealthLink` main. Actions run `39808112467` completed successfully.
+- Backend/frontend/security gates, unchanged 0031 migration head, production build,
+  protected staged smoke, promotion and stable smoke passed. Stable-host Vercel
+  lookup resolves to READY deployment `dpl_3RyPMHxWh3BVG6pgsrEEfHQrUyGr` at this SHA.
+- Independent stable smoke passed 9/9 probes. Live citizen Settings/theme persistence
+  passed; original Light restored. Sign-out confirmation stalled browser automation,
+  so session cleanup is not confirmed. No clinical/chat data or provider secrets changed.
+- Dev-only braces exception still expires 2026-11-21; runtime-log query still returns
+  403 and drain inventory is empty. These are explicit limits, not a clean-log claim.
+- Full receipt: `PRODUCTION_PHASE_32_RELEASE_2026_10_22.md`. Follow-up docs only use
+  `[skip ci]`; the deployed application commit remains `6649931`.

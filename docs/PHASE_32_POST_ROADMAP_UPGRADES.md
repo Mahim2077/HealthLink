@@ -2,7 +2,7 @@
 
 The owner designated **all work after completion of the original Phase 31
 roadmap as Phase 32** on **2026-10-22**, and authorized documenting, committing,
-pushing and deploying the pending increment. Follow the
+pushing and deploying the increment, now released as `6649931`. Follow the
 [production receipt](PRODUCTION_PHASE_32_RELEASE_2026_10_22.md) for actual status.
 
 ## Boundary and numbering
@@ -12,7 +12,7 @@ continuation, not a rewrite of older features or historical receipts. Earlier
 commits, migration identifiers and dated test results remain intact.
 
 **Migration numbers are not phase numbers.** `0031_ai_conversations` belongs to
-the Phase 32 saved-chat continuation; do not rename it. The pending Settings/
+the Phase 32 saved-chat continuation; do not rename it. The released Settings/
 theme/security increment adds no migration. Expected production head remains 0031.
 
 ## Complete Phase 32 scope
@@ -87,7 +87,7 @@ Mahim2077 Vercel connection, **mahim2077s-projects / healthlink-sd**. No alterna
 account/project, secret rotation, permission downgrade or real clinical-data
 mutation is authorized by this release.
 
-Documented/local completion is separate from production completion. Record exact
-commit, Actions run, deployment identity, stable-origin verification and remaining
-assurance gaps before marking the pending increment released. No medical safety,
-provider privacy, backup or monitoring certification is implied by the tests.
+Production completion is recorded in the linked receipt: application `6649931`,
+successful Actions run `39808112467`, READY production deployment and independently
+verified stable origin. No medical safety, provider privacy, backup or monitoring
+certification is implied by the tests; the receipt records actual acceptance limits.

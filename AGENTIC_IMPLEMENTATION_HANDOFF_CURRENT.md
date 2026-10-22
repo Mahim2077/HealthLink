@@ -13,16 +13,16 @@ Workspace:              D:\HealthLink_V_1
 Repository:             https://github.com/Mahim2077/HealthLink
 Production:             https://healthlink-sd.vercel.app/
 Branch:                 main
-Released app commit:    21e94a5372f6cbf29d71f12fa85e4fa069930ea1
-GitHub Actions run:     39398090813 (successful, 4m 29s)
+Released app commit:    6649931e29bdf19a9b085ec2b0641a79f97777b7
+GitHub Actions run:     39808112467 (completed / success)
 Released DB head:       0031_ai_conversations
-Released roadmap:       Original Phases 0-31; earlier Phase 32 saved-chat increment released
-Current release:        Modern chat + private history committed, pushed and deployed to stable production
+Released roadmap:       Original Phases 0-31 and the consolidated Phase 32 continuation
+Current release:        Phase 32 Settings/themes + dependency/CI security live; saved chat preserved
 Local QA DB head:       0031_ai_conversations (synthetic loopback database only)
-Implementation commit:  5de35ffb285b74535f2eece623a6c16310a3f68b
-Local release scope:    Phase 32: Settings/themes + dependency/CI security + post-31 documentation
+Implementation commit:  6649931e29bdf19a9b085ec2b0641a79f97777b7
+Deployment ID:          dpl_3RyPMHxWh3BVG6pgsrEEfHQrUyGr (READY / production)
 Release authority:      Owner explicitly authorized document/commit/push/deploy on 2026-10-22
-Next work:              Complete authorized Phase 32 CI release and stable-origin verification
+Next work:              Await owner direction; maintain advisory exception and observability follow-up
 ```
 
 ## Phase 32 designation and release authority
@@ -34,12 +34,29 @@ history and migration identifiers; `0031_ai_conversations` must not be renamed.
 
 The same 2026-10-22 instruction authorizes this Phase 32 commit, push and release,
 superseding earlier local holds below for this release only. Account restrictions,
-clinical-data safety and CI safeguards remain mandatory. Release is pending until
-confirmed in `docs/PRODUCTION_PHASE_32_RELEASE_2026_10_22.md`; push is not deployment.
+clinical-data safety and CI safeguards remain mandatory. Phase 32 is now released;
+see `docs/PRODUCTION_PHASE_32_RELEASE_2026_10_22.md` for exact evidence and limits.
 
-Recent local and historical release context:
+### Phase 32 production checkpoint — 2026-10-22
 
-### Latest local continuation — dependency integrity fixes (unreleased)
+Commit `6649931` passed both CI quality jobs and the serialized production job:
+unchanged migration head 0031, production build, protected staged smoke, promotion
+and stable smoke. Vercel's stable-host lookup resolves to the READY deployment
+above and the exact application SHA. An independent stable smoke passed all nine
+probes. Citizen Settings/theme persistence passed live browser acceptance; Light
+was restored. Browser automation stalled at the ordinary sign-out confirmation,
+so session cleanup is not confirmed. No clinical records or chats were changed.
+
+The exact-version dev-only braces exception still expires 2026-11-21. A fresh
+runtime-log query returned 403 and drain inventory was empty; operational assurance
+gaps remain explicit. No alternate account, secret change or live AI call was used.
+The receipt-only follow-up commit is not a new application deployment.
+
+Historical local checkpoints below describe their state before the authorized
+Phase 32 release. Their earlier holds and unreleased statements are superseded by
+the current checkpoint above; feature details and dated test counts remain useful.
+
+### Pre-release local continuation — dependency integrity fixes (now in Phase 32)
 
 After the full integrity audit, the owner authorized careful fixes, not a
 release. See `docs/DEPENDENCY_REMEDIATION_2026_10_22.md` and
@@ -73,7 +90,7 @@ release. See `docs/DEPENDENCY_REMEDIATION_2026_10_22.md` and
   has not run on these local changes. Previous production operational assurance
   gaps remain gaps, not failures proved or fixed by dependency upgrades.
 
-### Latest local continuation — Settings and UI upgrade (unreleased)
+### Pre-release local continuation — Settings and UI upgrade (now in Phase 32)
 
 The owner requested a portal-wide UI inspection, Settings plan and implementation,
 then explicitly approved automated Edge/Playwright QA with synthetic local data.
@@ -127,8 +144,9 @@ Raw synthetic screenshots/review sheets are ignored under
 `.runtime/ui-settings-audit/`; browser results under `.runtime/browser-qa/`.
 The optimized local preview uses Next on 3003 plus the loopback Services proxy on
 3001 and mock API on 8001. The API uses QA PostgreSQL on 55433, not production.
-Production remains the released modern-chat commit above. The pre-existing
-production runtime-log/monitoring gap remains unresolved and out of this task.
+At that local checkpoint production remained the earlier modern-chat commit.
+The Phase 32 release now includes these changes. The pre-existing production
+runtime-log/monitoring gap remains unresolved; see the current receipt.
 
 **Released modern-chat continuation:** see `docs/AI_CONVERSATIONS_2026_10_19.md` and the
 latest `design-qa.md` entry. The owner approved the hybrid conversation sidebar /
