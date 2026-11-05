@@ -2,6 +2,11 @@
 
 ## Status and approved target
 
+**Executed on 2026-11-05.** See the
+[production closure receipt](PRODUCTION_PHASE_32_CLOSURE_2026_11_05.md) for the
+actual CI/CD and production results. The plan below preserves the preparation
+checkpoint and its original candidate details.
+
 Prepared from the [fresh verification report](PHASE_32_CLOSING_RELEASE_CHECK_2026_11_04.md).
 **Awaiting the owner's commit/push/deploy instruction. Nothing in this plan has
 been published.** This is the closing release of Phase 32 and the existing
