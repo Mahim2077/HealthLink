@@ -195,6 +195,12 @@ jobs:
         with:
           version: "0.12.7"
 
+      - name: Provision the Vercel builder's Python fallback
+        # The pinned builder falls back to the newest installed Python if 3.12
+        # is absent, then upgrades requirements.txt projects below that version.
+        # Make its default available so it respects backend/.python-version (3.13).
+        run: uv python install 3.12
+
       - name: Install Vercel CLI
         run: npm install --global vercel@59.10.0
 
