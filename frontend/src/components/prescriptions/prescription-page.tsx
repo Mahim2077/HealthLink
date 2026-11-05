@@ -8,13 +8,16 @@ import { usePortalAuth } from "@/components/auth/auth-provider";
 import { PrescriptionPanel } from "@/components/prescriptions/prescription-panel";
 import { EmptyState, LoadingState } from "@/components/ui/async-state";
 import type { Portal } from "@/lib/auth/types";
+import { citizenPrescriptionBackPath } from "@/lib/medical-records/navigation";
 
 export function PrescriptionPage({
   prescriptionId,
   portal,
+  returnTo,
 }: {
   prescriptionId: string;
   portal: Extract<Portal, "CITIZEN" | "PROFESSIONAL">;
+  returnTo?: string;
 }) {
   const auth = usePortalAuth(portal);
   const status = auth.status;
@@ -75,7 +78,7 @@ export function PrescriptionPage({
 
   const backPath =
     portal === "CITIZEN"
-      ? "/citizen/appointments"
+      ? citizenPrescriptionBackPath(returnTo)
       : "/professional/visits";
 
   return (

@@ -17,6 +17,7 @@ from app.appointments.schemas import (
     AppointmentCancellationResponse,
     AppointmentFinishResponse,
     AppointmentListResponse,
+    ChamberFacilityChoice,
     ChamberQueueActionResponse,
     ChamberSessionFinishResponse,
     ChamberSessionStartRequest,
@@ -98,6 +99,15 @@ def cancel_appointment(
 # ---------------------------------------------------------------------------
 # Phase 11 — doctor chamber session + serial queue
 # ---------------------------------------------------------------------------
+
+
+@chamber_router.get("/facilities", response_model=list[ChamberFacilityChoice])
+def list_chamber_facilities(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[ProfessionalAuthContext, Depends(get_current_verified_doctor_for_chamber)],
+) -> list[ChamberFacilityChoice]:
+    return AppointmentService(db, _settings(request)).list_chamber_facilities(context)
 
 
 @chamber_router.post(

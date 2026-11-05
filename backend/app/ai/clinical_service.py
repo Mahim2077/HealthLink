@@ -27,7 +27,6 @@ from app.auth.constants import Portal
 from app.auth.dependencies import AuthContext
 from app.auth.models import User
 from app.citizens.models import CitizenProfile
-from app.citizens.repository import CitizenRepository
 from app.clinical_audit.service import AuditService
 from app.core.config import Settings
 from app.core.exceptions import HealthLinkError
@@ -179,16 +178,6 @@ class ClinicalAIExplanationService:
             raise HealthLinkError("Prescription not found.", status_code=404)
         visit = self.db.get(MedicalVisit, prescription.visit_id)
         finalized = bool(visit and visit.status == VisitStatus.FINALIZED.value)
-        if auth.portal is Portal.CITIZEN:
-            citizen = CitizenRepository(self.db).get_profile_by_user_id(
-                auth.user.id
-            )
-            if citizen is None or prescription.citizen_id != citizen.id:
-                raise HealthLinkError("Clinical record not found.", status_code=404)
-            return (
-                _Access(auth, prescription.citizen_id, "SELF"),
-                prescription,
-            )
         decision = ClinicalReadPolicy(self.db).authorize(
             auth,
             prescription.citizen_id,

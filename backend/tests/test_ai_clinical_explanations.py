@@ -345,7 +345,7 @@ def test_author_doctor_can_explain_finalized_prescription(
     assert event.access_source == "AUTHOR"
 
 
-def test_own_draft_prescription_matches_citizen_read_authority_but_not_author_only(
+def test_draft_prescription_explanation_denies_citizen_and_author_only_before_provider(
     test_settings: Settings, db_session
 ) -> None:
     settings = _enabled(test_settings)
@@ -359,12 +359,79 @@ def test_own_draft_prescription_matches_citizen_read_authority_but_not_author_on
     path = f"/api/v1/ai/prescriptions/{prescription.id}/explain"
 
     with _client(settings, db_session, provider) as client:
-        allowed = client.post(path, headers=_auth(citizen_token))
-        denied = client.post(path, headers=_auth(doctor_token))
+        citizen_response = client.post(path, headers=_auth(citizen_token))
+        doctor_response = client.post(path, headers=_auth(doctor_token))
 
-    assert allowed.status_code == 200, allowed.text
-    assert denied.status_code == 404
-    assert len(provider.prompts) == 1
+    assert citizen_response.status_code == 404, citizen_response.text
+    assert doctor_response.status_code == 404, doctor_response.text
+    assert provider.prompts == []
+    assert db_session.scalar(
+        select(MedicalRecordAccessLog).where(
+            MedicalRecordAccessLog.action == "AI_ACCESS"
+        )
+    ) is None
+
+
+def test_prescription_explanation_publishes_to_citizen_only_after_finish_appointment(
+    test_settings: Settings, db_session
+) -> None:
+    from test_prescriptions import (
+        CREATE_PRESCRIPTION_PATH,
+        _VALID_PAYLOAD,
+        _finish_visit,
+        _login_citizen_for_visit,
+        _set_up_visit,
+    )
+
+    settings = _enabled(test_settings)
+    provider = CapturingClinicalProvider()
+    with _client(settings, db_session, provider) as client:
+        doctor_token, visit_id, _ = _set_up_visit(
+            client, db_session,
+            clinic_name="AI Publication Boundary Clinic", weekday="MONDAY",
+            nid_number="NID-AI-PUBLICATION", bmdc="BMDC-AI-PUBLICATION",
+        )
+        created = client.post(
+            CREATE_PRESCRIPTION_PATH.format(visit_id=visit_id),
+            headers=_auth(doctor_token), json=_VALID_PAYLOAD,
+        )
+        assert created.status_code == 201, created.text
+        prescription_id = uuid.UUID(created.json()["id"])
+        path = f"/api/v1/ai/prescriptions/{prescription_id}/explain"
+        citizen_token = _login_citizen_for_visit(client, db_session, visit_id)
+
+        denied = client.post(path, headers=_auth(citizen_token))
+        assert denied.status_code == 404, denied.text
+        assert provider.prompts == []
+        assert db_session.scalar(
+            select(MedicalRecordAccessLog).where(
+                MedicalRecordAccessLog.resource_id == prescription_id,
+                MedicalRecordAccessLog.action == "AI_ACCESS",
+            )
+        ) is None
+
+        # The same centralized policy still permits the current Doctor's draft.
+        doctor_draft = client.post(path, headers=_auth(doctor_token))
+        assert doctor_draft.status_code == 200, doctor_draft.text
+        assert len(provider.prompts) == 1
+
+        _finish_visit(client, db_session, doctor_token, visit_id)
+
+        published = client.post(path, headers=_auth(citizen_token))
+        assert published.status_code == 200, published.text
+        assert sorted(item["medicine_name"] for item in published.json()["medicine_explanations"]) == sorted(
+            item["medicine_name"] for item in _VALID_PAYLOAD["items"]
+        )
+        assert len(provider.prompts) == 2
+
+    events = list(db_session.scalars(
+        select(MedicalRecordAccessLog).where(
+            MedicalRecordAccessLog.resource_id == prescription_id,
+            MedicalRecordAccessLog.action == "AI_ACCESS",
+        )
+    ))
+    assert len(events) == 2
+    assert {event.access_source for event in events} == {"CURRENT_PATIENT", "SELF"}
 
 
 def test_prescription_output_that_diagnoses_is_blocked_after_audit(

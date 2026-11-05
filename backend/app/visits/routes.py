@@ -104,7 +104,7 @@ def read_visit_as_doctor(
     if visit is None:
         raise HealthLinkError("Visit not found.", status_code=404)
     decision = ClinicalReadPolicy(db).authorize(auth, visit.citizen_id, "VISIT", resource_id=visit.id, author_role_id=visit.doctor_role_registration_id, finalized=visit.status == "FINALIZED")
-    result = VisitsService(db).read_visit_for_citizen(visit.citizen_id, visit_id)
+    result = VisitsService(db)._read_authorized_visit(visit, access_source=decision.source)
     AuditService(db).record(auth=auth, citizen_id=visit.citizen_id, resource_type="VISIT", resource_id=visit.id, access_source=decision.source)
     return result
 

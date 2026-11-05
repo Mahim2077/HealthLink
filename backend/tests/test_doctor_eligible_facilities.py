@@ -176,6 +176,27 @@ def test_eligible_facilities_flags_verified_assignment(
     assert choices[other_active.id].is_verified_assignment is False
 
 
+def test_eligible_facilities_include_public_disambiguation_without_coordinates(
+    client: TestClient, db_session
+) -> None:
+    first = _make_facility(db_session, name="Same-name Clinic")
+    second = _make_facility(db_session, name="Same-name Clinic")
+    first.address = "Road 1, Savar"
+    second.address = "Road 2, Savar"
+    db_session.commit()
+    doctor_user, _ = _make_verified_doctor(db_session, facility=first)
+
+    from app.doctors.service import DoctorService
+    from app.core.config import get_settings
+
+    choices = {choice.id: choice for choice in DoctorService(db_session, get_settings()).list_eligible_facilities(doctor_user.id)}
+    assert choices[first.id].address == "Road 1, Savar"
+    assert choices[second.id].address == "Road 2, Savar"
+    assert choices[first.id].registration_number == first.registration_number
+    assert "latitude" not in choices[first.id].model_dump()
+    assert "longitude" not in choices[first.id].model_dump()
+
+
 def test_eligible_facilities_rejects_unverified_doctor(
     client: TestClient,
     db_session,

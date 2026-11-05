@@ -10,6 +10,13 @@ def test_health_endpoint(client: TestClient) -> None:
         "service": "HealthLink Test",
         "environment": "test",
     }
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "SAMEORIGIN"
+    assert response.headers["referrer-policy"] == "same-origin"
+    assert response.headers["permissions-policy"] == "geolocation=(self), camera=(), microphone=()"
+    assert response.headers["content-security-policy"] == (
+        "base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+    )
 
 
 def test_health_endpoint_allows_configured_frontend_origin(

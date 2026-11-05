@@ -17,3 +17,5 @@ certifi>=2026.10.19
 pillow>=13.0.0
 urllib3>=2.8.0,<3.0
 Mako>=1.4.2,<2.0
+# Patch the ASN.1 decoder advisories found during the release preflight.
+pyasn1>=0.6.5,<0.7.0

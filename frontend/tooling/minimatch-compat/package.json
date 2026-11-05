@@ -1,0 +1,15 @@
+{
+  "name": "@healthlink/minimatch-compat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Development-only compatibility for HealthLink's pinned ESLint glob consumers.",
+  "main": "index.cjs",
+  "exports": {
+    ".": { "import": "./index.mjs", "require": "./index.cjs" },
+    "./package.json": "./package.json"
+  },
+  "files": ["index.cjs", "index.mjs", "README.md"],
+  "dependencies": {
+    "minimatch-engine": "npm:minimatch@11.0.4"
+  }
+}

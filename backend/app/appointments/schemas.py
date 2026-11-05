@@ -143,6 +143,13 @@ class ChamberSessionStartRequest(BaseModel):
         return value
 
 
+class ChamberFacilityChoice(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+
+
 class ChamberSessionView(BaseModel):
     """Current chamber session summary returned by `get today`."""
 

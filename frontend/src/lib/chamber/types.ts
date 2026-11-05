@@ -20,6 +20,8 @@ export type QueueStatus =
 
 export type SessionStatus = "NOT_STARTED" | "ACTIVE" | "COMPLETED";
 
+export type ChamberFacilityChoice = { id: string; name: string };
+
 export type ChamberAppointmentView = {
   queue_id: string;
   appointment_id: string;

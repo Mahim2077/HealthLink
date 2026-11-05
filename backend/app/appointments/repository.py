@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.appointments.models import (
@@ -336,6 +336,37 @@ class AppointmentRepository:
     # Phase 11 — chamber session + serial queue
     # ------------------------------------------------------------------
 
+    def chamber_facilities_query(self, registration: ProfessionalRoleRegistration):
+        # Owned sessions retain access to accepted appointments after a schedule
+        # is retired. Another doctor's schedule/session never grants authority.
+        scheduled = select(DoctorPracticeSchedule.id).where(
+            DoctorPracticeSchedule.facility_id == HealthcareFacility.id,
+            DoctorPracticeSchedule.doctor_user_id == registration.professional.user_id,
+            DoctorPracticeSchedule.status == PracticeScheduleStatus.ACTIVE.value,
+            DoctorPracticeSchedule.deleted_at.is_(None),
+        ).exists()
+        booked = select(DoctorPracticeSession.id).where(
+            DoctorPracticeSession.facility_id == HealthcareFacility.id,
+            DoctorPracticeSession.doctor_role_registration_id == registration.id,
+        ).exists()
+        return select(HealthcareFacility).where(or_(
+            HealthcareFacility.id == registration.facility_id, scheduled, booked,
+        ))
+
+    def other_current_patient(self, session: DoctorPracticeSession) -> bool:
+        return self.db.scalar(select(AppointmentQueueEntry.id)
+            .join(DoctorPracticeSession, DoctorPracticeSession.id == AppointmentQueueEntry.practice_session_id)
+            .join(Appointment, Appointment.id == AppointmentQueueEntry.appointment_id)
+            .where(DoctorPracticeSession.doctor_role_registration_id == session.doctor_role_registration_id,
+                   DoctorPracticeSession.id != session.id,
+                   DoctorPracticeSession.status == SessionStatus.ACTIVE.value,
+                   AppointmentQueueEntry.queue_status == QueueStatus.CURRENT.value,
+                   Appointment.status == AppointmentStatus.BOOKED.value,
+                   Appointment.doctor_role_registration_id == session.doctor_role_registration_id,
+                   Appointment.facility_id == DoctorPracticeSession.facility_id,
+                   Appointment.appointment_date == DoctorPracticeSession.session_date)
+            .limit(1)) is not None
+
     def _lock_for_queue(
         self,
         doctor_role_registration_id: uuid.UUID,
@@ -343,9 +374,10 @@ class AppointmentRepository:
     ) -> None:
         """Transaction-scoped advisory lock for chamber queue mutations.
 
-        Mirrors ``_lock_for_booking`` but uses a different folded key so
-        booking locks and queue locks do not collide when a doctor is
-        racing a late-arriving booking while running the queue.
+        Serialize all of a doctor's queue mutations, including different
+        facilities/dates: the consultation workspace has one current patient.
+        Booking/cancellation first take their doctor/date booking lock, then
+        this lock to serialize availability checks with session closure.
         """
 
         bind = self.db.get_bind()
@@ -353,7 +385,7 @@ class AppointmentRepository:
             return
         u = int(doctor_role_registration_id.int)
         key = (u ^ (u >> 32)) & 0x7FFFFFFFFFFFFFFF
-        key = key ^ (date.toordinal(session_date) << 1) ^ 0x5A5A5A5A
+        key = key ^ 0x5A5A5A5A
         self.db.execute(
             select(func.pg_advisory_xact_lock(key))
         ).scalar()

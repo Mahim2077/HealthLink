@@ -45,6 +45,7 @@ export type VisitDraftUpdateRequest = {
 export type DoctorCurrentPatientView = {
   queue_id: string;
   appointment_id: string;
+  appointment_date: string;
   serial_number: number;
   citizen_id: string;
   facility_id: string;

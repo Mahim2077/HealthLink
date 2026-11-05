@@ -37,16 +37,17 @@ export function RemindersWorkspace() {
   if (!reminders || !notifications) return error ? <ErrorState message={error} onAction={() => { setError(""); setVersion(v => v + 1); }} /> : <LoadingState label="Loading reminders" />;
   return <div className="space-y-7">
     {error && <ErrorState message={error} onAction={() => { setError(""); setVersion(v => v + 1); }} />}
+    <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">Automatic reminder delivery is not enabled. Saving or activating a schedule does not send alerts or create new notifications. Use another reminder method for any time-critical medicine schedule.</p>
     {notice && <p role="status" className="text-sm text-emerald-800">{notice}</p>}
     {editing ? <ReminderForm key={editing === "new" ? "new" : editing.id} initial={editing === "new" ? undefined : editing} onCancel={() => setEditing(null)} onSaved={() => { setEditing(null); setNotice("Reminder saved."); setPage(1); setVersion(v => v + 1); }} /> : <button disabled={pending} className={`${reminderButtonClass} bg-sky-800 text-white`} onClick={() => setEditing("new")}>Create reminder</button>}
-    <section className="space-y-4" aria-labelledby="medicine-reminders-heading"><h2 id="medicine-reminders-heading" className="text-xl font-bold">Medicine reminders</h2>
-      {!reminders.length && <EmptyState title="No reminders" message="Create a medicine reminder with one or more daily times." />}
+    <section className="space-y-4" aria-labelledby="medicine-reminders-heading"><h2 id="medicine-reminders-heading" className="text-xl font-bold">Saved medicine schedules</h2>
+      {!reminders.length && <EmptyState title="No saved schedules" message="Save daily times for reference. Automatic alerts are not enabled." />}
       {reminders.map(reminder => <article key={reminder.id} className="hl-card space-y-3 p-5"><h3 className="font-bold">{reminder.medicine}</h3><p className="text-sm">{reminder.times.map(t => t.slice(0, 5)).join(", ")} · Asia/Dhaka · {reminder.is_active ? "Active" : "Inactive"}</p><p className="text-sm text-slate-600">{reminder.start_date} to {reminder.end_date ?? "no end date"}</p><div className="flex gap-3"><button disabled={pending || !!editing} className={reminderButtonClass} onClick={() => setEditing(reminder)}>Edit</button><button disabled={pending || !!editing} className={reminderButtonClass} onClick={() => void action(() => setReminderActive(reminder.id, !reminder.is_active))}>{reminder.is_active ? "Deactivate" : "Activate"}</button></div></article>)}
       <PageControls disabled={pending || !!editing} label="Reminder pages" page={page} count={reminders.length} setPage={p => { setReminders(null); setPage(p); }} />
     </section>
     <section className="space-y-4" aria-labelledby="notifications-heading"><div className="flex items-center justify-between gap-3"><h2 id="notifications-heading" className="text-xl font-bold">Notifications</h2><button disabled={pending || !!editing} className={reminderButtonClass} onClick={() => { setError(""); setVersion(v => v + 1); }}>Refresh notifications</button></div>
-      <p className="text-sm text-slate-600">These are in-app notices and may arrive late. Acknowledging a notice does not record that medicine was taken.</p>
-      {!notifications.length && <EmptyState title="No notifications" message="Due medicine reminders and booked appointment notices appear here." />}
+      <p className="text-sm text-slate-600">Previously recorded in-app notices appear here. Automatic reminder delivery is disabled; no new scheduled notices are generated. Acknowledging a notice does not record that medicine was taken.</p>
+      {!notifications.length && <EmptyState title="No notifications" message="No previous notices are available. Saved schedules do not generate automatic notifications." />}
       {notifications.map(item => <article key={item.id} className="hl-card space-y-3 p-5"><p>{item.message}</p><p className="text-sm text-slate-600">{item.acknowledged_at ? "Acknowledged" : item.read_at ? "Read" : "Unread"}</p><div className="flex flex-wrap gap-3"><button className={reminderButtonClass} disabled={pending || !!item.read_at} onClick={() => void action(() => markNotification(item.id, "read"))}>Mark read</button><button className={reminderButtonClass} disabled={pending || !!item.acknowledged_at} onClick={() => void action(() => markNotification(item.id, "acknowledge"))}>Acknowledge</button></div></article>)}
       <PageControls disabled={pending || !!editing} label="Notification pages" page={notificationPage} count={notifications.length} setPage={p => { setNotifications(null); setNotificationPage(p); }} />
     </section>
@@ -58,7 +59,7 @@ export function RemindersPage() {
   const { status, refreshSession } = auth;
   const [failed, setFailed] = useState(false);
   useEffect(() => { if (status === "authenticated") return; let active = true; void refreshSession().catch(() => { if (active) setFailed(true); }); return () => { active = false; }; }, [status, refreshSession]);
-  return <main id="main-content" className="mx-auto w-full max-w-4xl flex-1 space-y-6 px-5 py-10 sm:px-8"><h1 className="text-3xl font-bold">Reminders and notifications</h1><p className="text-sm text-slate-600">Manage your daily medicine reminders and view appointment notices.</p>
+  return <main id="main-content" className="mx-auto w-full max-w-4xl flex-1 space-y-6 px-5 py-10 sm:px-8"><h1 className="text-3xl font-bold">Reminders and notifications</h1><p className="text-sm text-slate-600">Keep medicine schedules for reference and review previous notices. Automatic delivery is not enabled.</p>
     {status !== "authenticated" ? failed ? <EmptyState title="Sign in required" message="Sign in to manage your reminders." action={<Link href="/citizen/login">Sign in</Link>} /> : <LoadingState label="Checking session" /> : !auth.isRequiredPortal ? <EmptyState title="Citizen portal required" message="Use your citizen session to manage reminders." /> : <RemindersWorkspace key={auth.claims?.sid} />}
   </main>;
 }

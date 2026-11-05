@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import { citizenErrorMessage } from "@/lib/citizen/presentation";
+import { citizenHistoryPath } from "@/lib/medical-records/navigation";
 import type {
   MedicalHistoryLoadAction,
   MedicalHistoryPage,
@@ -36,9 +37,11 @@ function formatTimestamp(value: string): string {
 function HistoryEventCard({
   event,
   portal,
+  query,
 }: {
   event: MedicalHistoryPage["items"][number];
   portal: HistoryPortal;
+  query: MedicalHistoryQuery;
 }) {
   const Icon =
     event.resource_type === "PRESCRIPTION"
@@ -83,7 +86,7 @@ function HistoryEventCard({
 
   if (event.resource_type === "PRESCRIPTION") {
     const href = portal === "citizen"
-      ? `/citizen/prescriptions/${event.resource_id}`
+      ? `/citizen/prescriptions/${event.resource_id}?${new URLSearchParams({ returnTo: citizenHistoryPath(query) })}`
       : `/professional/prescriptions/${event.resource_id}`;
     return (
       <Link
@@ -101,14 +104,16 @@ function HistoryEventCard({
 export function MedicalHistoryTimeline({
   loadAction,
   portal,
+  initialQuery = { page: 1, page_size: 10 },
 }: {
   loadAction: MedicalHistoryLoadAction;
   portal: HistoryPortal;
+  initialQuery?: MedicalHistoryQuery;
 }) {
-  const [resourceType, setResourceType] = useState<"" | MedicalHistoryResourceType>("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [query, setQuery] = useState<MedicalHistoryQuery>({ page: 1, page_size: 10 });
+  const [resourceType, setResourceType] = useState<"" | MedicalHistoryResourceType>(initialQuery.resource_type ?? "");
+  const [dateFrom, setDateFrom] = useState(initialQuery.date_from ?? "");
+  const [dateTo, setDateTo] = useState(initialQuery.date_to ?? "");
+  const [query, setQuery] = useState<MedicalHistoryQuery>(initialQuery);
   const [result, setResult] = useState<MedicalHistoryPage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
@@ -215,7 +220,7 @@ export function MedicalHistoryTimeline({
           </p>
           <div className="grid gap-4" data-testid="medical-history-events">
             {result.items.map((event) => (
-              <HistoryEventCard event={event} key={event.id} portal={portal} />
+              <HistoryEventCard event={event} key={event.id} portal={portal} query={query} />
             ))}
           </div>
           <nav aria-label="Medical history pages" className="flex items-center justify-between border-t border-slate-200 pt-4">

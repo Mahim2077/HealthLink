@@ -42,6 +42,30 @@ describe("Saved AI conversations", () => {
     expect(screen.getByRole("button", { name: /General · Records off/ })).toBeInTheDocument();
   });
 
+  it("keeps a new empty conversation at the top while scrolling actual turns to the bottom", async () => {
+    const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollTo");
+    const scrollTo = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", { configurable: true, value: scrollTo });
+    try {
+      render(<AiAssistant />);
+      const transcript = screen.getByRole("region", { name: "Conversation messages" });
+      Object.defineProperty(transcript, "scrollHeight", { configurable: true, value: 900 });
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: "instant" });
+      fireEvent.change(input(), { target: { value: summary.title } });
+      fireEvent.click(send());
+      await screen.findByText(response.answer);
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: 900, behavior: "instant" });
+      fireEvent.click(screen.getByRole("button", { name: "New conversation" }));
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: "instant" });
+      expect(screen.getByRole("heading", { name: "What would you like to understand?" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "New conversation" }));
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: "instant" });
+    } finally {
+      if (original) Object.defineProperty(HTMLElement.prototype, "scrollTo", original);
+      else Reflect.deleteProperty(HTMLElement.prototype, "scrollTo");
+    }
+  });
+
   it("requires fresh records consent and defaults back to General after sending", async () => {
     mocks.send.mockResolvedValue({ conversation: summary, turn: { ...turn, mode: "RECORD_AWARE" } });
     render(<AiAssistant />);

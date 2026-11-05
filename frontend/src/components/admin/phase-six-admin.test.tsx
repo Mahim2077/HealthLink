@@ -64,4 +64,56 @@ describe("Phase 6 admin interfaces", () => {
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
   });
+
+  it("keeps decision actions available after whitespace qualification validation", async () => {
+    mocks.verify.mockResolvedValue({ ...application, verification_status: "VERIFIED", facility });
+    render(<ProfessionalVerificationDetail registrationId="r1" />);
+    await screen.findByText("BMDC-100");
+    fireEvent.change(screen.getByLabelText("Match active facility"), { target: { value: "f1" } });
+    fireEvent.change(screen.getByLabelText("Verified qualification"), { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: "Verify and link facility" }));
+    expect(screen.getByText("Confirm the doctor's qualification before verification.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Verify and link facility" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Reject application" })).toBeEnabled();
+    expect(mocks.verify).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Verified qualification"), { target: { value: " MBBS " } });
+    fireEvent.click(screen.getByRole("button", { name: "Verify and link facility" }));
+    await waitFor(() => expect(mocks.verify).toHaveBeenCalledWith("r1", "f1", "PEDIATRICS", "MBBS"));
+  });
+
+  it("distinguishes same-name active facilities during verification without internal IDs", async () => {
+    mocks.loadFacilities.mockResolvedValue([
+      { ...facility, address: "Road 1, Dhaka" },
+      { ...facility, id: "f2", address: "Road 2, Dhaka", registration_number: "F-2" },
+      { ...facility, id: "inactive", is_active: false },
+    ]);
+    render(<ProfessionalVerificationDetail registrationId="r1" />);
+    const options = await screen.findAllByRole("option", { name: /General Hospital/ });
+    expect(options).toHaveLength(2);
+    expect(options[0]).toHaveTextContent("Road 1, Dhaka");
+    expect(options[0]).toHaveTextContent("Registration F-1");
+    expect(options[1]).toHaveTextContent("Road 2, Dhaka");
+    expect(options[1]).toHaveTextContent("Registration F-2");
+    fireEvent.change(screen.getByLabelText("Match active facility"), { target: { value: "f2" } });
+    expect(screen.getByLabelText("Match active facility")).toHaveValue("f2");
+  });
+
+  it("distinguishes a no-match facility search and clears it without changing records", async () => {
+    render(<FacilityManager />);
+    await screen.findByText("General Hospital");
+    fireEvent.change(screen.getByLabelText("Search facilities"), { target: { value: "no-such-facility" } });
+    expect(screen.getByText("No matching facilities")).toBeInTheDocument();
+    expect(screen.queryByText("No facilities yet")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(screen.getByText("General Hospital")).toBeInTheDocument();
+    expect(mocks.createFacility).not.toHaveBeenCalled();
+    expect(mocks.updateFacility).not.toHaveBeenCalled();
+  });
+
+  it("keeps the registry-empty message when no facilities exist", async () => {
+    mocks.loadFacilities.mockResolvedValue([]);
+    render(<FacilityManager />);
+    expect(await screen.findByText("No facilities yet")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear search" })).not.toBeInTheDocument();
+  });
 });

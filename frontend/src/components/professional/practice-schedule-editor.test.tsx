@@ -55,6 +55,58 @@ describe("PracticeScheduleEditor", () => {
     expect(screen.getByLabelText("Max patients")).toHaveValue(25);
   });
 
+  it("preserves an unsaved Add form when replacing it with Edit is cancelled", async () => {
+    const { deps, spies } = buildDeps();
+    render(<PracticeScheduleEditor deps={deps} />);
+    await screen.findByRole("button", { name: "Edit" });
+    fireEvent.change(screen.getByLabelText("Max patients"), { target: { value: "19" } });
+    vi.mocked(window.confirm).mockReturnValue(false);
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("unsaved changes"));
+    expect(screen.getByRole("heading", { name: "Add weekly window" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Max patients")).toHaveValue(19);
+    expect(spies.createRow).not.toHaveBeenCalled();
+    expect(spies.updateRow).not.toHaveBeenCalled();
+  });
+
+  it("replaces an unsaved form only after confirming discard", async () => {
+    const { deps } = buildDeps();
+    render(<PracticeScheduleEditor deps={deps} />);
+    await screen.findByRole("button", { name: "Edit" });
+    fireEvent.change(screen.getByLabelText("Max patients"), { target: { value: "19" } });
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("Discard"));
+    expect(screen.getByRole("heading", { name: "Edit weekly window" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Max patients")).toHaveValue(20);
+  });
+
+  it("preserves unsaved edits when selecting another window is cancelled", async () => {
+    const { deps } = buildDeps({ loadSchedule: vi.fn().mockResolvedValue([baseEntry, { ...baseEntry, id: "schedule-2", weekday: "FRIDAY", max_patients: 30 }]) });
+    render(<PracticeScheduleEditor deps={deps} />);
+    const edits = await screen.findAllByRole("button", { name: "Edit" });
+    fireEvent.click(edits[0]);
+    fireEvent.change(screen.getByLabelText("Max patients"), { target: { value: "19" } });
+    vi.mocked(window.confirm).mockReturnValue(false);
+    fireEvent.click(edits[1]);
+    expect(screen.getByLabelText("Weekday")).toHaveValue("MONDAY");
+    expect(screen.getByLabelText("Max patients")).toHaveValue(19);
+  });
+
+  it("distinguishes same-name facilities using their public location and registration", async () => {
+    const { deps } = buildDeps({ loadFacilities: vi.fn().mockResolvedValue([
+      { ...baseFacility, area: "Savar, Dhaka", address: "Road 1", registration_number: "CL-1" },
+      { ...baseFacility, id: "facility-2", area: "Savar, Dhaka", address: "Road 2", registration_number: "CL-2", is_verified_assignment: false },
+    ]) });
+    render(<PracticeScheduleEditor deps={deps} />);
+    const choices = await screen.findAllByRole("option", { name: /Home Hospital/ });
+    expect(choices).toHaveLength(2);
+    expect(choices[0]).toHaveTextContent("Savar, Dhaka");
+    expect(choices[0]).toHaveTextContent("CL-1");
+    expect(choices[1]).toHaveTextContent("CL-2");
+    expect(choices[0].textContent).not.toBe(choices[1].textContent);
+    expect(choices[0]).not.toHaveTextContent("facility-1");
+  });
+
   it("renders an empty state when no schedule rows exist", async () => {
     const { deps } = buildDeps({ loadSchedule: vi.fn().mockResolvedValue([]) });
     render(<PracticeScheduleEditor deps={deps} />);

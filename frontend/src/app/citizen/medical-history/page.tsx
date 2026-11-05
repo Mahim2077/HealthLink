@@ -2,15 +2,22 @@
 
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
 import { usePortalAuth } from "@/components/auth/auth-provider";
 import { MedicalHistorySummary } from "@/components/ai/medical-history-summary";
 import { MedicalHistoryTimeline } from "@/components/medical-records/medical-history-timeline";
 import { EmptyState, LoadingState } from "@/components/ui/async-state";
 import { listCitizenMedicalHistory } from "@/lib/medical-records/api";
+import { historyQueryFromSearch } from "@/lib/medical-records/navigation";
 
 export default function CitizenMedicalHistoryPage() {
+  return <Suspense fallback={<main id="main-content" className="px-5 py-12"><LoadingState label="Loading medical history" /></main>}><CitizenMedicalHistoryContent /></Suspense>;
+}
+
+function CitizenMedicalHistoryContent() {
+  const searchParams = useSearchParams();
   const auth = usePortalAuth("CITIZEN");
   const status = auth.status;
   const refreshSession = auth.refreshSession;
@@ -46,7 +53,7 @@ export default function CitizenMedicalHistoryPage() {
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Review your finalized clinical timeline across HealthLink facilities. Use the filters to find visits and prescriptions by date.</p>
       </header>
       <div className="mt-8 space-y-8" key={auth.claims?.sid}>
-        <MedicalHistoryTimeline loadAction={listCitizenMedicalHistory} portal="citizen" />
+        <MedicalHistoryTimeline key={searchParams.toString()} initialQuery={historyQueryFromSearch(searchParams)} loadAction={listCitizenMedicalHistory} portal="citizen" />
         <MedicalHistorySummary />
       </div>
     </main>

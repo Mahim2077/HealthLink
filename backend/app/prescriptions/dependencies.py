@@ -59,6 +59,16 @@ def get_prescription_access(
             raise AuthorizationError("Citizen profile required.")
         if prescription.citizen_id != profile.id:
             raise HealthLinkError("Prescription not found.", status_code=404)
+        visit = db.get(MedicalVisit, prescription.visit_id)
+        # The same publication rule protects both structured reads and PDFs.
+        # A saved draft belongs to the doctor workspace, not the citizen record.
+        ClinicalReadPolicy(db).authorize(
+            auth,
+            prescription.citizen_id,
+            "PRESCRIPTION",
+            resource_id=prescription.id,
+            finalized=bool(visit and visit.status == "FINALIZED"),
+        )
         return PrescriptionAccess(
             auth=auth,
             prescription_id=prescription_id,

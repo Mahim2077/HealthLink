@@ -17,6 +17,15 @@ beforeEach(() => {
 });
 
 describe("reminders", () => {
+  it("does not promise automatic delivery for saved or active schedules", async () => {
+    render(<RemindersWorkspace />);
+    expect(await screen.findByText(/Saving or activating a schedule does not send alerts/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Saved medicine schedules" })).toBeInTheDocument();
+    expect(screen.getByText(/Saved schedules do not generate automatic notifications/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Create reminder" }));
+    expect(screen.getByText(/This saves a schedule for reference only/)).toHaveTextContent(/automatic reminder delivery is not enabled/);
+    expect(screen.queryByText(/may arrive late|Changes apply to future reminders/)).not.toBeInTheDocument();
+  });
   it("preserves a failed draft and submits separate daily times", async () => {
     vi.mocked(api.saveReminder).mockRejectedValue(new Error("Connection unavailable"));
     render(<ReminderForm onSaved={vi.fn()} onCancel={vi.fn()} />);

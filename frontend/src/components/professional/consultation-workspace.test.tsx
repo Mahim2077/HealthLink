@@ -26,6 +26,7 @@ const baseCurrent = (
   overrides: Partial<DoctorCurrentPatientView>,
 ): DoctorCurrentPatientView => ({
   appointment_id: "appt-1",
+  appointment_date: "2026-08-10",
   citizen_id: "citizen-1",
   facility_id: "facility-1",
   facility_name: "City Hospital",
@@ -124,6 +125,28 @@ describe("ConsultationWorkspace", () => {
     expect(
       screen.queryByRole("button", { name: /open consultation/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("dates an older open encounter explicitly without closing or hiding it", async () => {
+    const { deps, spies } = buildDeps({
+      loadCurrentPatient: vi.fn().mockResolvedValue(baseCurrent({ appointment_date: "2020-01-02", visit: baseVisit({}) })),
+    });
+    render(<ConsultationWorkspace visitsDeps={deps} />);
+    expect(await screen.findByText("Resuming an older open encounter")).toBeInTheDocument();
+    expect(screen.getByText(/not today's queue/)).toBeInTheDocument();
+    expect(screen.getByText(/Encounter date:/).querySelector("time")).toHaveAttribute("dateTime", "2020-01-02");
+    expect(screen.getByRole("button", { name: "Finish Appointment" })).toBeEnabled();
+    expect(spies.finishAppointment).not.toHaveBeenCalled();
+    expect(spies.startVisitForCurrent).not.toHaveBeenCalled();
+  });
+
+  it("shows today's date without an older-encounter notice", async () => {
+    const { careDate } = await import("@/lib/care-date");
+    const { deps } = buildDeps({ loadCurrentPatient: vi.fn().mockResolvedValue(baseCurrent({ appointment_date: careDate() })) });
+    render(<ConsultationWorkspace visitsDeps={deps} />);
+    await screen.findByRole("heading", { name: /serial #1/i });
+    expect(screen.queryByText("Resuming an older open encounter")).not.toBeInTheDocument();
+    expect(screen.getByText(/Encounter date:/).querySelector("time")).toHaveAttribute("dateTime", careDate());
   });
 
   it("opens a draft visit and saves clinical notes for the current patient", async () => {

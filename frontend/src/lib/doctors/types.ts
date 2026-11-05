@@ -134,12 +134,17 @@ export type DoctorDiscoveryFacility = {
   name: string;
   facility_type: string;
   area: string | null;
+  address?: string | null;
+  registration_number?: string | null;
 };
 
 export type FacilityChoice = {
   id: string;
   name: string;
   facility_type: string;
+  area?: string | null;
+  address?: string | null;
+  registration_number?: string | null;
   is_active: boolean;
   is_verified_assignment: boolean;
 };

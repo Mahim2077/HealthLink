@@ -110,8 +110,18 @@ test('Citizen → Doctor → Lab → Citizen: real local care journey', async ({
   await citizen.getByRole('button', { name: 'Search', exact: true }).click();
   const results = citizen.getByRole('region', { name: 'Doctor search results', exact: true });
   await expect(results).toContainText(f.doctor_name);
-  await citizen.getByRole('combobox', { name: 'Sort by', exact: true }).selectOption('NEAREST');
+  const sortControl = citizen.getByRole('combobox', { name: 'Sort by', exact: true });
+  await sortControl.focus();
+  await sortControl.selectOption('NEAREST');
   await expect(citizen.getByRole('dialog')).toBeVisible();
+  await expect(citizen.getByRole('button', { name: 'Close location choice' })).toBeFocused();
+  await citizen.keyboard.press('Shift+Tab');
+  await expect(citizen.getByRole('button', { name: 'Not now', exact: true })).toBeFocused();
+  expect(await citizen.locator('main').evaluate(element => element.inert || !!element.closest('[inert]'))).toBe(true);
+  await citizen.keyboard.press('Escape');
+  await expect(citizen.getByRole('dialog')).toHaveCount(0);
+  await expect(sortControl).toBeFocused();
+  await sortControl.selectOption('NEAREST');
   await citizen.getByRole('button', { name: 'Enter area manually', exact: true }).click();
   await expect(citizen.getByRole('combobox', { name: 'Zila', exact: true }).locator('option')).toHaveCount(65);
   await citizen.getByRole('combobox', { name: 'Zila', exact: true }).selectOption(f.district_code);
@@ -181,6 +191,25 @@ test('Citizen → Doctor → Lab → Citizen: real local care journey', async ({
   expect(saved.status()).toBe(201);
   shared.prescription = await saved.json();
   await expect(doctor.getByText('Consultation and prescription saved', { exact: true })).toBeVisible();
+  // Saved clinical work stays private to authorized staff until Finish Appointment.
+  await citizen.goto('/citizen/appointments');
+  await expect(citizen.locator('main')).toContainText(f.facility_name);
+  await expect(citizen.locator(`a[href="/citizen/prescriptions/${shared.prescription.id}"]`)).toHaveCount(0);
+  allowed.add(`citizen:404:/api/v1/prescriptions/${shared.prescription.id}`);
+  const draftRead = citizen.waitForResponse(response => new URL(response.url()).pathname === `/api/v1/prescriptions/${shared.prescription.id}` && response.request().method() === 'GET');
+  await citizen.goto(`/citizen/prescriptions/${shared.prescription.id}`);
+  const deniedDraft = await draftRead;
+  expect(deniedDraft.status()).toBe(404);
+  // Reuse only this synthetic session in memory; never persist an access token.
+  const authorization = (await deniedDraft.request().allHeaders()).authorization;
+  expect(authorization).toMatch(/^Bearer /);
+  const explanationPath = `/api/v1/ai/prescriptions/${shared.prescription.id}/explain`;
+  const draftExplanation = await citizen.request.post(explanationPath, { headers: { authorization } });
+  expect(draftExplanation.status()).toBe(404);
+  expect(await draftExplanation.text()).not.toContain('Medicine A');
+  await expect(citizen.getByRole('heading', { name: 'Prescription unavailable', exact: true })).toBeVisible();
+  await expect(citizen.getByText('Synthetic local record only', { exact: true })).toHaveCount(0);
+  await snapshot(citizen, info, 'citizen-unfinished-prescription-denied');
   shared.testName = 'Browser synthetic CBC ' + f.run_id.slice(-6);
   await doctor.getByLabel('Test name', { exact: true }).fill(shared.testName);
   await doctor.getByRole('combobox', { name: 'Lab technician', exact: true }).selectOption(f.lab_registration_id);
@@ -195,6 +224,11 @@ test('Citizen → Doctor → Lab → Citizen: real local care journey', async ({
   await doctor.setViewportSize({ width: 1366, height: 900 });
   await doctor.getByRole('button', { name: 'Finish Appointment', exact: true }).click();
   await expect(doctor.getByRole('heading', { name: 'No active patient', exact: true })).toBeVisible();
+  const publishedExplanation = await citizen.request.post(explanationPath, { headers: { authorization } });
+  expect(publishedExplanation.status()).toBe(200);
+  expect((await publishedExplanation.json()).medicine_explanations).toEqual(expect.arrayContaining([
+    expect.objectContaining({ medicine_name: 'Medicine A' }),
+  ]));
   await doctor.goto('/professional/dashboard');
   await expect(doctor.getByRole('link', { name: /Recent authored prescription/ })).toBeVisible();
   await snapshot(doctor, info, 'doctor-dashboard');
@@ -694,4 +728,223 @@ test('Dark portal matrix: readable settings, dashboards, records, chat and works
 test('Regression guard: chamber persistence and full-name sharing search', async () => {
   expect.soft(shared.promotionPersisted, 'Start response CURRENT must survive the next HTTP request').toBe(true);
   expect.soft(shared.fullNameSupported, 'Sharing search must find the displayed full doctor name').toBe(true);
+});
+
+test('Survey regressions: landing bounds and baseline response headers', async ({ browser }, info) => {
+  const page = await actor(browser, 'citizen');
+  for (const width of [320, 390, 768, 1024, 1280, 1366]) {
+    await page.setViewportSize({ width, height: 900 });
+    const response = await page.goto('/');
+    expect(response.headers()['x-content-type-options']).toBe('nosniff');
+    expect(response.headers()['x-frame-options']).toBe('SAMEORIGIN');
+    expect(response.headers()['referrer-policy']).toBe('same-origin');
+    expect(response.headers()['permissions-policy']).toContain('geolocation=(self)');
+    expect(response.headers()['content-security-policy']).toContain("frame-ancestors 'self'");
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    if (width >= 1280) {
+      const image = await page.getByRole('img', { name: 'A Bangladeshi doctor representing connected care' }).boundingBox();
+      for (const name of ['Create citizen account', 'Find a verified doctor']) {
+        const link = page.getByRole('link', { name, exact: true });
+        const bounds = await link.boundingBox();
+        expect(bounds.x + bounds.width).toBeLessThanOrEqual(image.x + 1);
+        expect(await link.evaluate(element => {
+          const r = element.getBoundingClientRect();
+          return element.contains(document.elementFromPoint(r.right - 5, r.top + r.height / 2));
+        })).toBe(true);
+      }
+    }
+    await snapshot(page, info, 'survey-landing-' + width);
+  }
+});
+
+test('Survey regressions: filtered prescription return, empty mobile chat and truthful reminders', async ({ browser }, info) => {
+  const page = await actor(browser, 'citizen');
+  await page.goto('/citizen/medical-history?resource_type=PRESCRIPTION&date_from=2026-01-01');
+  await expect(page.getByRole('combobox', { name: 'Record type', exact: true })).toHaveValue('PRESCRIPTION');
+  await expect(page.getByLabel('From', { exact: true })).toHaveValue('2026-01-01');
+  await page.getByRole('link', { name: /^Open prescription from/ }).first().click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Prescription', exact: true })).toBeAttached();
+  await page.getByRole('link', { name: 'Back', exact: true }).click();
+  await page.waitForURL('**/citizen/medical-history?resource_type=PRESCRIPTION&date_from=2026-01-01');
+  await expect(page.getByRole('combobox', { name: 'Record type', exact: true })).toHaveValue('PRESCRIPTION');
+  await expect(page.getByLabel('From', { exact: true })).toHaveValue('2026-01-01');
+  await page.getByLabel('To', { exact: true }).fill(fixture().today);
+  const filteredHistory = page.waitForResponse(response => {
+    const url = new URL(response.url());
+    return url.pathname === '/api/v1/citizens/me/medical-history' && url.searchParams.get('date_to') === fixture().today;
+  });
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
+  expect((await filteredHistory).status()).toBe(200);
+  await expect(page.getByLabel('From', { exact: true })).toHaveValue('2026-01-01');
+  await expect(page.getByLabel('To', { exact: true })).toHaveValue(fixture().today);
+  await snapshot(page, info, 'survey-history-return-preserves-filters');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/citizen/ai-assistant');
+  const transcript = page.getByRole('region', { name: 'Conversation messages', exact: true });
+  await expect(page.getByRole('heading', { name: 'What would you like to understand?', exact: true })).toBeVisible();
+  await expect.poll(() => transcript.evaluate(element => element.scrollTop)).toBe(0);
+  const heading = await page.getByRole('heading', { name: 'What would you like to understand?', exact: true }).boundingBox();
+  const region = await transcript.boundingBox();
+  expect(heading.y).toBeGreaterThanOrEqual(region.y);
+  expect(heading.y + heading.height).toBeLessThanOrEqual(region.y + region.height);
+  await snapshot(page, info, 'survey-mobile-empty-chat-top');
+  await page.goto('/citizen/reminders');
+  await expect(page.getByText(/Saving or activating a schedule does not send alerts/)).toBeVisible();
+  await page.getByRole('button', { name: 'Create reminder', exact: true }).click();
+  await expect(page.getByText(/This saves a schedule for reference only/)).toBeVisible();
+  await snapshot(page, info, 'survey-reminders-delivery-disabled');
+});
+
+test('Survey regressions: unsaved practice edits and facility filtered-empty state', async ({ browser }, info) => {
+  const doctor = await actor(browser, 'doctor');
+  await doctor.goto('/professional/settings/practice');
+  const maxPatients = doctor.getByLabel('Max patients', { exact: true });
+  await maxPatients.fill('19');
+  const schedule = doctor.getByRole('listitem').filter({ has: doctor.getByRole('button', { name: 'Edit', exact: true }) }).first();
+  doctor.once('dialog', dialog => dialog.dismiss());
+  await schedule.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(maxPatients).toHaveValue('19');
+  await expect(doctor.getByRole('heading', { name: 'Add weekly window', exact: true })).toBeVisible();
+  doctor.once('dialog', dialog => dialog.accept());
+  await schedule.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(doctor.getByRole('heading', { name: 'Edit weekly window', exact: true })).toBeVisible();
+  await snapshot(doctor, info, 'survey-confirmed-practice-form-transition');
+  await doctor.getByRole('button', { name: 'Cancel edit', exact: true }).click();
+  const admin = await actor(browser, 'admin');
+  await admin.goto('/admin/facilities');
+  await admin.getByRole('textbox', { name: 'Search facilities', exact: true }).fill('no-survey-match-' + fixture().run_id);
+  await expect(admin.getByRole('heading', { name: 'No matching facilities', exact: true })).toBeVisible();
+  await snapshot(admin, info, 'survey-facility-no-match');
+  await admin.getByRole('button', { name: 'Clear search', exact: true }).click();
+  await expect(admin.getByRole('heading', { name: fixture().facility_name, exact: true })).toBeVisible();
+});
+
+test('Secondary-facility care: booking, chamber, consultation and Citizen publication', async ({ browser }, info) => {
+  const f = fixture();
+  const date = f.today;
+  const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(date + 'T12:00:00Z')).toUpperCase();
+  const doctor = await actor(browser, 'doctor');
+  await doctor.goto('/professional/settings/practice');
+  await doctor.getByRole('combobox', { name: 'Facility', exact: true }).selectOption(f.secondary_facility_id);
+  await doctor.getByRole('combobox', { name: 'Weekday', exact: true }).selectOption(weekday);
+  await doctor.getByLabel('Start time', { exact: true }).fill('09:00');
+  await doctor.getByLabel('End time', { exact: true }).fill('11:00');
+  await doctor.getByRole('spinbutton', { name: 'Max patients', exact: true }).fill('17');
+  const publish = doctor.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/v1/professionals/me/practice-schedule');
+  await doctor.getByRole('button', { name: 'Publish window', exact: true }).click();
+  expect((await publish).status()).toBe(201);
+  const citizen = await actor(browser, 'citizen');
+  await citizen.goto('/citizen/appointments/book?doctor_user_id=' + f.doctor_id);
+  const facility = citizen.getByRole('combobox', { name: 'Practice facility', exact: true });
+  await expect(facility).toHaveValue(f.facility_id);
+  await citizen.getByTestId('appointment-date-input').fill(date);
+  await citizen.getByTestId('reason-input').fill('Synthetic secondary-facility QA booking');
+  await facility.selectOption(f.secondary_facility_id);
+  await expect(citizen.getByTestId('appointment-date-input')).toHaveValue('');
+  await expect(citizen.getByTestId('reason-input')).toHaveValue('Synthetic secondary-facility QA booking');
+  await citizen.getByTestId('appointment-date-input').fill(date);
+  await expect(citizen.getByText(/Published daily capacity: 17 patients/)).toBeVisible();
+  await snapshot(citizen, info, 'survey-secondary-facility-booking');
+  const booking = citizen.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/v1/citizens/appointments');
+  await citizen.getByTestId('book-submit').click();
+  const response = await booking;
+  expect(response.status()).toBe(201);
+  expect((await response.json()).facility_id).toBe(f.secondary_facility_id);
+  await citizen.waitForURL('**/citizen/appointments?*');
+  await expect(citizen.locator('main')).toContainText(f.secondary_facility_name);
+  const appointment = await response.json();
+  await doctor.goto('/professional/chamber');
+  await doctor.getByRole('combobox', { name: 'Chamber facility', exact: true }).selectOption(f.secondary_facility_id);
+  const start = doctor.waitForResponse(result => result.url().endsWith('/chamber/sessions/start') && result.request().method() === 'POST');
+  await doctor.getByRole('button', { name: /Open today's chamber/i }).click();
+  expect((await start).status()).toBe(200);
+  await expect(doctor.getByRole('heading', { name: /In progress/ })).toBeVisible();
+  await snapshot(doctor, info, 'secondary-facility-chamber');
+  await doctor.getByRole('link', { name: 'Open consultation', exact: true }).click();
+  await expect(doctor.locator('main')).toContainText(f.secondary_facility_name);
+  await doctor.getByRole('button', { name: 'Open consultation', exact: true }).click();
+  await doctor.getByLabel('Chief complaint', { exact: true }).fill('Synthetic secondary-facility consultation');
+  await doctor.getByLabel('Medicine name', { exact: true }).fill('Secondary Medicine');
+  await doctor.getByLabel('Dosage', { exact: true }).fill('Recorded dose');
+  await doctor.getByLabel('Frequency', { exact: true }).fill('Recorded frequency');
+  await doctor.getByLabel('Duration', { exact: true }).fill('Recorded duration');
+  const save = doctor.waitForResponse(result => /\/visits\/[^/]+\/prescription$/.test(new URL(result.url()).pathname) && result.request().method() === 'POST');
+  await doctor.getByRole('button', { name: 'Save consultation & prescription', exact: true }).click();
+  const saved = await save;
+  expect(saved.status()).toBe(201);
+  const prescription = await saved.json();
+  allowed.add(`citizen:404:/api/v1/prescriptions/${prescription.id}`);
+  await citizen.goto(`/citizen/prescriptions/${prescription.id}`);
+  await expect(citizen.getByRole('heading', { name: 'Prescription unavailable', exact: true })).toBeVisible();
+  const finish = doctor.waitForResponse(result => new URL(result.url()).pathname === `/api/v1/appointments/${appointment.id}/finish` && result.request().method() === 'POST');
+  await doctor.getByRole('button', { name: 'Finish Appointment', exact: true }).click();
+  expect((await finish).status()).toBe(200);
+  await expect(doctor.getByRole('heading', { name: 'No active patient', exact: true })).toBeVisible();
+  await citizen.reload();
+  await expect(citizen.getByRole('heading', { name: 'Secondary Medicine', exact: true })).toBeVisible();
+  await snapshot(citizen, info, 'secondary-facility-published-prescription');
+});
+
+test('Area catalog retry restores focus and recovers manual nearby search', async ({ browser }, info) => {
+  const f = fixture();
+  const citizen = await actor(browser, 'citizen');
+  let areaRequests = 0;
+  let searches = 0;
+  citizen.on('request', request => {
+    if (new URL(request.url()).pathname === '/api/v1/doctors/search' && request.method() === 'POST') searches++;
+  });
+  await citizen.route('**/api/v1/locations/bangladesh', route => ++areaRequests === 1 ? route.abort('failed') : route.continue());
+  await citizen.goto('/citizen/doctors/search');
+  await expect(citizen.getByRole('region', { name: 'Doctor search results', exact: true })).toHaveAttribute('aria-busy', 'false');
+  await citizen.getByRole('combobox', { name: 'Sort by', exact: true }).selectOption('NEAREST');
+  const dialog = citizen.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Enter area manually', exact: true }).click();
+  const zila = dialog.getByRole('combobox', { name: 'Zila', exact: true });
+  await expect(zila).toBeDisabled();
+  const searchesBeforeRetry = searches;
+  await dialog.getByRole('button', { name: 'Retry area list', exact: true }).click();
+  await expect(zila).toBeEnabled();
+  await expect(zila).toBeFocused();
+  expect(areaRequests).toBe(2);
+  expect(searches).toBe(searchesBeforeRetry);
+  await snapshot(citizen, info, 'area-retry-focus-restored');
+  await zila.selectOption(f.district_code);
+  await dialog.getByRole('combobox', { name: 'Upazila', exact: true }).selectOption(f.upazila_code);
+  const search = citizen.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/doctors/search' && response.request().method() === 'POST');
+  await dialog.getByRole('button', { name: 'Find doctors in this area', exact: true }).click();
+  expect((await search).status()).toBe(200);
+  await expect(dialog).toHaveCount(0);
+});
+
+test('Closed chamber rejects booking and permits choosing a future practice date', async ({ browser }, info) => {
+  const f = fixture();
+  const doctor = await actor(browser, 'doctor');
+  await doctor.goto('/professional/chamber');
+  await doctor.getByRole('combobox', { name: 'Chamber facility', exact: true }).selectOption(f.facility_id);
+  await expect(doctor.getByRole('heading', { name: /In progress/ })).toBeVisible();
+  doctor.once('dialog', dialog => dialog.accept());
+  const close = doctor.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/professionals/chamber/sessions/finish' && response.request().method() === 'POST');
+  await doctor.getByRole('button', { name: 'Close chamber', exact: true }).click();
+  expect((await close).status()).toBe(200);
+  const citizen = await actor(browser, 'citizen');
+  await citizen.goto('/citizen/appointments/book?doctor_user_id=' + f.doctor_id);
+  await expect(citizen.getByRole('combobox', { name: 'Practice facility', exact: true })).toHaveValue(f.facility_id);
+  await citizen.getByTestId('appointment-date-input').fill(f.today);
+  allowed.add('citizen:409:/api/v1/citizens/appointments');
+  const rejected = citizen.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/citizens/appointments' && response.request().method() === 'POST');
+  await citizen.getByTestId('book-submit').click();
+  expect((await rejected).status()).toBe(409);
+  await expect(citizen.getByTestId('book-submit-error')).toContainText('Choose another available date');
+  await expect(citizen.getByTestId('appointment-date-input')).toBeEnabled();
+  await snapshot(citizen, info, 'closed-chamber-booking-rejected');
+  const nextDate = new Date(f.today + 'T12:00:00Z');
+  nextDate.setUTCDate(nextDate.getUTCDate() + 7);
+  await citizen.getByTestId('appointment-date-input').fill(nextDate.toISOString().slice(0, 10));
+  const accepted = citizen.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/citizens/appointments' && response.request().method() === 'POST');
+  await citizen.getByTestId('book-submit').click();
+  const booked = await accepted;
+  expect(booked.status()).toBe(201);
+  expect((await booked.json()).serial_number).toBe(1);
+  await citizen.waitForURL('**/citizen/appointments?*');
+  await expect(citizen.locator('main')).toContainText(f.facility_name);
 });

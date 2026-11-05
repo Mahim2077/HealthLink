@@ -36,7 +36,7 @@ describe("MedicalHistoryTimeline", () => {
     expect(await screen.findByText("Seasonal allergy")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open prescription/i })).toHaveAttribute(
       "href",
-      "/citizen/prescriptions/prescription-1",
+      "/citizen/prescriptions/prescription-1?returnTo=%2Fcitizen%2Fmedical-history",
     );
     expect(loadAction).toHaveBeenCalledWith({ page: 1, page_size: 10 });
   });
@@ -75,6 +75,22 @@ describe("MedicalHistoryTimeline", () => {
         page_size: 10,
       }),
     );
+    const prescriptionLink = await screen.findByRole("link", { name: /open prescription/i });
+    expect(new URL(prescriptionLink.getAttribute("href")!, "http://localhost").searchParams.get("returnTo")).toBe(
+      "/citizen/medical-history?resource_type=PRESCRIPTION&date_from=2026-08-01&page=2",
+    );
+  });
+
+  it("restores the applied history filters and page supplied by a prescription return link", async () => {
+    const initialQuery = { resource_type: "PRESCRIPTION" as const, date_from: "2026-08-01", date_to: "2026-08-31", page: 2, page_size: 10 };
+    const loadAction = vi.fn().mockResolvedValue(page({ page: 2 }));
+    render(<MedicalHistoryTimeline initialQuery={initialQuery} loadAction={loadAction} portal="citizen" />);
+    await screen.findByText("Seasonal allergy");
+    expect(screen.getByLabelText("Record type")).toHaveValue("PRESCRIPTION");
+    expect(screen.getByLabelText("From")).toHaveValue("2026-08-01");
+    expect(screen.getByLabelText("To")).toHaveValue("2026-08-31");
+    expect(loadAction).toHaveBeenCalledWith(initialQuery);
+    expect(screen.getByText("Page 2")).toBeInTheDocument();
   });
 
   it("lets a doctor open an authorized previous prescription", async () => {

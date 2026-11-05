@@ -20,6 +20,8 @@ import {
 } from "@/components/prescriptions/prescription-panel";
 import type { AppointmentFinishResponse } from "@/lib/appointments/types";
 import type { MedicalHistoryLoadAction } from "@/lib/medical-records/types";
+import { careDate } from "@/lib/care-date";
+import { formatCitizenDate } from "@/lib/citizen/presentation";
 import {
   badgeClassForVisit,
   describeVisitStatus,
@@ -195,6 +197,9 @@ export function ConsultationWorkspace({
           <h2 className="mt-2 text-2xl font-bold text-slate-950">
             Serial #{current.serial_number} · {patientName}
           </h2>
+          <p className="mt-2 text-sm font-semibold text-slate-700">
+            Encounter date: <time dateTime={current.appointment_date}>{formatCitizenDate(current.appointment_date)}</time> · Bangladesh time
+          </p>
           <p className="mt-2 text-sm text-slate-600">
             {visit
               ? `Visit started · ${describeVisitStatus(visit.status)}`
@@ -220,6 +225,16 @@ export function ConsultationWorkspace({
           )}
         </div>
       </header>
+
+      {current.appointment_date < careDate() ? (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="status">
+          <p className="font-bold">Resuming an older open encounter</p>
+          <p className="mt-1">This patient belongs to the chamber session on {formatCitizenDate(current.appointment_date)}, not today&apos;s queue. Review this open encounter before continuing; it has not been automatically closed or finalized.</p>
+          <Link className="mt-2 inline-flex min-h-11 items-center font-bold underline underline-offset-4" href="/professional/chamber">Review chamber queue</Link>
+        </div>
+      ) : current.appointment_date > careDate() ? (
+        <p className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950" role="status">This open encounter is dated {formatCitizenDate(current.appointment_date)}, not today. Review its chamber session before continuing.</p>
+      ) : null}
 
       {actionError ? (
         <p

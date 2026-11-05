@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -108,6 +108,7 @@ class DoctorCurrentPatientView(BaseModel):
 
     queue_id: uuid.UUID
     appointment_id: uuid.UUID
+    appointment_date: date
     serial_number: int
     citizen_id: uuid.UUID
     facility_id: uuid.UUID

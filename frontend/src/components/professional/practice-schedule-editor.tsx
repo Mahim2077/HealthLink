@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import { useUnsavedChanges } from "@/components/ui/use-unsaved-changes";
+import { facilityOptionLabels } from "@/lib/facilities/presentation";
 import {
   createPracticeSchedule,
   deletePracticeSchedule,
@@ -167,6 +168,7 @@ export function PracticeScheduleEditor({ deps }: { deps?: Partial<ScheduleEditor
   }, [refresh]);
 
   const beginEdit = useCallback((entry: PracticeScheduleEntry) => {
+    if (submitting || (dirty && !window.confirm("You have unsaved changes. Discard them and edit this practice window?"))) return;
     setDirty(false);
     setEditingId(entry.id);
     setSubmitError(null);
@@ -179,7 +181,7 @@ export function PracticeScheduleEditor({ deps }: { deps?: Partial<ScheduleEditor
       status: entry.status,
       weekday: entry.weekday,
     });
-  }, []);
+  }, [dirty, submitting]);
 
   const cancelEdit = useCallback(() => {
     setDirty(false);
@@ -281,6 +283,7 @@ export function PracticeScheduleEditor({ deps }: { deps?: Partial<ScheduleEditor
     }
     return left.is_verified_assignment ? -1 : 1;
   });
+  const facilityLabels = facilityOptionLabels(facilities);
 
   return (
     <section className="space-y-8">
@@ -316,7 +319,7 @@ export function PracticeScheduleEditor({ deps }: { deps?: Partial<ScheduleEditor
                   {formatWeekday(entry.weekday)}
                 </p>
                 <p className="mt-1 text-base font-semibold text-slate-950">
-                  {entry.facility_name}
+                  {facilityLabels.get(entry.facility_id) ?? entry.facility_name}
                 </p>
                 <p className="mt-1 text-sm text-slate-600">
                   {entry.start_time} – {entry.end_time} · capacity{" "}
@@ -332,6 +335,7 @@ export function PracticeScheduleEditor({ deps }: { deps?: Partial<ScheduleEditor
                 <button
                   className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-slate-400"
                   onClick={() => beginEdit(entry)}
+                  disabled={submitting}
                   type="button"
                 >
                   Edit
@@ -339,6 +343,7 @@ export function PracticeScheduleEditor({ deps }: { deps?: Partial<ScheduleEditor
                 <button
                   className="min-h-11 rounded-xl border border-rose-200 bg-white px-4 text-sm font-bold text-rose-700 transition hover:bg-rose-50"
                   onClick={() => void handleDelete(entry)}
+                  disabled={submitting}
                   type="button"
                 >
                   Remove
@@ -379,7 +384,7 @@ export function PracticeScheduleEditor({ deps }: { deps?: Partial<ScheduleEditor
               <option value="">Select a facility…</option>
               {verifiedFirst.map((facility) => (
                 <option key={facility.id} value={facility.id}>
-                  {facility.name} ({facility.facility_type})
+                  {facilityLabels.get(facility.id) ?? facility.name} ({facility.facility_type.replaceAll("_", " ")})
                   {facility.is_verified_assignment ? " · verified" : ""}
                 </option>
               ))}

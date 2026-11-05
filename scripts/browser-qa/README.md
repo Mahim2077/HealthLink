@@ -30,13 +30,31 @@ contexts isolate each portal's session. Generated reports/screenshots remain
 under ignored `.runtime/browser-qa`; no PDF is written to disk. The PDF assertion
 checks the in-memory Blob actually received by the UI.
 
-The first six cases cover the care journey, privacy/AI controls and four viewport
-sizes. The journey requires first-patient promotion to survive refresh and sharing
-search to match the displayed full name; no workaround is used. The last case
-retains explicit regression checks for both previously reproduced defects. All
-eight cases run together in order, including synthetic schedule editing, a
-facility contact update that preserves its confirmed location, and admin
-verification of a new synthetic pending application.
+The suite now contains **20 cases** covering the care journey, privacy/AI,
+four-viewport portal matrix, Settings/session controls, Light/Dark/System themes,
+synthetic schedule/facility/verification operations and survey regressions. The
+journey requires first-patient promotion to survive refresh, full-name sharing
+search, denial of unfinished Citizen prescriptions and publication after actual
+Finish Appointment; no workaround is used. The same prescription's AI explanation
+must return 404 before Finish Appointment and 200 afterward. A fault-injection
+case aborts the first area catalog request, then checks real-API retry, focus on
+the enabled Zila select and successful manual nearby search without an extra
+doctor search during catalog recovery.
+
+Four survey cases cover landing bounds/response policies, filtered-history return
+and native date Apply, mobile empty-chat top alignment, truthful reminder copy,
+unsaved practice transitions, filtered-empty facility state and booking at a
+selected secondary facility through its correct name in appointment history.
+The secondary-facility case continues through selecting that chamber, queue
+activation, consultation/prescription, draft denial, actual Finish Appointment
+and finalized Citizen publication. It no longer stops at booking.
+A closed-chamber regression checks that booking is rejected with useful copy,
+then succeeds for the next published weekly date without consuming a serial
+for the rejected request.
+The seed provides a unique secondary facility without altering existing accounts.
+The PDF browser assertion still checks the in-memory Blob; separate fully
+synthetic metadata PDFs may be generated/rendered under ignored runtime storage
+for date/age/facility layout checks, never as stored application prescriptions.
 
 The 2026-10-17 final pass used the optimized production build locally. A temporary
 loopback-only reverse proxy mirrored Vercel Services routing (frontend port 3003,

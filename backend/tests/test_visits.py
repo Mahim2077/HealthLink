@@ -383,7 +383,29 @@ def test_current_patient_returns_joint_view_with_active_session(
     assert body is not None
     assert body["serial_number"] == 1
     assert body["facility_name"] == "Visits Active Clinic"
+    assert body["appointment_date"] == target.isoformat()
     assert body["patient"]["full_name"].startswith("Vera")
+
+    # Recreate a deliberately older, still-open session with synthetic data.
+    # The workspace must expose its real date, not hide or silently close it.
+    older_date = date.today() - timedelta(days=30)
+    appointment = db_session.get(Appointment, uuid.UUID(body["appointment_id"]))
+    queue_entry = db_session.get(AppointmentQueueEntry, uuid.UUID(body["queue_id"]))
+    session = db_session.get(DoctorPracticeSession, queue_entry.practice_session_id)
+    appointment.appointment_date = older_date
+    session.session_date = older_date
+    db_session.commit()
+    older_response = client.get(
+        DOCTOR_CURRENT_PATH,
+        headers={"Authorization": f"Bearer {doctor_token}"},
+    )
+    assert older_response.status_code == 200, older_response.text
+    assert older_response.json()["appointment_date"] == older_date.isoformat()
+    assert older_response.json()["appointment_id"] == body["appointment_id"]
+    db_session.refresh(appointment)
+    db_session.refresh(session)
+    assert appointment.status == AppointmentStatus.BOOKED.value
+    assert session.status == SessionStatus.ACTIVE.value
 
 
 def test_start_for_current_creates_draft_and_is_idempotent(
@@ -756,12 +778,25 @@ def test_citizen_sees_own_visits_today(
         headers={"Authorization": f"Bearer {citizen_token}"},
     )
     assert citizen_response.status_code == 200, citizen_response.text
+    assert citizen_response.json()["visits"] == []
+
+    # Today's clinical summary is published only by Finish Appointment.
+    finished = client.post(
+        f"/api/v1/appointments/{opened.json()['appointment_id']}/finish",
+        headers={"Authorization": f"Bearer {doctor_token}"},
+    )
+    assert finished.status_code == 200, finished.text
+    citizen_response = client.get(
+        CITIZEN_VISITS_TODAY,
+        headers={"Authorization": f"Bearer {citizen_token}"},
+    )
+    assert citizen_response.status_code == 200, citizen_response.text
     payload = citizen_response.json()
     assert len(payload["visits"]) == 1
     summary = payload["visits"][0]
     assert summary["id"] == visit_id
     assert summary["facility_name"] == "Visits Citizen Today Clinic"
-    assert summary["status"] == "DRAFT"
+    assert summary["status"] == "FINALIZED"
 
 
 def test_citizen_cannot_read_another_citizens_visit(
@@ -856,6 +891,16 @@ def test_citizen_can_read_own_visit_detail(
     )
     visit_id = opened.json()["id"]
 
+    response = client.get(
+        CITIZEN_VISIT_PATH.format(visit_id=visit_id),
+        headers={"Authorization": f"Bearer {citizen_token}"},
+    )
+    assert response.status_code == 404, response.text
+    finished = client.post(
+        f"/api/v1/appointments/{opened.json()['appointment_id']}/finish",
+        headers={"Authorization": f"Bearer {doctor_token}"},
+    )
+    assert finished.status_code == 200, finished.text
     response = client.get(
         CITIZEN_VISIT_PATH.format(visit_id=visit_id),
         headers={"Authorization": f"Bearer {citizen_token}"},

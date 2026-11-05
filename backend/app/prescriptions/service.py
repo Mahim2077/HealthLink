@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Iterable
 
 from sqlalchemy.orm import Session
@@ -26,6 +26,7 @@ from app.prescriptions.pdf import (
     PrescriptionDoctor,
     PrescriptionItemView,
     PrescriptionPdfView,
+    bangladesh_visit_time,
     generate_prescription_pdf_bytes,
 )
 from app.prescriptions.repository import PrescriptionsRepository
@@ -90,7 +91,7 @@ def _ensure_visit_doctor_owns_visit(
 
 
 def _doctor_header_for(
-    db: Session, role_registration_id: uuid.UUID
+    db: Session, role_registration_id: uuid.UUID, *, facility_id: uuid.UUID
 ) -> _DoctorHeader:
     registration = db.get(
         ProfessionalRoleRegistration, role_registration_id
@@ -111,9 +112,8 @@ def _doctor_header_for(
     doctor_detail = db.get(
         DoctorRegistrationDetail, role_registration_id
     )
-    facility: HealthcareFacility | None = None
-    if registration.facility_id is not None:
-        facility = db.get(HealthcareFacility, registration.facility_id)
+    # A reassignment must not relabel the facility of an old encounter.
+    facility = db.get(HealthcareFacility, facility_id)
     user = profile.user
     return _DoctorHeader(
         full_name=f"{user.first_name} {user.last_name}",
@@ -132,7 +132,7 @@ def _doctor_header_for(
 
 
 def _patient_summary(
-    db: Session, citizen_id: uuid.UUID
+    db: Session, citizen_id: uuid.UUID, *, visit_date: datetime
 ) -> tuple[str, str]:
     profile = db.get(CitizenProfile, citizen_id)
     if profile is None:
@@ -142,14 +142,16 @@ def _patient_summary(
         )
     age_label = "Age not provided"
     if profile.date_of_birth is not None:
-        today = datetime.now(timezone.utc).date()
-        years = today.year - profile.date_of_birth.year - (
-            (today.month, today.day)
+        # SQLite returns naive timestamps; the application's persisted naive
+        # convention is UTC. Age belongs to the Dhaka encounter date, never
+        # the date on which a historical PDF happens to be regenerated.
+        visit_day = bangladesh_visit_time(visit_date).date()
+        years = visit_day.year - profile.date_of_birth.year - (
+            (visit_day.month, visit_day.day)
             < (profile.date_of_birth.month, profile.date_of_birth.day)
         )
-        age_label = (
-            f"{years} years (DOB {profile.date_of_birth.isoformat()})"
-        )
+        age_at_visit = f"{years} years" if years >= 0 else "Age unavailable at visit"
+        age_label = f"{age_at_visit} (DOB {profile.date_of_birth.isoformat()})"
     user = profile.user
     return f"{user.first_name} {user.last_name}", age_label
 
@@ -176,9 +178,12 @@ def _build_pdf_view(
             status_code=500,
         )
     doctor_header = _doctor_header_for(
-        db, prescription.author_doctor_role_registration_id
+        db, prescription.author_doctor_role_registration_id,
+        facility_id=visit.facility_id,
     )
-    patient_name, patient_age = _patient_summary(db, prescription.citizen_id)
+    patient_name, patient_age = _patient_summary(
+        db, prescription.citizen_id, visit_date=visit.visit_date
+    )
     serial_label = _serial_label(visit)
     pdf_items = tuple(
         PrescriptionItemView(
@@ -371,9 +376,9 @@ class PrescriptionsService:
             raise HealthLinkError(
                 "Prescription not found.", status_code=404
             )
-        # The route dependency already enforces author-only professional
-        # access. Keep the visit ownership check here as a service-layer
-        # invariant so direct callers cannot cross doctor boundaries.
+        # This author-specific helper retains visit ownership as a service
+        # invariant. The canonical route also supports policy-authorized
+        # professional readers without granting them author/edit privileges.
         visit = self._repository.get_visit_for_prescription(prescription)
         if visit is None:
             raise HealthLinkError(
@@ -394,7 +399,12 @@ class PrescriptionsService:
         prescription_id: uuid.UUID,
     ) -> PrescriptionView:
         prescription = self._repository.get_prescription_by_id(prescription_id)
-        if prescription is None or prescription.citizen_id != citizen_id:
+        if (
+            prescription is None
+            or prescription.citizen_id != citizen_id
+            or prescription.visit is None
+            or prescription.visit.status != "FINALIZED"
+        ):
             raise HealthLinkError(
                 "Prescription not found.", status_code=404
             )

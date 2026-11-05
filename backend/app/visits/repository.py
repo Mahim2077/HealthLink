@@ -114,7 +114,7 @@ class VisitsRepository:
             return None
 
         # CURRENT alone is not authority after session/appointment closure.
-        queue_entry = self.db.scalar(
+        queue_entries = list(self.db.scalars(
             select(AppointmentQueueEntry)
             .join(
                 DoctorPracticeSession,
@@ -133,8 +133,16 @@ class VisitsRepository:
             )
             .where(AppointmentQueueEntry.queue_status == QueueStatus.CURRENT.value)
             .order_by(AppointmentQueueEntry.became_current_at.desc())
-            .limit(1)
-        )
+            .limit(2)
+        ))
+        if len(queue_entries) > 1:
+            from app.core.exceptions import HealthLinkError
+
+            raise HealthLinkError(
+                "More than one chamber has a current patient. Close the other chamber before opening a consultation.",
+                status_code=409,
+            )
+        queue_entry = queue_entries[0] if queue_entries else None
         if queue_entry is None:
             return None
 
@@ -358,7 +366,7 @@ class VisitsRepository:
     ) -> Iterable[tuple[MedicalVisit, Appointment | None, User, HealthcareFacility]]:
         """Return visits for a citizen joined to their appointment + doctor + facility.
 
-        Restricted to ``DRAFT`` and ``FINALIZED`` visits; appointment
+        Restricted to published ``FINALIZED`` visits; appointment
         joins are LEFT OUTER so a manual-grant consultation can still
         surface.
         """
@@ -384,6 +392,7 @@ class VisitsRepository:
                 Appointment, Appointment.id == MedicalVisit.appointment_id
             )
             .where(MedicalVisit.citizen_id == citizen_id)
+            .where(MedicalVisit.status == VisitStatus.FINALIZED.value)
             .order_by(MedicalVisit.visit_date.desc())
         )
         if target_date is not None:

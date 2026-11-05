@@ -143,6 +143,8 @@ class DoctorFacilityOption(BaseModel):
     name: str
     facility_type: str
     area: str | None = None
+    address: str | None = None
+    registration_number: str | None = None
 
 
 class DoctorProfile(DoctorSummary):

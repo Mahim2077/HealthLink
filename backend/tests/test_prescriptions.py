@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
+
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -16,6 +18,7 @@ from app.appointments.models import (
 from app.auth.models import User
 from app.citizens.models import CitizenProfile, UserNationalIdentifier
 from app.core.security import hash_password
+from app.core.exceptions import HealthLinkError
 from app.doctors.models import DoctorPracticeSchedule, PracticeScheduleStatus
 from app.facilities.models import HealthcareFacility
 from app.prescriptions.models import (
@@ -23,6 +26,7 @@ from app.prescriptions.models import (
     PrescriptionDocument,
     PrescriptionItem,
 )
+from app.prescriptions.service import PrescriptionsService
 from app.professionals.constants import ProfessionalRoleCode, VerificationStatus
 from app.professionals.models import (
     DoctorRegistrationDetail,
@@ -31,6 +35,7 @@ from app.professionals.models import (
     ProfessionalRoleRegistration,
 )
 from app.visits.models import MedicalVisit, VisitStatus
+from app.visits.service import VisitsService
 
 
 CITIZEN_PASSWORD = "StrongPassword123!"
@@ -329,6 +334,19 @@ def _login_citizen_for_visit(
     )
     assert login.status_code == 200, login.text
     return login.json()["access_token"]
+
+
+def _finish_visit(
+    client: TestClient, db_session, doctor_token: str, visit_id: uuid.UUID
+) -> None:
+    visit = db_session.get(MedicalVisit, visit_id)
+    assert visit is not None
+    response = client.post(
+        f"/api/v1/appointments/{visit.appointment_id}/finish",
+        headers={"Authorization": f"Bearer {doctor_token}"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["visit_status"] == "FINALIZED"
 
 
 _VALID_PAYLOAD = {
@@ -670,16 +688,11 @@ def test_create_prescription_rejects_forbidden_identifier_in_payload(
     assert response.status_code == 400, response.text
 
 
-def test_citizen_can_read_own_prescription(
-    client: TestClient, db_session
+def test_citizen_only_reads_own_prescription_after_appointment_is_finished(
+    client: TestClient, db_session, monkeypatch
 ) -> None:
-    # Phase 13 rule: a citizen reads a prescription via citizen_id == own.
-    # We register the citizen AFTER the doctor opens the visit so that
-    # we know exactly whose prescription this is. The first citizen
-    # registered by _set_up_visit is the visit's citizen. Use that fact
-    # by directly querying the visit row to recover the citizen_id and
-    # then re-registering a second citizen (the "other" citizen) to
-    # assert the positive path via login.
+    # L08 deliberately replaces the legacy ownership-only publication rule.
+    # Saving a draft is not publication; Finish Appointment is the boundary.
     doctor_token, visit_id, _ = _set_up_visit(
         client, db_session, clinic_name="Rx Citizen Read Clinic", weekday="MONDAY",
         nid_number="NID-RX-CREAD", bmdc="BMDC-CREAD",
@@ -712,15 +725,91 @@ def test_citizen_can_read_own_prescription(
     )
     assert login.status_code == 200, login.text
     citizen_token = login.json()["access_token"]
+    citizen_headers = {"Authorization": f"Bearer {citizen_token}"}
+    doctor_headers = {"Authorization": f"Bearer {doctor_token}"}
+    other_token, other_citizen_id = _register_citizen(client)
+    other_headers = {"Authorization": f"Bearer {other_token}"}
+    rendered = []
 
-    response = client.get(
-        CITIZEN_PRESCRIPTION_PATH.format(prescription_id=prescription_id),
-        headers={"Authorization": f"Bearer {citizen_token}"},
+    def render(view):
+        rendered.append(view.prescription_id)
+        return b"%PDF-publication-check"
+
+    monkeypatch.setattr(
+        "app.prescriptions.service.generate_prescription_pdf_bytes", render
     )
+    prescription_path = CITIZEN_PRESCRIPTION_PATH.format(prescription_id=prescription_id)
+    pdf_path = PDF_PATH.format(prescription_id=prescription_id)
+    visit_path = f"/api/v1/citizens/me/visits/{visit_id}"
+
+    for path in (prescription_path, pdf_path, visit_path):
+        denied = client.get(path, headers=citizen_headers)
+        assert denied.status_code == 404, denied.text
+        assert _VALID_PAYLOAD["clinical_notes"] not in denied.text
+        assert client.get(path, headers=other_headers).status_code == 404
+    assert rendered == []  # Denied citizen PDFs never reach the renderer.
+    prescription_service = PrescriptionsService(db_session)
+    visit_service = VisitsService(db_session)
+    prescription_uuid = uuid.UUID(prescription_id)
+    for read, resource_id in (
+        (prescription_service.read_for_citizen, prescription_uuid),
+        (visit_service.read_visit_for_citizen, visit_id),
+    ):
+        with pytest.raises(HealthLinkError) as error:
+            read(citizen_id, resource_id)
+        assert error.value.status_code == 404
+
+    appointments = client.get(BOOK_PATH, headers=citizen_headers)
+    assert appointments.status_code == 200, appointments.text
+    assert appointments.json()["appointments"][0]["prescription_id"] is None
+
+    # The author retains their draft workspace and on-demand PDF access.
+    doctor_read = client.get(prescription_path, headers=doctor_headers)
+    assert doctor_read.status_code == 200, doctor_read.text
+    assert doctor_read.json()["can_edit"] is True
+    doctor_visit_path = f"/api/v1/doctors/me/visits/{visit_id}"
+    doctor_visit = client.get(doctor_visit_path, headers=doctor_headers)
+    assert doctor_visit.status_code == 200, doctor_visit.text
+    assert doctor_visit.json()["status"] == "DRAFT"
+    assert client.get(pdf_path, headers=doctor_headers).status_code == 200
+    assert rendered == [prescription_id]
+
+    _finish_visit(client, db_session, doctor_token, visit_id)
+
+    response = client.get(prescription_path, headers=citizen_headers)
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["id"] == prescription_id
     assert body["citizen_id"] == str(citizen_id)
+    assert body["can_edit"] is False
+    pdf = client.get(pdf_path, headers=citizen_headers)
+    assert pdf.status_code == 200, pdf.text
+    assert pdf.content == b"%PDF-publication-check"
+    assert pdf.headers["cache-control"] == "private, no-store"
+    assert rendered == [prescription_id, prescription_id]
+    published_visit = client.get(visit_path, headers=citizen_headers)
+    assert published_visit.status_code == 200, published_visit.text
+    assert published_visit.json()["status"] == "FINALIZED"
+    assert published_visit.json()["prescription_id"] == prescription_id
+    appointments = client.get(BOOK_PATH, headers=citizen_headers)
+    assert appointments.json()["appointments"][0]["prescription_id"] == prescription_id
+    assert appointments.json()["appointments"][0]["status"] == "COMPLETED"
+    assert prescription_service.read_for_citizen(citizen_id, prescription_uuid).id == prescription_uuid
+    assert visit_service.read_visit_for_citizen(citizen_id, visit_id).status == "FINALIZED"
+    for read, resource_id in (
+        (prescription_service.read_for_citizen, prescription_uuid),
+        (visit_service.read_visit_for_citizen, visit_id),
+    ):
+        with pytest.raises(HealthLinkError) as error:
+            read(uuid.UUID(str(other_citizen_id)), resource_id)
+        assert error.value.status_code == 404
+
+    for path in (prescription_path, pdf_path, visit_path):
+        assert client.get(path, headers=other_headers).status_code == 404
+    # The author can still read the finalized history after leaving CURRENT.
+    assert client.get(prescription_path, headers=doctor_headers).status_code == 200
+    assert client.get(doctor_visit_path, headers=doctor_headers).status_code == 200
+    assert client.get(pdf_path, headers=doctor_headers).status_code == 200
 
 
 def test_citizen_cannot_edit_own_prescription(
@@ -741,6 +830,7 @@ def test_citizen_cannot_edit_own_prescription(
     )
     assert created.status_code == 201, created.text
 
+    _finish_visit(client, db_session, doctor_token, visit_id)
     citizen_token = _login_citizen_for_visit(client, db_session, visit_id)
     response = client.put(
         CITIZEN_PRESCRIPTION_PATH.format(
@@ -979,6 +1069,7 @@ def test_pdf_stream_allows_owning_citizen(
         json=_VALID_PAYLOAD,
     )
     prescription_id = created.json()["id"]
+    _finish_visit(client, db_session, doctor_token, visit_id)
 
     visit_row = db_session.get(MedicalVisit, visit_id)
     assert visit_row is not None

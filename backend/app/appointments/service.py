@@ -30,6 +30,7 @@ from app.appointments.schemas import (
     AppointmentListResponse,
     AppointmentQueueEntryView,
     ChamberAppointmentView,
+    ChamberFacilityChoice,
     ChamberQueueActionResponse,
     ChamberSessionFinishResponse,
     ChamberSessionView,
@@ -182,6 +183,23 @@ class AppointmentService:
             doctor_role_registration_id=registration.id,
             appointment_date=request.appointment_date,
         )
+        # Booking/cancellation always take booking -> queue locks. Closure takes
+        # the same queue lock, so its completed state cannot race this check.
+        self.repository._lock_for_queue(
+            doctor_role_registration_id=registration.id,
+            session_date=request.appointment_date,
+        )
+        existing_session = self.repository.get_practice_session_for_doctor(
+            doctor_role_registration_id=registration.id,
+            facility_id=request.facility_id,
+            session_date=request.appointment_date,
+        )
+        if existing_session is not None:
+            self.db.refresh(existing_session)
+            if existing_session.status == SessionStatus.COMPLETED.value:
+                raise AppointmentScheduleUnavailableError(
+                    "The doctor has closed this chamber for this date. Choose another available date."
+                )
 
         active_count = self.repository.count_active_appointments_for_day(
             doctor_role_registration_id=registration.id,
@@ -296,9 +314,18 @@ class AppointmentService:
         user_ids = list({user_id for user_id in prof_to_user.values()})
         users_by_id = self.repository.list_users_by_id(user_ids)
 
+        # The appointment may belong to a secondary practice location. Resolve
+        # its stored facility IDs in one query, never the doctor's current or
+        # originally submitted primary-facility label.
+        facility_ids = list({row[0].facility_id for row in rows})
+        facility_names = dict(self.db.execute(
+            select(HealthcareFacility.id, HealthcareFacility.name)
+            .where(HealthcareFacility.id.in_(facility_ids))
+        ).all())
+
         # Phase 13 exposes the prescription through the existing citizen
         # appointment history without creating a second, redundant history
-        # endpoint. One query maps appointment -> visit -> prescription.
+        # endpoint. Only finalized visits publish a citizen prescription link.
         from app.prescriptions.models import Prescription
         from app.visits.models import MedicalVisit
 
@@ -306,7 +333,12 @@ class AppointmentService:
         prescription_rows = self.db.execute(
             select(MedicalVisit.appointment_id, Prescription.id)
             .join(Prescription, Prescription.visit_id == MedicalVisit.id)
-            .where(MedicalVisit.appointment_id.in_(appointment_ids))
+            .where(
+                MedicalVisit.appointment_id.in_(appointment_ids),
+                MedicalVisit.citizen_id == citizen.id,
+                Prescription.citizen_id == citizen.id,
+                MedicalVisit.status == VisitStatus.FINALIZED.value,
+            )
         ).all()
         prescription_by_appointment = {
             appointment_id: prescription_id
@@ -328,7 +360,9 @@ class AppointmentService:
                     doctor_user_id=user_id,
                     doctor_name=full_name,
                     facility_id=appointment.facility_id,
-                    facility_name=registration.facility_name_submitted or "",
+                    facility_name=facility_names.get(
+                        appointment.facility_id, "Facility unavailable"
+                    ),
                     appointment_date=appointment.appointment_date,
                     serial_number=appointment.serial_number,
                     status=AppointmentStatus(appointment.status),
@@ -468,6 +502,21 @@ class AppointmentService:
         )
         return self.db.scalar(statement)
 
+    def list_chamber_facilities(self, context: ProfessionalAuthContext) -> list[ChamberFacilityChoice]:
+        registration = context.role_registration
+        facilities = self.db.scalars(self.repository.chamber_facilities_query(registration)
+            .where(HealthcareFacility.is_active.is_(True))
+            .order_by(HealthcareFacility.id != registration.facility_id,
+                      HealthcareFacility.name, HealthcareFacility.id))
+        return [ChamberFacilityChoice.model_validate(facility) for facility in facilities]
+
+    def _chamber_facility(self, context: ProfessionalAuthContext, facility_id: uuid.UUID) -> HealthcareFacility:
+        facility = self.db.scalar(self.repository.chamber_facilities_query(context.role_registration)
+            .where(HealthcareFacility.id == facility_id))
+        if facility is None:
+            raise ChamberSessionStateError("Verified doctor is not associated with this facility.")
+        return facility
+
     def start_session(
         self,
         context: ProfessionalAuthContext,
@@ -476,13 +525,8 @@ class AppointmentService:
         session_date: date,
     ) -> ChamberSessionView:
         registration = context.role_registration
-        if registration.facility_id != facility_id:
-            raise ChamberSessionStateError(
-                "Verified doctor is not associated with this facility."
-            )
-
-        facility = self.repository.get_facility(facility_id)
-        if facility is None or not facility.is_active:
+        facility = self._chamber_facility(context, facility_id)
+        if not facility.is_active:
             raise ChamberSessionNotFoundError("Facility not found.")
 
         self.repository._lock_for_queue(
@@ -520,6 +564,9 @@ class AppointmentService:
             raise ChamberSessionStateError(
                 "Unable to start chamber session."
             ) from error
+        except Exception:
+            self.db.rollback()
+            raise
 
         return result
 
@@ -531,13 +578,7 @@ class AppointmentService:
         session_date: date,
     ) -> ChamberSessionView | None:
         registration = context.role_registration
-        if registration.facility_id != facility_id:
-            raise ChamberSessionStateError(
-                "Verified doctor is not associated with this facility."
-            )
-        facility = self.repository.get_facility(facility_id)
-        if facility is None:
-            raise ChamberSessionNotFoundError("Facility not found.")
+        facility = self._chamber_facility(context, facility_id)
         session = self.repository.get_practice_session_for_doctor(
             doctor_role_registration_id=registration.id,
             facility_id=facility_id,
@@ -620,6 +661,13 @@ class AppointmentService:
         next_entry = self._next_waiting(session_id)
         if next_entry is None:
             return None
+        session = self.repository.get_practice_session_by_id(session_id)
+        if session is None or session.status != SessionStatus.ACTIVE.value:
+            raise ChamberSessionStateError("Start the chamber session before queue actions.")
+        if self.repository.other_current_patient(session):
+            raise ChamberQueueStateError(
+                "Finish the current consultation at your other chamber before calling another patient."
+            )
         next_entry.queue_status = QueueStatus.CURRENT.value
         next_entry.became_current_at = datetime.now(timezone.utc)
         try:
@@ -797,12 +845,12 @@ class AppointmentService:
         session_date: date,
     ) -> ChamberQueueActionResponse:
         registration = context.role_registration
-        session = self._open_session(
-            registration.id, facility_id, session_date
-        )
         self.repository._lock_for_queue(
             doctor_role_registration_id=registration.id,
             session_date=session_date,
+        )
+        session = self._open_session(
+            registration.id, facility_id, session_date
         )
         current = self.repository.current_queue_entry(session.id)
         if current is not None:
@@ -897,14 +945,6 @@ class AppointmentService:
             raise ChamberQueueEntryNotFoundError(
                 "Queue entry not found for this doctor."
             )
-        if entry.queue_status not in (
-            QueueStatus.WAITING.value,
-            QueueStatus.CURRENT.value,
-        ):
-            raise ChamberQueueStateError(
-                "Queue entry is no longer in the active queue."
-            )
-
         session = self.repository.get_practice_session_by_id(
             entry.practice_session_id
         )
@@ -916,6 +956,12 @@ class AppointmentService:
             doctor_role_registration_id=registration.id,
             session_date=session.session_date,
         )
+        self.db.refresh(entry)
+        self.db.refresh(session)
+        if session.status != SessionStatus.ACTIVE.value:
+            raise ChamberSessionStateError("Queue actions require an active chamber session.")
+        if entry.queue_status not in (QueueStatus.WAITING.value, QueueStatus.CURRENT.value):
+            raise ChamberQueueStateError("Queue entry is no longer in the active queue.")
 
         # If the entry we're acting on is CURRENT, the partial unique
         # index will free up the moment we flush; if it's WAITING, we
@@ -948,15 +994,17 @@ class AppointmentService:
             self.db.flush()
 
         # After the action, auto-advance the next WAITING into CURRENT.
-        promoted = self._promote_lowest_waiting(entry.practice_session_id)
-
         try:
+            promoted = self._promote_lowest_waiting(entry.practice_session_id)
             self.db.commit()
         except IntegrityError as error:
             self.db.rollback()
             raise ChamberQueueStateError(
                 "Unable to apply queue action."
             ) from error
+        except Exception:
+            self.db.rollback()
+            raise
 
         self.db.refresh(entry)
         if promoted is not None:
@@ -988,6 +1036,10 @@ class AppointmentService:
         session_date: date,
     ) -> ChamberSessionFinishResponse:
         registration = context.role_registration
+        self.repository._lock_for_queue(
+            doctor_role_registration_id=registration.id,
+            session_date=session_date,
+        )
         session = self.repository.get_practice_session_for_doctor(
             doctor_role_registration_id=registration.id,
             facility_id=facility_id,
@@ -997,6 +1049,7 @@ class AppointmentService:
             raise ChamberSessionNotFoundError(
                 "No chamber session exists for this date."
             )
+        self.db.refresh(session)
         if session.status == SessionStatus.COMPLETED.value:
             raise ChamberSessionStateError(
                 "Chamber session is already closed for the day."
@@ -1005,11 +1058,6 @@ class AppointmentService:
             raise ChamberSessionStateError(
                 "Start the chamber session before finishing it."
             )
-
-        self.repository._lock_for_queue(
-            doctor_role_registration_id=registration.id,
-            session_date=session_date,
-        )
 
         session.status = SessionStatus.COMPLETED.value
         session.ended_at = datetime.now(timezone.utc)

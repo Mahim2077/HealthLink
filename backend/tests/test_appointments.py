@@ -4,7 +4,7 @@ import uuid
 from datetime import date, time
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import event, select
 
 from app.auth.models import User
 from app.citizens.models import CitizenProfile
@@ -602,3 +602,72 @@ def test_history_lists_citizen_appointments(
 def test_history_requires_authentication(client: TestClient) -> None:
     response = client.get(HISTORY_PATH)
     assert response.status_code == 401
+
+
+def test_history_uses_booked_facility_names_with_one_batched_lookup(
+    client: TestClient, db_session
+) -> None:
+    token, _ = _register_citizen(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    primary = _make_facility(db_session, name="Primary registration clinic")
+    secondary = _make_facility(db_session, name="Secondary booked clinic")
+    doctor_user_id = _make_doctor(
+        db_session, first_name="Multi", last_name="Facility", facility=primary,
+    )
+    for facility in (primary, secondary):
+        _add_schedule(
+            db_session, doctor_user_id=doctor_user_id, facility=facility,
+            weekday="MONDAY",
+        )
+    booked = {}
+    for day, facility in (
+        ("2099-01-05", secondary),
+        ("2099-01-19", primary),
+        ("2099-01-12", secondary),
+    ):
+        response = client.post(BOOK_PATH, headers=auth, json={
+            "doctor_user_id": str(doctor_user_id),
+            "facility_id": str(facility.id),
+            "appointment_date": day,
+        })
+        assert response.status_code == 201, response.text
+        assert response.json()["facility_id"] == str(facility.id)
+        assert response.json()["facility_name"] == facility.name
+        booked[day] = response.json()["id"]
+
+    cancelled = client.post(
+        f"/api/v1/appointments/{booked['2099-01-12']}/cancel", headers=auth,
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    # Historical bookings remain accurately labelled even after a facility
+    # stops accepting bookings; registration-submitted text is not canonical.
+    secondary.is_active = False
+    registration = db_session.scalar(select(ProfessionalRoleRegistration))
+    assert registration is not None
+    registration.facility_name_submitted = "An outdated submitted primary label"
+    db_session.commit()
+    queries = []
+
+    def capture_facility_lookup(connection, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().startswith("SELECT healthcare_facilities.id, healthcare_facilities.name"):
+            queries.append(statement)
+
+    engine = db_session.get_bind()
+    event.listen(engine, "before_cursor_execute", capture_facility_lookup)
+    try:
+        response = client.get(HISTORY_PATH, headers=auth)
+    finally:
+        event.remove(engine, "before_cursor_execute", capture_facility_lookup)
+    assert response.status_code == 200, response.text
+    rows = response.json()["appointments"]
+    assert [row["id"] for row in rows] == [
+        booked["2099-01-19"], booked["2099-01-12"], booked["2099-01-05"],
+    ]
+    assert [row["status"] for row in rows] == ["BOOKED", "CANCELLED", "BOOKED"]
+    assert [(row["facility_id"], row["facility_name"]) for row in rows] == [
+        (str(primary.id), primary.name),
+        (str(secondary.id), secondary.name),
+        (str(secondary.id), secondary.name),
+    ]
+    assert len(queries) == 1
+    assert " IN (" in queries[0]

@@ -20,7 +20,7 @@ from app.prescriptions.schemas import (
     PrescriptionUpdateRequest,
     PrescriptionView,
 )
-from app.prescriptions.service import PrescriptionsService
+from app.prescriptions.service import PrescriptionsService, _prescription_view
 from app.professionals.dependencies import ProfessionalAuthContext
 from app.visits.models import MedicalVisit
 from app.clinical_audit.service import AuditService
@@ -92,10 +92,11 @@ def get_prescription(
         )
     prescription = db.get(Prescription, access.prescription_id)
     assert prescription is not None
-    # The canonical dependency has already resolved the centralized read policy.
-    result = service.read_for_citizen(
-        prescription.citizen_id, access.prescription_id
-    ).model_copy(update={"can_edit": access.actor_kind == "author_doctor"})
+    # Professional access is already resolved by the canonical dependency.
+    # Do not reuse the finalized-only citizen service for authorized draft reads.
+    result = _prescription_view(
+        prescription, can_edit=access.actor_kind == "author_doctor"
+    )
     AuditService(db).record(auth=access.auth, citizen_id=prescription.citizen_id,
         resource_type="PRESCRIPTION", resource_id=access.prescription_id,
         access_source=access.access_source)

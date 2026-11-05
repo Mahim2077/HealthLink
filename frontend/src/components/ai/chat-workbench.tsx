@@ -50,7 +50,12 @@ export function ChatWorkbench({ symptomPanel }: { symptomPanel: ReactNode }) {
     }).catch(reason => { if (!controller.signal.aborted) { setHistoryError(errorMessage(reason)); setHistoryLoading(false); } });
     return () => { alive.current = false; controller.abort(); abort.current?.abort(); };
   }, []);
-  useEffect(() => { scroll.current?.scrollTo?.({ top: scroll.current.scrollHeight, behavior: "instant" }); }, [conversation?.id, conversation?.turns.length, pendingQuestion]);
+  useEffect(() => {
+    const transcript = scroll.current;
+    if (!transcript) return;
+    const hasMessages = Boolean(conversation?.turns.length || pendingQuestion);
+    transcript.scrollTo?.({ top: hasMessages ? transcript.scrollHeight : 0, behavior: "instant" });
+  }, [conversation?.id, conversation?.turns.length, pendingQuestion, symptoms]);
   useEffect(() => { if (deleting) cancelDelete.current?.focus(); }, [deleting]);
 
   function resetComposer() {
@@ -58,7 +63,7 @@ export function ChatWorkbench({ symptomPanel }: { symptomPanel: ReactNode }) {
   }
   function startNew() {
     if (busy) return;
-    setConversation(null); resetComposer(); setSymptoms(false); setHistoryOpen(false); setDeleting(null); input.current?.focus();
+    setConversation(null); resetComposer(); setSymptoms(false); setHistoryOpen(false); setDeleting(null); scroll.current?.scrollTo?.({ top: 0, behavior: "instant" }); input.current?.focus();
   }
   async function openConversation(item: ConversationSummary) {
     if (busy) return;

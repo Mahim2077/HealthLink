@@ -2,10 +2,11 @@
 
 import { useCallback, useState, type FormEvent } from "react";
 
-import type { DoctorProfile } from "@/lib/doctors/types";
+import type { DoctorDiscoveryFacility, DoctorProfile } from "@/lib/doctors/types";
 import { careDate } from "@/lib/care-date";
 import { citizenErrorMessage } from "@/lib/citizen/presentation";
 import { bookAppointment } from "@/lib/appointments/api";
+import { facilityOptionLabels } from "@/lib/facilities/presentation";
 import type {
   AppointmentBookingRequest,
   AppointmentBookingResponse,
@@ -24,6 +25,19 @@ export type AppointmentBookFormValues = {
 };
 
 const todayIsoDate = careDate;
+
+type BookingDoctor = Pick<DoctorProfile, "id" | "name" | "facility_id" | "facility_name" | "practice_days">;
+
+/** The public facility catalog contains active facilities only. */
+export function bookablePracticeFacilities(doctor: BookingDoctor, facilities: readonly DoctorDiscoveryFacility[]): DoctorDiscoveryFacility[] {
+  const scheduled = new Set(doctor.practice_days.filter(day => day.status === "ACTIVE").map(day => day.facility_id));
+  return facilities.filter(facility => scheduled.has(facility.id));
+}
+
+function appointmentWeekday(date: string): string | null {
+  const parsed = new Date(`${date}T12:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? null : new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(parsed).toUpperCase();
+}
 
 export function validateAppointmentBooking(
   values: AppointmentBookFormValues,
@@ -69,24 +83,32 @@ function buildRequest(
 
 export function AppointmentBookForm({
   doctor,
+  facilities,
   bookAction = bookAppointment,
   onBooked,
 }: {
-  doctor: Pick<DoctorProfile, "id" | "name" | "facility_id" | "facility_name" | "practice_days">;
+  doctor: BookingDoctor;
+  facilities: readonly DoctorDiscoveryFacility[];
   bookAction?: (request: AppointmentBookingRequest) => Promise<AppointmentBookingResponse>;
   onBooked?: (response: AppointmentBookingResponse) => void;
 }) {
-  const [values, setValues] = useState<AppointmentBookFormValues>({
+  const choices = bookablePracticeFacilities(doctor, facilities);
+  const facilityLabels = facilityOptionLabels(choices);
+  const [values, setValues] = useState<AppointmentBookFormValues>(() => ({
     doctorUserId: doctor.id,
-    facilityId: doctor.facility_id,
+    facilityId: choices.find(facility => facility.id === doctor.facility_id)?.id ?? choices[0]?.id ?? "",
     appointmentDate: "",
     reason: "",
-  });
+  }));
   const [errors, setErrors] = useState<
     Partial<Record<keyof AppointmentBookFormValues, string>>
   >({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const selectedPracticeDays = doctor.practice_days.filter(day => day.status === "ACTIVE" && day.facility_id === values.facilityId);
+  const selectedWeekday = appointmentWeekday(values.appointmentDate);
+  const selectedDateWindows = selectedPracticeDays.filter(day => day.weekday === selectedWeekday);
+  const dailyCapacity = selectedDateWindows.length ? Math.max(...selectedDateWindows.map(day => day.max_patients)) : null;
 
   const updateField = useCallback(
     <K extends keyof AppointmentBookFormValues>(
@@ -108,13 +130,16 @@ export function AppointmentBookForm({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitting) return;
     setSubmitError(null);
 
     const nextErrors = validateAppointmentBooking(values);
+    if (!choices.some(facility => facility.id === values.facilityId)) {
+      nextErrors.facilityId = "Choose a facility with available practice days.";
+    }
     if (!nextErrors.appointmentDate) {
-      const weekday = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(new Date(`${values.appointmentDate}T12:00:00Z`)).toUpperCase();
-      if (!doctor.practice_days.some(day => day.status === "ACTIVE" && day.facility_id === doctor.facility_id && day.weekday === weekday)) {
-        nextErrors.appointmentDate = "Choose a date matching the doctor’s available practice days.";
+      if (!selectedDateWindows.length) {
+        nextErrors.appointmentDate = "Choose a date matching the doctor’s available practice days at this facility.";
       }
     }
     if (Object.keys(nextErrors).length > 0) {
@@ -148,15 +173,35 @@ export function AppointmentBookForm({
     >
       <div className="rounded-xl bg-teal-50 p-4 text-sm">
         <p className="font-bold text-slate-950">{doctor.name}</p>
-        <p className="mt-1 text-slate-700">{doctor.facility_name}</p>
+        <p className="mt-1 text-slate-700">{facilityLabels.get(values.facilityId) ?? "Choose a practice facility below"}</p>
         <p className="mt-3 text-slate-600">Available practice days (Bangladesh time):</p>
         <ul className="mt-2 grid gap-1">
-          {doctor.practice_days.filter(day => day.status === "ACTIVE" && day.facility_id === doctor.facility_id).map(day => (
+          {selectedPracticeDays.map(day => (
             <li key={day.id}>{day.weekday.charAt(0) + day.weekday.slice(1).toLowerCase()} · {day.start_time.slice(0, 5)}–{day.end_time.slice(0, 5)}</li>
           ))}
         </ul>
+        {dailyCapacity !== null ? <p className="mt-3 text-slate-700">Published daily capacity: {dailyCapacity} patients. Remaining places are checked when you book.</p> : null}
         <p className="mt-3 text-slate-600">Your booking receives a queue serial, not a fixed appointment time. Availability is confirmed when you book.</p>
       </div>
+
+      <label className="text-sm font-bold text-slate-700">
+        Practice facility
+        <select
+          aria-invalid={errors.facilityId ? "true" : "false"}
+          className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"
+          disabled={submitting || choices.length === 0}
+          onChange={(event) => {
+            setValues(current => ({ ...current, facilityId: event.target.value, appointmentDate: "" }));
+            setErrors(current => ({ ...current, facilityId: undefined, appointmentDate: undefined }));
+            setSubmitError(null);
+          }}
+          value={values.facilityId}
+        >
+          {choices.length === 0 ? <option value="">No practice facilities available</option> : null}
+          {choices.map(facility => <option key={facility.id} value={facility.id}>{facilityLabels.get(facility.id) ?? facility.name}</option>)}
+        </select>
+      </label>
+      {errors.facilityId ? <p className="-mt-2 text-sm text-rose-700" role="alert">{errors.facilityId}</p> : null}
 
       <label className="text-sm font-bold text-slate-700">
         Appointment date
@@ -164,7 +209,7 @@ export function AppointmentBookForm({
           aria-invalid={errors.appointmentDate ? "true" : "false"}
           className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"
           data-testid="appointment-date-input"
-          disabled={submitting}
+          disabled={submitting || choices.length === 0}
           min={todayIsoDate()}
           onChange={(event) => updateField("appointmentDate", event.target.value)}
           type="date"
@@ -183,7 +228,7 @@ export function AppointmentBookForm({
           aria-invalid={errors.reason ? "true" : "false"}
           className="mt-2 min-h-24 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
           data-testid="reason-input"
-          disabled={submitting}
+          disabled={submitting || choices.length === 0}
           maxLength={REASON_MAX_LENGTH}
           onChange={(event) => updateField("reason", event.target.value)}
           placeholder="Briefly describe your symptoms or reason for the visit"
@@ -214,7 +259,7 @@ export function AppointmentBookForm({
         <button
           className="min-h-11 rounded-xl bg-teal-700 px-5 text-sm font-bold text-white transition hover:bg-teal-800 disabled:cursor-wait disabled:opacity-60"
           data-testid="book-submit"
-          disabled={submitting}
+          disabled={submitting || choices.length === 0}
           type="submit"
         >
           {submitting ? "Booking…" : "Book appointment"}

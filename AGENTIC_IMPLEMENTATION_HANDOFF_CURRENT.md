@@ -1,6 +1,6 @@
 # HealthLink current agentic implementation handoff
 
-> **Status date:** 2026-10-22
+> **Status date:** 2026-11-04
 > **Read this file first.** It is the authoritative operational checkpoint for
 > the current workspace. Older implementation prompts and handoffs remain useful
 > for architecture/history, but this file supersedes their phase-start, storage,
@@ -21,9 +21,250 @@ Current release:        Phase 32 Settings/themes + dependency/CI security live; 
 Local QA DB head:       0031_ai_conversations (synthetic loopback database only)
 Implementation commit:  6649931e29bdf19a9b085ec2b0641a79f97777b7
 Deployment ID:          dpl_3RyPMHxWh3BVG6pgsrEEfHQrUyGr (READY / production)
-Release authority:      Owner explicitly authorized document/commit/push/deploy on 2026-10-22
-Next work:              Await owner direction; maintain advisory exception and observability follow-up
+Release authority:      Publication remains held; local minimal stack-preserving fix authorized
+Local continuation:     Survey/Python/lint, QA-01/QA-02 and FR-01/FR-02/FR-03 corrections; not committed, pushed or deployed
+Next work:              Execute prepared closing deployment only after owner instruction; exact-commit CI/stage/stable checks before Phase 32 closure
 ```
+
+### Final closing-release check — 2026-11-04 (READY for authorized release; not published)
+
+Fresh [verification](docs/PHASE_32_CLOSING_RELEASE_CHECK_2026_11_04.md) and the
+[prepared deployment plan](docs/PHASE_32_CLOSING_DEPLOYMENT_PLAN.md) are current.
+All **614 backend** (44 PostgreSQL), **347 frontend**, **17 security**, lint/types,
+optimized build, isolated clean install, npm/Python audits and byte-identical
+Python lock reproduction pass. Optimized Edge **20/20**, standard HTTP **28/28**,
+secondary HTTP **7/7** and lifecycle **11/11** pass, including all reported fixes.
+
+Only approved Mahim2077 connections were used for read-only platform checks.
+Project/owner/Node/domain and all 12 expected production environment keys match;
+values were not decrypted. Nine anonymous stable-production probes pass. The
+stable alias points to the saved READY production deployment `dpl_3RyPM...` at
+the release receipt above; the plan records its full ID as a recovery reference.
+Remote `main` still matches base HEAD 70059d3. The new candidate is uncommitted,
+so its exact-commit CI and hosted staging checks have not yet occurred.
+
+Source fingerprint remains `b7846bfd9ba52d7a0ea5b73cbccb9e50451713912dcdf234f4676aabce063011`
+(531 files); no product/test/dependency/environment changes were made in this
+assessment. QA services/cluster are stopped. Evidence remains under ignored
+`.runtime/phase32-closing-check-20261104/`. No Git staging, commit, push,
+production migration, deployment or promotion occurred. Publication awaits
+instruction, and Phase 32 closes only after verified production release.
+
+### FR-02 / FR-03 corrections — 2026-11-04 (verified locally; not released)
+
+See `docs/FR_02_FR_03_CORRECTIONS_2026_11_04.md`. Booking now checks the exact
+session under the same queue lock as closure, before allocating any appointment
+or serial; both use a consistent booking → queue lock order where applicable.
+Closed-day requests return 409 with alternate-date guidance. Real PostgreSQL
+tests verify both race orders and no rows for rejected booking. Facility choices
+exclude soft-deleted schedules while preserving owned sessions/accepted bookings;
+the retirement regressions now use the actual DELETE API.
+
+Fresh results: **614 backend** (including **44 PostgreSQL**), **347 frontend**,
+**17 security**, lint/typecheck, optimized 44-page build, **20 Edge journeys**,
+**28 standard HTTP**, **7 secondary HTTP** and **11/11 lifecycle checks**.
+The new browser case confirms closed-day rejection and future-date recovery.
+Known findings from the latest review are resolved within tested local scope.
+Only seven source/test/harness files changed; no dependency, schema, environment
+or stack change. Earlier corrections and work are preserved.
+
+No commit, push, production mutation or deployment occurred. QA services/cluster
+are stopped; receipts remain ignored. Publication still awaits instruction.
+Phase 32 and the existing plan close after successful production verification;
+no new phase was introduced.
+
+### Earlier blocker review — 2026-11-04 (pre-FR-02/FR-03 fix; no product changes)
+
+See `docs/DEPLOYMENT_BLOCKER_RECHECK_2026_11_04.md`. FR-01 remains corrected,
+but an independent lifecycle probe confirms **FR-02/P2**: after the Doctor
+closes a chamber, Citizen booking still returns 201 into its completed queue,
+while reopening returns 409. This accepted appointment cannot proceed to care.
+**FR-03/P3** is a smaller regression: the facility list omits the schedule
+soft-delete condition, retaining an unused facility after API deletion.
+Keep owned-session access when correcting retirement behavior so accepted
+secondary bookings remain serviceable.
+
+Fresh lifecycle checks are 9/11, with those two failed expectations. Fresh
+npm production/full and strict Python runtime/dev audits pass without findings
+or exceptions. Approved Mahim2077 project/team/domain access and environment-key
+presence are confirmed; nine anonymous stable-production probes pass. Product
+source remains identical to the FR-01 receipt; the earlier broad passing totals
+are retained evidence, not a new run or proof these boundaries work.
+
+No product fix, commit, push, production mutation or deployment occurred during
+this assessment. QA API/cluster are stopped and new evidence remains ignored.
+Next work is FR-02/FR-03 correction and focused lifecycle/concurrency regression,
+followed by normal exact-commit release verification. Phase 32 remains open.
+
+### FR-01 correction — 2026-11-04 (verified locally; not released)
+
+See `docs/FR_01_SECONDARY_FACILITY_CORRECTION_2026_11_04.md`. Doctor chamber
+selection and API access now support owned published practice facilities and
+owned sessions, preserving accepted secondary bookings after schedule retirement.
+Foreign Doctor access stays denied. Doctor-wide PostgreSQL queue locking and a
+cross-session promotion guard keep one current patient; ambiguous legacy state
+fails closed. The existing consultation/prescription/publication workflow is
+preserved, with no dependency, stack, schema or security-policy change.
+
+Fresh checks pass: **610 backend** (including **42 PostgreSQL**), **346 frontend**,
+**17 security**, lint/typecheck, optimized 44-page build, **19 Edge journeys**,
+**28 standard HTTP** and **7/7 original secondary-facility reproduction checks**.
+The secondary browser case now reaches actual consultation, prescription,
+Finish Appointment and Citizen publication. An incidental medicine-order test
+assumption was corrected without weakening its exact contents/access assertions.
+
+The previous FR-01 readiness blocker is resolved within local tested scope.
+The candidate is ready for the next authorized release process; publication
+remains held. QA processes/cluster are stopped and evidence remains ignored.
+Phase 32 and the existing phased plan close only after successful production
+verification; no new phase, commit, push or deployment was made.
+
+### Earlier final readiness assessment — 2026-11-04 (pre-FR-01 fix; not released)
+
+See `docs/PHASE_32_FINAL_READINESS_2026_11_04.md`. The owner requested a fresh
+white-box/black-box assessment before the deployment that would close Phase 32
+and the existing phased plan. **FR-01/P2 is confirmed:** a published secondary
+facility schedule and Citizen booking both return 201, but the booking Doctor's
+secondary queue read and chamber start return 409 (not associated with facility).
+The same Doctor/date primary chamber control returns 200. Existing browser case
+18 ends at booking, so its passing result did not cover secondary consultation.
+
+Preserve multi-facility support when fixing the Doctor facility/session context
+across queue and clinical work. Add a full secondary booking → consultation →
+prescription → Finish → Citizen-publication regression with authority/isolation
+controls. The previous QA-01/QA-02 fixes remain valid. No product source was
+changed during this final assessment; only documentation and ignored probes.
+Phase 32 remains open for its closing release; no new phase was created.
+No commit, push, migration against production or deployment occurred.
+
+Fresh final results: backend **602/602** including **40 PostgreSQL**, frontend
+**343/343**, security **17/17**, lint/typecheck, optimized 44-page build, clean
+isolated npm install, both npm audits with zero findings/exceptions, both strict
+Python audits and byte-identical uv 0.12.7 lock reproduction. Edge **19/19** and
+standard HTTP **28/28** pass; the added secondary workflow is **5/7** with the two
+confirmed 409 failures above. All 528 application/test/config manifest files
+are unchanged through this final assessment. QA processes/cluster are stopped;
+fresh evidence remains under `.runtime/final-phase32-qa-20261104/`.
+
+### Latest correction checkpoint — 2026-11-04 (fixed locally; not released)
+
+See `docs/QA_DEFECT_CORRECTIONS_2026_11_04.md`. Prescription AI now uses the
+centralized clinical publication policy for Citizens as well as Doctors.
+Citizen drafts are denied before provider/audit; current treating-Doctor access
+is preserved, and the same prescription becomes available to its Citizen after
+actual Finish Appointment. The area dialog waits for an enabled Zila before
+focusing; a deferred retry test retains enabled/focus assertions. This addresses
+the earlier intermittent finding without claiming a reproduced production bug.
+
+Fresh checks pass: backend **602** (including **40 PostgreSQL**), frontend **343**,
+security/adapter **17**, lint/typecheck, optimized 44-page build, **19/19 Edge
+journeys**, **28/28 supplemental HTTP** checks and **2/2 area-retry probes**.
+No dependency, lock, schema or security-gate changes were needed. Only six
+application/test/harness files differ from the preserved pre-fix QA manifest;
+earlier work is intact. Synthetic local services were stopped after QA; ignored
+receipts and fixtures remain. Publication is still held. No commit, push,
+deployment, production mutation or live-model call occurred.
+
+### Earlier QA checkpoint — 2026-11-03 (pre-fix issues; not released)
+
+The owner requested white-box and black-box testing of the current local version.
+See `docs/LOCAL_WHITE_BOX_BLACK_BOX_TEST_REPORT_2026_11_03.md` for the complete
+results, reproduction steps, evidence and limits. Application/test/config source
+fingerprints match before and after QA; no product code was changed.
+
+Fresh results: 601 backend tests including 40 PostgreSQL cases; final frontend
+343/343 after one intermittent focus failure in the first executable run;
+17 security/adapter tests, lint/typecheck, audits, reproducible Python locks and
+optimized build pass. Optimized-build Edge acceptance passes 18/18. Supplemental
+HTTP testing passes 27/28 and **confirms QA-01**: own draft JSON/PDF/visit return
+404, but AI prescription explanation returns 200 and the unfinished instructions.
+Foreign-owner controls remain denied. An existing stale unit test expects this
+draft-AI success, so green totals do not establish release readiness.
+
+QA-02 is an intermittent unit focus assertion; isolated/full reruns and two
+real-browser area-retry probes pass. A user-visible race is not established.
+Fix QA-01 and its oracle, and investigate QA-02 without weakening assertions.
+QA services were stopped; synthetic fixtures/evidence retained. Publication
+remains held; no commit, push or deployment occurred.
+
+### Latest local checkpoint — 2026-11-03 (not released)
+
+The owner requested a minimal effective fix that preserves the existing technology
+stack. Next/React/TypeScript/ESLint and the lint configuration stay at their
+reviewed versions. A private development adapter replaces the vulnerable
+minimatch 3/10 copies with the genuine patched 11.0.4 engine while supporting the
+current lint callers. No linter migration, new security exception or audit-gate
+change was made. See `docs/MINIMAL_LINT_DEPENDENCY_FIX_2026_11_03.md`.
+
+Fresh verification passed clean npm CI installation, both dependency gates with
+zero findings/zero exceptions used, **17 security/adapter tests**, **343 frontend
+tests**, TypeScript, ESLint and the optimized 44-page build. All 239 original
+linted files keep identical rule maps; the two adapter entry points are also
+linted. Runtime dependency records and all unrelated retained lock records are
+unchanged. Earlier survey/Python fixes are preserved. Publication remains held;
+no commit, push or deployment occurred. Production facts below are the previously
+verified release checkpoint, not a fresh November 3 live inspection.
+
+### Earlier release preflight — 2026-10-31 (not released)
+
+The owner requested fresh checks followed by commit, push and deploy, then
+explicitly chose to **keep the release held for an upstream fix** when the new
+development advisory remained blocked. This selected hold governs the pending
+release. No new exception, bypass or incompatible override is authorized. See
+`docs/PRE_RELEASE_PREFLIGHT_2026_10_31.md` for current evidence and blockers.
+
+The approved Mahim2077 Vercel connection now reads `healthlink-sd` successfully
+using its account-default scope. Returned project/owner IDs match the existing
+CI guards. No alternate account, token change, project relink or replacement is
+needed. Production still serves the released application commit listed above.
+Fresh checks passed: **601 backend tests after the pyasn1 0.6.5 patch**, **343
+frontend tests**, **10 security-gate tests**, lint/typecheck, optimized builds and
+**18/18 Edge journeys**. Python runtime/dev audits are clean; both hash locks
+reproduce with uv 0.12.7. Only pyasn1 changed in those locks. QA services are
+stopped; synthetic fixtures/evidence remain ignored and retained.
+
+The full npm advisory gate remains blocked by new minimatch
+`GHSA-g3hv-75wg-m249`. Official registry checks found no compatible v3/v10
+backport or supported parent update. Production npm audit is clean. No exception,
+gate bypass, incompatible override, commit, push or deployment was made. The
+preflight report records the selected hold and the alternative that was not
+selected; do not treat an ordinary continuation request as approval of that
+security-policy change. No background monitoring or automatic retry was requested.
+
+A post-browser Turbopack worker failure was resolved by preserving the prior
+generated `.next` state and rebuilding cold; cold and warm builds then passed
+all 44 pages without source/configuration changes. Its precise cache failure
+mechanism is unproven. No new migration is required; expected head remains 0031.
+
+### Local survey corrections — 2026-10-24 (not released)
+
+The owner requested fixing the issues documented in
+`docs/PRODUCTION_LIVE_SURVEY_2026_10_22.md`. See
+`docs/SURVEY_BUGFIX_REPORT_2026_10_24.md` for the issue-by-issue implementation,
+final verification receipts and remaining boundaries. This is a Phase 32
+maintenance continuation, not a new roadmap phase or production receipt.
+
+The working tree fixes finalized-only Citizen prescription/visit publication,
+location modal accessibility, specialty synonyms, facility-choice labels,
+Mirsarai text, filtered-empty messaging, unsaved schedule transitions,
+mobile empty-chat scroll, older encounter context, history return filters and
+disabled-reminder copy. Additional deterministic risks were corrected in result
+paging/catalog recovery, multi-facility booking and its history display, Admin
+qualification validation and historical PDF metadata. Baseline response policies
+are added without blocking same-origin GPS/PDFs or requiring new dependencies.
+
+No schema migration, production data cleanup, real AI call, commit, push or
+deployment. Existing unit tests are retained and expanded. Production's last
+verified release remains the dated checkpoint below; do not reuse its old release
+authorization for this new working tree. Duplicate registry provenance/location
+backlog remains an owner-reviewed data task, not permission to delete records.
+
+Final local verification: **601 backend/PostgreSQL tests**, **343 frontend tests
+across 64 files**, **10 offline security-gate tests**, TypeScript, ESLint,
+optimized build and **18/18 Edge journeys**. One existing non-failing TestClient
+deprecation warning remains. QA services started for this task were stopped;
+synthetic fixtures and ignored evidence are retained. No dependencies, advisory
+exceptions or release workflow were changed.
 
 ## Phase 32 designation and release authority
 

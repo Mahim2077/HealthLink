@@ -9,6 +9,20 @@ root = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(root / "backend"), str(root / "backend/tests")]
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+import app.core.config as config
+from app.core.config import Settings
+
+# Register models using explicit synthetic settings, never developer .env values.
+config.get_settings = lambda: Settings(
+    _env_file=None,
+    app_env="test",
+    debug=False,
+    database_url="postgresql+psycopg://postgres@127.0.0.1:55433/healthlink_phase27_qa",
+    jwt_secret_key="synthetic-browser-seed-not-used-outside-local-tests",
+    ai_enabled=False,
+    ai_provider="mock",
+    ai_api_key="",
+)
 from app.main import create_app  # register models, without connecting
 from app.admins.models import AdminAccount
 from app.auth.models import User
@@ -35,6 +49,7 @@ with Session(create_database_engine(url)) as db:
     if db.scalar(select(User).where(User.email == f"browser-citizen-{run_id}@example.com")):
         raise RuntimeError("Never overwrite existing browser fixtures.")
     facility = _facility(db, f"Synthetic Browser Hospital {run_id[-6:]}")
+    secondary_facility = _facility(db, f"Synthetic Secondary Hospital {run_id[-6:]}")
     areas = list_area_options()
     district = next(item for item in areas.districts if item.name == "Dhaka")
     upazila = next(item for item in areas.upazilas if item.district_code == district.code)
@@ -100,6 +115,7 @@ with Session(create_database_engine(url)) as db:
         "doctor_name": f"{doctor_user.first_name} {doctor_user.last_name}",
         "pending_name": f"{pending_user.first_name} {pending_user.last_name}",
         "facility_name": facility.name, "facility_id": str(facility.id), "doctor_id": str(doctor_user.id),
+        "secondary_facility_id": str(secondary_facility.id), "secondary_facility_name": secondary_facility.name,
         "doctor_registration_id": str(doctor.id), "lab_registration_id": str(lab.id),
         "pending_registration_id": str(pending_doctor.id),
         "citizen_id": str(citizen.id), "citizen_user_id": str(citizen_user.id),

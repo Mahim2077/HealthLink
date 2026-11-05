@@ -13,7 +13,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "audit:security": "node ../scripts/check-npm-audit.mjs",
-    "test:security": "node --test ../scripts/check-npm-audit.test.mjs",
+    "test:security": "node --test ../scripts/check-npm-audit.test.mjs ../scripts/check-minimatch-compat.test.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -34,8 +34,12 @@
     "eslint": "9.39.2",
     "eslint-config-next": "16.4.2",
     "jsdom": "30.1.3",
+    "minimatch": "file:./tooling/minimatch-compat",
     "tailwindcss": "4.3.3",
     "typescript": "5.9.3",
     "vitest": "4.1.12"
+  },
+  "overrides": {
+    "minimatch": "$minimatch"
   }
 }

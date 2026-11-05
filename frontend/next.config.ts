@@ -8,6 +8,20 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   poweredByHeader: false,
   reactStrictMode: true,
+  async headers() {
+    return [{
+      source: "/:path*",
+      headers: [
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "X-Frame-Options", value: "SAMEORIGIN" },
+        { key: "Referrer-Policy", value: "same-origin" },
+        { key: "Permissions-Policy", value: "geolocation=(self), camera=(), microphone=()" },
+        // Keep same-origin PDF previews and Next's scripts/styles working. A
+        // stricter script policy needs a separately tested nonce/hash strategy.
+        { key: "Content-Security-Policy", value: "base-uri 'self'; form-action 'self'; frame-ancestors 'self'" },
+      ],
+    }];
+  },
   async rewrites() {
     if (process.env.NODE_ENV !== "development") {
       return [];

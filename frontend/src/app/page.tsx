@@ -125,15 +125,15 @@ export default function Home() {
 
       <main id="main-content">
         <section className="bg-[#fbfefd]">
-          <div className="grid w-full xl:min-h-[clamp(32rem,64vh,40.625rem)] xl:grid-cols-[48.5%_51.5%]">
-            <div className="flex items-center px-5 py-16 sm:px-8 lg:px-16 xl:pl-[clamp(5rem,7.75vw,7rem)] xl:pr-10">
-              <div className="max-w-[640px]">
+          <div className="grid w-full xl:min-h-[clamp(32rem,64vh,40.625rem)] xl:grid-cols-[minmax(0,48.5%)_minmax(0,51.5%)]">
+            <div className="flex min-w-0 items-center px-5 py-16 sm:px-8 lg:px-16 xl:pl-[clamp(5rem,7.75vw,7rem)] xl:pr-10">
+              <div className="w-full min-w-0 max-w-[640px]">
                 <p className="text-xs font-extrabold uppercase tracking-[0.28em] text-teal-700 sm:text-sm">
                   Connected care, made clear
                 </p>
                 <h1
                   aria-label="Care that follows your story."
-                  className="mt-8 font-display text-[2.75rem] font-extrabold leading-[0.99] tracking-[-0.055em] text-slate-950 sm:text-6xl xl:text-[4.5rem]"
+                  className="mt-8 font-display text-[2.75rem] font-extrabold leading-[0.99] tracking-[-0.055em] text-slate-950 sm:text-6xl xl:text-[clamp(3rem,4.6vw,4.5rem)]"
                 >
                   Care that follows
                   <br />
@@ -143,15 +143,15 @@ export default function Home() {
                   HealthLink brings verified providers, appointments, and health records together—so every next step feels simpler.
                 </p>
 
-                <div className="mt-9 flex flex-col gap-4 sm:flex-row">
+                <div className="mt-9 flex flex-col gap-4 sm:flex-row sm:flex-wrap">
                   <Link
-                    className="inline-flex min-h-14 items-center justify-center rounded-xl bg-teal-700 px-7 text-base font-bold text-white shadow-lg shadow-teal-900/15 transition hover:-translate-y-0.5 hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:min-w-[278px]"
+                    className="inline-flex min-h-14 min-w-0 items-center justify-center rounded-xl bg-teal-700 px-7 py-3 text-center text-base font-bold text-white shadow-lg shadow-teal-900/15 transition hover:-translate-y-0.5 hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:flex-1 sm:basis-60"
                     href="/citizen/register"
                   >
                     Create citizen account
                   </Link>
                   <Link
-                    className="inline-flex min-h-14 items-center justify-center rounded-xl border border-teal-700 bg-white px-7 text-base font-bold text-indigo-950 transition hover:-translate-y-0.5 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:min-w-[278px]"
+                    className="inline-flex min-h-14 min-w-0 items-center justify-center rounded-xl border border-teal-700 bg-white px-7 py-3 text-center text-base font-bold text-indigo-950 transition hover:-translate-y-0.5 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:flex-1 sm:basis-60"
                     href="/citizen/login?returnTo=%2Fcitizen%2Fdoctors%2Fsearch"
                   >
                     Find a verified doctor

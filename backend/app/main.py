@@ -24,6 +24,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if request.headers.get("authorization") or request.url.path.startswith("/api/v1/auth/"):
             response.headers["Cache-Control"] = "private, no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["Referrer-Policy"] = "same-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(self), camera=(), microphone=()"
+        response.headers["Content-Security-Policy"] = (
+            "base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+        )
         return response
 
     application.add_middleware(

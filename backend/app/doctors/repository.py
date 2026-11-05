@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth.models import User
 from app.doctors.models import DoctorPracticeSchedule, PracticeScheduleStatus
+from app.doctors.specialty_search import specialty_codes_for_query
 from app.facilities.models import HealthcareFacility
 from app.professionals.constants import (
     ProfessionalRoleCode,
@@ -128,6 +129,7 @@ class DoctorRepository:
                     func.lower(ProfessionalRoleRegistration.designation).like(like),
                     func.lower(DoctorRegistrationDetail.qualification).like(like),
                     DoctorRegistrationDetail.specialization.like(specialization_like),
+                    DoctorRegistrationDetail.specialization.in_(specialty_codes_for_query(query)),
                 )
             )
 

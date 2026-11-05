@@ -3,11 +3,16 @@
 import { apiClient } from "@/lib/api/client";
 
 import type {
+  ChamberFacilityChoice,
   ChamberQueueActionResponse,
   ChamberSessionFinishResponse,
   ChamberSessionStartRequest,
   ChamberSessionView,
 } from "./types";
+
+export async function loadChamberFacilities(): Promise<ChamberFacilityChoice[]> {
+  return apiClient.get<ChamberFacilityChoice[]>("professionals/chamber/facilities");
+}
 
 // All chamber routes live under the verified-doctor guard so a plain
 // fetch from the citizen or admin portal would 403; the apiClient

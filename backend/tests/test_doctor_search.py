@@ -472,3 +472,47 @@ def test_nearest_sort_requires_a_location_choice(client: TestClient) -> None:
         json={"sort": "NEAREST"},
     )
     assert response.status_code == 422
+
+
+def test_specialist_alias_search_preserves_verification_and_facility_filters(
+    client: TestClient, db_session
+) -> None:
+    token = register_citizen(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    facility = _make_facility(db_session, name="City Hospital")
+    other_facility = _make_facility(db_session, name="River Hospital")
+    target, _ = _make_doctor(db_session, first_name="Amina", last_name="Rahman", facility=facility, specialization="CARDIOLOGY")
+    other, _ = _make_doctor(db_session, first_name="Sadia", last_name="Akter", facility=other_facility, specialization="CARDIOLOGY")
+    _make_doctor(db_session, first_name="Pending", last_name="Doctor", facility=facility, specialization="CARDIOLOGY", verified=False)
+    _make_doctor(db_session, first_name="Medicine", last_name="Doctor", facility=facility)
+    inactive_facility = _make_facility(db_session, name="Inactive Hospital")
+    inactive_facility.is_active = False
+    db_session.commit()
+    _make_doctor(db_session, first_name="Inactive", last_name="Doctor", facility=inactive_facility, specialization="CARDIOLOGY")
+    for term in ("cardiology", "cardiologist", "CARDIOLOGISTS", "heart specialist"):
+        response = client.post("/api/v1/doctors/search", headers=auth, json={"query": term})
+        assert response.status_code == 200, response.text
+        assert {row["id"] for row in response.json()["items"]} == {str(target), str(other)}
+    filtered = client.get(CITIZEN_SEARCH_PATH, headers=auth, params={"query": "cardiologist", "facility_id": str(facility.id)})
+    assert filtered.status_code == 200
+    assert [row["id"] for row in filtered.json()] == [str(target)]
+    conflicting = client.post("/api/v1/doctors/search", headers=auth, json={"query": "cardiologist", "specialization": "PEDIATRICS"})
+    assert conflicting.status_code == 200
+    assert conflicting.json()["items"] == []
+
+
+def test_discovery_facilities_include_public_disambiguation_without_coordinates(
+    client: TestClient, db_session
+) -> None:
+    token = register_citizen(client)
+    facilities = [_make_facility(db_session, name="Shared Hospital") for _ in range(2)]
+    facilities[0].address = "North Road"
+    facilities[1].address = "South Road"
+    db_session.commit()
+    response = client.get("/api/v1/doctors/facilities", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert {row["address"] for row in payload} == {"North Road", "South Road"}
+    assert {row["registration_number"] for row in payload} == {facility.registration_number for facility in facilities}
+    assert "latitude" not in response.text
+    assert "longitude" not in response.text

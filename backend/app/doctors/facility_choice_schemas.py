@@ -8,9 +8,8 @@ from pydantic import BaseModel, ConfigDict
 class DoctorFacilityChoice(BaseModel):
     """Lightweight facility option for the doctor's own schedule editor.
 
-    Deliberately omits address, phone, email, and registration_number —
-    those are operational details. The doctor only needs enough
-    information to pick the correct facility for a weekly window.
+    Public locality, address and facility registration distinguish same-name
+    choices. Personal identifiers, contact details and coordinates stay absent.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -18,6 +17,9 @@ class DoctorFacilityChoice(BaseModel):
     id: uuid.UUID
     name: str
     facility_type: str
+    area: str | None = None
+    address: str | None = None
+    registration_number: str | None = None
     is_active: bool
     is_verified_assignment: bool
 

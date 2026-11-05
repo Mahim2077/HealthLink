@@ -155,6 +155,8 @@ class DoctorService:
                 name=facility.name,
                 facility_type=facility.facility_type,
                 area=_facility_area(facility),
+                address=facility.address,
+                registration_number=facility.registration_number,
             )
             for facility in self.repository.list_active_facilities()
         ]
@@ -200,6 +202,9 @@ class DoctorService:
                 id=facility.id,
                 name=facility.name,
                 facility_type=facility.facility_type,
+                area=_facility_area(facility),
+                address=facility.address,
+                registration_number=facility.registration_number,
                 is_active=facility.is_active,
                 is_verified_assignment=facility.id in verified_ids,
             )

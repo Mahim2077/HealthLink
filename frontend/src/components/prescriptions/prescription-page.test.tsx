@@ -24,3 +24,18 @@ it.each(["CITIZEN", "PROFESSIONAL"] as const)("provides a page heading without c
     showAiExplanation: portal === "CITIZEN",
   });
 });
+
+it("returns a Citizen to the originating filtered history page", () => {
+  render(<PrescriptionPage prescriptionId="synthetic" portal="CITIZEN" returnTo="/citizen/medical-history?resource_type=PRESCRIPTION&page=2" />);
+  expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/citizen/medical-history?resource_type=PRESCRIPTION&page=2");
+});
+
+it.each([undefined, "https://other.example/citizen/medical-history", "//other.example/citizen/medical-history", "/admin/dashboard", "javascript:alert(1)"])("uses a safe direct-entry fallback for %s", (returnTo) => {
+  render(<PrescriptionPage prescriptionId="synthetic" portal="CITIZEN" returnTo={returnTo} />);
+  expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/citizen/appointments");
+});
+
+it("never changes the Professional return destination using Citizen query state", () => {
+  render(<PrescriptionPage prescriptionId="synthetic" portal="PROFESSIONAL" returnTo="/citizen/medical-history" />);
+  expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/professional/visits");
+});

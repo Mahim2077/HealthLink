@@ -10,12 +10,14 @@ import {
   callNextPatient,
   finishChamberSession,
   loadChamberSession,
+  loadChamberFacilities,
   removeQueueEntry,
   startChamberSession,
 } from "@/lib/chamber/api";
 import { loadProfessionalMe } from "@/lib/professional/api";
 import type { ProfessionalMe } from "@/lib/professional/types";
 import { citizenErrorMessage } from "@/lib/citizen/presentation";
+import type { ChamberFacilityChoice } from "@/lib/chamber/types";
 
 const defaultDeps: ChamberDeps = {
   actOnCurrent: actOnCurrentPatient,
@@ -46,16 +48,24 @@ export default function ChamberPage() {
   const [record, setRecord] = useState<ProfessionalMe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  const [facilities, setFacilities] = useState<ChamberFacilityChoice[]>([]);
+  const [facilityId, setFacilityId] = useState("");
 
   useEffect(() => {
     let active = true;
     void loadProfessionalMe().then(
-      (value) => {
+      async (value) => {
+        const choices = value.role_code === "DOCTOR" && value.verification_status === "VERIFIED"
+          ? await loadChamberFacilities() : [];
         if (active) {
           setRecord(value);
+          setFacilities(choices);
+          setFacilityId((selected) => choices.some((item) => item.id === selected) ? selected
+            : choices.find((item) => item.id === value.facility?.id)?.id ?? choices[0]?.id ?? "");
           setError(null);
         }
       },
+    ).catch(
       (reason) => {
         if (active) {
           setError(citizenErrorMessage(reason, "We could not load this professional role."));
@@ -138,12 +148,12 @@ export default function ChamberPage() {
       </main>
     );
   }
-  if (!record.facility) {
+  if (!facilityId) {
     return (
       <main className="flex flex-1 items-center px-5 py-12" id="main-content">
         <EmptyState
-          title="No facility linked"
-          message="Contact an administrator to link a verified facility to this role."
+          title="No chamber facility available"
+          message="Publish practice hours at an active facility or contact an administrator about your linked facility."
         />
       </main>
     );
@@ -162,12 +172,20 @@ export default function ChamberPage() {
           Today&rsquo;s chamber queue
         </h1>
         <p className="mt-2 text-sm text-slate-600">
-          Manage serials at {record.facility.name}.
+          Manage serials at {facilities.find((item) => item.id === facilityId)?.name}.
         </p>
+        {facilities.length > 1 && <label className="mt-5 block max-w-md text-sm font-semibold text-slate-700">
+          Chamber facility
+          <select className="mt-2 block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900"
+            onChange={(event) => setFacilityId(event.target.value)} value={facilityId}>
+            {facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}
+          </select>
+        </label>}
       </header>
       <div className="mt-8">
         <ChamberQueue
-          facility_id={record.facility.id}
+          key={facilityId}
+          facility_id={facilityId}
           chamberDeps={defaultDeps}
         />
       </div>

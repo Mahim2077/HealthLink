@@ -16,6 +16,15 @@ def test_bangladesh_area_options_expose_names_without_coordinates(client) -> Non
     assert "longitude" not in response.text
 
 
+def test_mirsarai_area_label_is_not_confused_with_sarail(client) -> None:
+    response = client.get("/api/v1/locations/bangladesh")
+    assert response.status_code == 200
+    areas = {row["name"]: row for row in response.json()["upazilas"]}
+    assert areas["Mirsarai"]["code"] == "BD20150053"
+    assert areas["Mirsarai"]["name_bn"] == "মীরসরাই"
+    assert areas["Sarail"]["name_bn"] == "সরাইল"
+
+
 def test_only_admin_can_confirm_facility_location_without_coordinate_leak(
     client, db_session, monkeypatch
 ) -> None:

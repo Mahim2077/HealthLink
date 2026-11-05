@@ -72,6 +72,7 @@ def test_prescription_link_requires_owned_finalized_matching_item(client, db_ses
     db_session.add(item); db_session.commit()
     headers = _auth(_token(db_session, test_settings, user, Portal.CITIZEN))
     payload = _payload(prescription_item_id=str(item.id))
+    assert client.get("/api/v1/citizens/me/reminder-prescription-items", headers=headers).json() == []
     assert client.post("/api/v1/citizens/me/reminders", headers=headers, json=payload).status_code == 422
     visit.status = "FINALIZED"; visit.finalized_at = datetime.now(UTC); db_session.commit()
     assert client.post("/api/v1/citizens/me/reminders", headers=headers, json=payload).status_code == 201

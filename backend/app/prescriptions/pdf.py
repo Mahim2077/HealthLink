@@ -12,8 +12,9 @@ from __future__ import annotations
 import io
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from html import escape
+from zoneinfo import ZoneInfo
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -33,6 +34,12 @@ _FORBIDDEN_PATTERNS = (
     re.compile(r"\bbirth\s*certificate\b", re.IGNORECASE),
     re.compile(r"\bbcn\b", re.IGNORECASE),
 )
+
+
+def bangladesh_visit_time(value: datetime) -> datetime:
+    """Interpret persisted naive timestamps as UTC, then use the care timezone."""
+    timestamp = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+    return timestamp.astimezone(ZoneInfo("Asia/Dhaka"))
 
 
 @dataclass(frozen=True)
@@ -131,7 +138,12 @@ def _patient_block(styles: dict[str, ParagraphStyle], view: PrescriptionPdfView)
         ["Serial", Paragraph(escape(view.serial_label), styles["body"])],
         [
             "Visit date",
-            Paragraph(view.visit_date.strftime("%Y-%m-%d %H:%M UTC"), styles["body"]),
+            Paragraph(
+                bangladesh_visit_time(view.visit_date).strftime(
+                    "%Y-%m-%d %H:%M Bangladesh time"
+                ),
+                styles["body"],
+            ),
         ],
     ]
     table = Table(rows, colWidths=[35 * mm, 110 * mm])

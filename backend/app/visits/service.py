@@ -97,6 +97,7 @@ def _current_patient_view(
     return DoctorCurrentPatientView(
         queue_id=ctx.queue_entry.id,
         appointment_id=ctx.appointment.id,
+        appointment_date=ctx.appointment.appointment_date,
         serial_number=ctx.appointment.serial_number,
         citizen_id=ctx.citizen.id,
         facility_id=ctx.facility.id,
@@ -294,10 +295,24 @@ class VisitsService:
         visit_id: uuid.UUID,
     ) -> VisitDraftView:
         visit = self.db.get(MedicalVisit, visit_id)
-        if visit is None or visit.citizen_id != citizen_id:
+        if (
+            visit is None
+            or visit.citizen_id != citizen_id
+            or visit.status != "FINALIZED"
+        ):
             raise HealthLinkError(
                 "Medical visit not found.", status_code=404
             )
+        return self._read_authorized_visit(visit, access_source="citizen")
+
+    def _read_authorized_visit(
+        self, visit: MedicalVisit, *, access_source: str
+    ) -> VisitDraftView:
+        """Build a view only after the caller has resolved clinical read authority.
+
+        Doctor reads must not go through the finalized-only citizen boundary:
+        the current-patient policy deliberately permits their working draft.
+        """
         citizen = self.db.get(CitizenProfile, visit.citizen_id)
         facility = self.db.get(HealthcareFacility, visit.facility_id)
         appointment = (
@@ -333,7 +348,7 @@ class VisitsService:
             finalized_at=visit.finalized_at,
             updated_at=visit.updated_at,
             patient=_patient_summary(citizen),
-            access_source="citizen",
+            access_source=access_source,
         )
 
     def list_citizen_visits(

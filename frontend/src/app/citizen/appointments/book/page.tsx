@@ -5,15 +5,15 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { AppointmentBookForm } from "@/components/citizen/appointment-book-form";
+import { AppointmentBookForm, bookablePracticeFacilities } from "@/components/citizen/appointment-book-form";
 import { usePortalAuth } from "@/components/auth/auth-provider";
 import {
   EmptyState,
   LoadingState,
 } from "@/components/ui/async-state";
 import type { AppointmentBookingResponse } from "@/lib/appointments/types";
-import { loadDoctorProfile } from "@/lib/doctors/api";
-import type { DoctorProfile } from "@/lib/doctors/types";
+import { loadDoctorDiscoveryFacilities, loadDoctorProfile } from "@/lib/doctors/api";
+import type { DoctorDiscoveryFacility, DoctorProfile } from "@/lib/doctors/types";
 import { citizenErrorMessage } from "@/lib/citizen/presentation";
 
 function BookContent() {
@@ -21,12 +21,13 @@ function BookContent() {
   const searchParams = useSearchParams();
   const initialDoctorUserId = searchParams.get("doctor_user_id") ?? "";
   const [doctor, setDoctor] = useState<DoctorProfile | null>(null);
+  const [facilities, setFacilities] = useState<DoctorDiscoveryFacility[]>([]);
   const [doctorError, setDoctorError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     if (!initialDoctorUserId) return;
-    void loadDoctorProfile(initialDoctorUserId).then(profile => {
-      if (active) setDoctor(profile);
+    void Promise.all([loadDoctorProfile(initialDoctorUserId), loadDoctorDiscoveryFacilities()]).then(([profile, choices]) => {
+      if (active) { setDoctor(profile); setFacilities(choices); setDoctorError(null); }
     }).catch(error => {
       if (active) setDoctorError(citizenErrorMessage(error, "We could not load this doctor. Please choose a doctor again."));
     });
@@ -92,7 +93,7 @@ function BookContent() {
           Book an appointment
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-          Choose a date from your doctor&apos;s weekly practice days. You will receive a serial number for the queue.
+          Choose a practice facility and a date from your doctor&apos;s weekly practice days there. You will receive a serial number for the queue.
         </p>
       </div>
 
@@ -106,10 +107,10 @@ function BookContent() {
         </p>
         <div className="mt-5">
           {doctorError ? <p role="alert" className="mb-4 text-sm text-rose-700">{doctorError}</p> : null}
-          {!initialDoctorUserId || doctorError || (doctor && !doctor.practice_days.some(day => day.status === "ACTIVE" && day.facility_id === doctor.facility_id)) ? (
+          {!initialDoctorUserId || doctorError || (doctor?.id === initialDoctorUserId && bookablePracticeFacilities(doctor, facilities).length === 0) ? (
             <EmptyState title="Choose an available doctor" message="Find a verified doctor with published practice days before booking." action={<Link className="font-bold text-teal-700" href="/citizen/doctors/search">Find a doctor</Link>} />
           ) : doctor?.id === initialDoctorUserId ? (
-            <AppointmentBookForm key={doctor.id} doctor={doctor} onBooked={handleBooked} />
+            <AppointmentBookForm key={doctor.id} doctor={doctor} facilities={facilities} onBooked={handleBooked} />
           ) : <LoadingState label="Loading doctor" description="Checking the current practice schedule." />}
         </div>
       </section>

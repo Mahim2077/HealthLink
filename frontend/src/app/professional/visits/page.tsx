@@ -193,10 +193,10 @@ export default function VisitsPage() {
           Visits &middot; {record.role_name}
         </p>
         <h1 className="mt-3 font-display text-3xl font-bold tracking-[-0.04em] text-slate-950 sm:text-4xl">
-          Today&rsquo;s consultations
+          Current consultations
         </h1>
         <p className="mt-2 text-sm text-slate-600">
-          Draft charts and prescriptions for current serials at {record.facility.name}.
+          Draft charts and prescriptions for the active chamber patient at {record.facility.name}. The workspace shows the encounter date, including any older open consultation.
         </p>
       </header>
       <div className="mt-8">

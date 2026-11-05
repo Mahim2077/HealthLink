@@ -74,6 +74,14 @@ lifecycle scripts are not needed by the verified build and are disabled locally
 and in the frontend CI quality gate. The workstation may have a newer system
 Node; ensure the actual npm process, not just a PATH label, runs under Node 24.
 
+The November 3 local fix preserves this stack and uses the private development
+adapter in `frontend/tooling/minimatch-compat` with the official patched
+`minimatch@11.0.4` engine. Keep `frontend/.npmrc`'s `install-links=true`; use npm
+11 for lock maintenance. The seven current consumer versions and development-only
+scope are guarded by `test:security`, which now contains 17 tests. Preserve the
+alias's genuine name/version/integrity metadata and review compatibility before
+updating a consumer. See [the fix receipt](MINIMAL_LINT_DEPENDENCY_FIX_2026_11_03.md).
+
 `audit:security` runs production and full npm audits. The production graph has
 **no advisory exceptions**. Full-tree exceptions must match a reviewed advisory
 ID, package, exact version, development-only lock entry and unexpired policy.
@@ -81,7 +89,12 @@ Unknown formats, contradictory totals/exit statuses, missing advisory chains,
 offline/failed scans and all other advisories fail closed. Regression tests cover
 these failure modes; no general severity threshold suppresses findings.
 
-### Explicit unresolved upstream limitation
+### Historical exception — reviewed 2026-10-22
+
+On 2026-11-03 both fresh audit gates reported zero flagged entries and used no
+exceptions. The existing braces entry below remains unchanged, including its
+2026-11-21 expiry. This newer scan is not a claim that braces was patched, and
+its policy still requires review before expiration.
 
 `braces@3.0.3`, pulled through Next.js ESLint → fast-glob → micromatch, has
 [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)
