@@ -118,7 +118,7 @@ npm.cmd run build
 ```
 
 See [implementation progress](docs/implementation-progress.md) for phase-by-phase
-status and verification evidence.
+status, and verification evidence.
 
 Runtime and development dependencies are separately hash-locked. See
 [dependency security](docs/DEPENDENCY_SECURITY.md) for safe updates and the one
