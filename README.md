@@ -100,7 +100,7 @@ Copy-Item .env.example .env.local
 npm.cmd run dev
 ```
 
-The web application is available at `http://localhost:3000`.
+The web application is available at `[http://localhost:3000](https://healthlink-sd.vercel.app/)`.
 
 ## Verification
 
