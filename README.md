@@ -22,9 +22,9 @@ prescription PDFs are regenerated in memory from authorized structured records.
 
 ## Applications
 
-- `backend/` — FastAPI, SQLAlchemy, Alembic, and PostgreSQL
-- `frontend/` — Next.js App Router, TypeScript, and Tailwind CSS
-- `docs/` — implementation decisions, assumptions, and phase verification
+- `backend/` — FastAPI, SQLAlchemy, Alembic and PostgreSQL
+- `frontend/` — Next.js App Router, TypeScript and Tailwind CSS
+- `docs/` — implementation decisions, assumptions and phase verification
 
 The three Markdown files at the repository root are the governing project
 documents and are preserved under their attached filenames.
