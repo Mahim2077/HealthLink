@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 import { citizenInputClassName, FormField } from "@/components/citizen/form-field";
+import { EmailCodeForm } from "@/components/auth/email-code-form";
 import { StatusAlert } from "@/components/citizen/status-alert";
-import { citizenErrorMessage } from "@/lib/citizen/presentation";
+import { requestSignupCode, requiresEmailVerification, type EmailChallenge } from "@/lib/auth/email-codes";
+import { registrationErrorMessage, registrationPasswordError, registrationPasswordHint } from "@/lib/auth/registration-validation";
 import { DOCTOR_SPECIALIZATIONS, type DoctorSpecialization } from "@/lib/doctors/specializations";
 import { onboardProfessional, registerProfessional } from "@/lib/professional/api";
 import {
@@ -82,6 +84,7 @@ export function ProfessionalApplicationForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProfessionalApplicationResponse | null>(null);
+  const [verification, setVerification] = useState<{ payload: ProfessionalRegistrationRequest; challenge: EmailChallenge } | null>(null);
   const isDoctor = form.role === "DOCTOR";
 
   const setField = (field: keyof FormState, value: string) => {
@@ -113,8 +116,9 @@ export function ProfessionalApplicationForm({
         setError("Complete every required identity and account field.");
         return;
       }
-      if (form.password.length < 8 || form.password.length > 128) {
-        setError("Password must be between 8 and 128 characters.");
+      const passwordError = registrationPasswordError(form.password);
+      if (passwordError) {
+        setError(passwordError);
         return;
       }
       if (form.password !== form.confirmPassword) {
@@ -134,25 +138,50 @@ export function ProfessionalApplicationForm({
       : { ...common, role_code: form.role as Exclude<ProfessionalRoleCode, "DOCTOR"> };
     setSubmitting(true);
     try {
-      const submitted = mode === "new"
-        ? await registerAction({
-            ...application,
-            email: form.email.trim(),
-            first_name: form.firstName.trim(),
-            last_name: form.lastName.trim(),
-            nid_number: form.nid.trim(),
-            password: form.password,
-          } as ProfessionalRegistrationRequest)
-        : await onboardAction(application as ProfessionalOnboardingRequest);
-      setResult(submitted);
+      if (mode === "onboard") {
+        setResult(await onboardAction(application as ProfessionalOnboardingRequest));
+        return;
+      }
+      const payload: ProfessionalRegistrationRequest = {
+        ...application,
+        email: form.email.trim(),
+        first_name: form.firstName.trim(),
+        last_name: form.lastName.trim(),
+        nid_number: form.nid.trim(),
+        password: form.password,
+      };
+      try {
+        setResult(await registerAction(payload));
+      } catch (reason) {
+        if (!requiresEmailVerification(reason)) throw reason;
+        const challenge = await requestSignupCode("PROFESSIONAL", payload.email);
+        setVerification({ payload, challenge });
+      }
     } catch (reason) {
-      setError(citizenErrorMessage(reason, "We could not submit this professional application."));
+      setError(registrationErrorMessage(reason, "We could not submit this professional application. Please try again."));
     } finally {
       setSubmitting(false);
     }
   };
 
   if (result) return <PendingApplication result={result} />;
+  if (verification) {
+    const { payload, challenge } = verification;
+    return (
+      <main className="mx-auto w-full max-w-xl flex-1 px-5 py-10 sm:py-16" id="main-content">
+        <section className="hl-settings-card">
+          <EmailCodeForm
+            backLabel="Back to application"
+            description={`Enter the code sent to ${payload.email} to submit your application for review.`}
+            initialChallenge={challenge}
+            onBack={() => setVerification(null)}
+            onResend={() => requestSignupCode("PROFESSIONAL", payload.email)}
+            onVerify={async (proof) => setResult(await registerAction({ ...payload, ...proof }))}
+          />
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto grid w-full max-w-7xl flex-1 items-start gap-8 px-5 py-10 sm:px-8 sm:py-14 lg:grid-cols-[0.72fr_1.28fr] lg:gap-12 lg:px-10" id="main-content">
@@ -175,7 +204,7 @@ export function ProfessionalApplicationForm({
               <FormField htmlFor="professional-last-name" label="Last name" required><input className={citizenInputClassName} id="professional-last-name" maxLength={100} onChange={(event) => setField("lastName", event.target.value)} required value={form.lastName} /></FormField>
               <FormField htmlFor="professional-nid" hint="Birth Certificate Numbers cannot be used for professional registration." label="National ID" required><input className={citizenInputClassName} id="professional-nid" inputMode="numeric" maxLength={32} onChange={(event) => setField("nid", event.target.value)} required value={form.nid} /></FormField>
               <FormField htmlFor="professional-email" label="Email address" required><input autoComplete="email" className={citizenInputClassName} id="professional-email" maxLength={320} onChange={(event) => setField("email", event.target.value)} required type="email" value={form.email} /></FormField>
-              <FormField htmlFor="professional-password" hint="Use 8–128 characters." label="Password" required><input autoComplete="new-password" className={citizenInputClassName} id="professional-password" maxLength={128} minLength={8} onChange={(event) => setField("password", event.target.value)} required type="password" value={form.password} /></FormField>
+              <FormField htmlFor="professional-password" hint={registrationPasswordHint} label="Password" required><input aria-describedby="professional-password-hint" autoComplete="new-password" className={citizenInputClassName} id="professional-password" maxLength={128} onChange={(event) => setField("password", event.target.value)} required type="password" value={form.password} /></FormField>
               <FormField htmlFor="professional-confirm-password" label="Confirm password" required><input autoComplete="new-password" className={citizenInputClassName} id="professional-confirm-password" maxLength={128} onChange={(event) => setField("confirmPassword", event.target.value)} required type="password" value={form.confirmPassword} /></FormField>
             </fieldset>
           ) : null}

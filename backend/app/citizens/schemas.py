@@ -24,6 +24,8 @@ LoginPassword = Annotated[SecretStr, Field(min_length=1, max_length=128)]
 class CitizenRegistrationRequest(BaseModel):
     email: EmailStr
     password: RegistrationPassword
+    challenge_id: uuid.UUID | None = None
+    code: Annotated[str | None, Field(pattern=r"^[0-9]{6}$")] = None
     first_name: Annotated[str, Field(min_length=1, max_length=100)]
     last_name: Annotated[str, Field(min_length=1, max_length=100)]
     date_of_birth: date

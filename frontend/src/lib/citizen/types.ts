@@ -3,6 +3,8 @@ import type { AccessTokenResponse } from "@/lib/auth/types";
 export type CitizenIdentityKind = "NID" | "BCN";
 
 type CitizenRegistrationBaseRequest = {
+  challenge_id?: string;
+  code?: string;
   email: string;
   password: string;
   first_name: string;

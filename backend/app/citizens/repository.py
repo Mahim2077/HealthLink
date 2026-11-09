@@ -21,8 +21,11 @@ class CitizenRepository:
         self.db.add(instance)
         return instance
 
-    def get_user_by_email(self, email: str) -> User | None:
-        return self.db.scalar(select(User).where(User.email == email))
+    def get_user_by_email(self, email: str, *, for_update: bool = False) -> User | None:
+        statement = select(User).where(User.email == email)
+        if for_update:
+            statement = statement.with_for_update().execution_options(populate_existing=True)
+        return self.db.scalar(statement)
 
     def get_user_by_id(
         self,

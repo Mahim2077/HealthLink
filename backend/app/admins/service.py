@@ -33,7 +33,7 @@ class AdminService:
 
     def login(self, request: AdminLoginRequest) -> IssuedTokens:
         email = str(request.email).strip().lower()
-        user = self.repository.get_user_by_email(email)
+        user = self.repository.get_user_by_email(email, for_update=True)
         password_matches = verify_password(
             request.password.get_secret_value(),
             user.password_hash if user is not None else _DUMMY_ADMIN_PASSWORD_HASH,
@@ -50,6 +50,7 @@ class AdminService:
             or admin is None
             or not admin.is_active
         ):
+            self.db.rollback()
             raise AuthenticationError("Invalid email or password.")
         return AuthService(self.db, self.settings).create_session(user.id, Portal.ADMIN)
 

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
         populate_by_name=True,
+        hide_input_in_errors=True,
     )
 
     app_name: str = Field(default="HealthLink", validation_alias="APP_NAME")
@@ -67,6 +68,13 @@ class Settings(BaseSettings):
         default=7,
         validation_alias="REFRESH_TOKEN_EXPIRE_DAYS",
     )
+    auth_email_otp_enabled: bool = False
+    auth_email_otp_secret: str = Field(default="", repr=False)
+    auth_smtp_host: str = "smtp-relay.brevo.com"
+    auth_smtp_port: Literal[465, 587] = 587
+    auth_smtp_username: str = ""
+    auth_smtp_key: str = Field(default="", repr=False)
+    auth_smtp_from_email: str = ""
     ai_enabled: bool = Field(default=False, validation_alias="AI_ENABLED")
     ai_provider: Literal["mock", "gemini", "groq"] = Field(
         default="groq",
@@ -151,6 +159,16 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [self.frontend_url.rstrip("/")]
+
+    @model_validator(mode="after")
+    def validate_auth_email_configuration(self) -> "Settings":
+        if not self.auth_email_otp_enabled:
+            return self
+        if len(self.auth_email_otp_secret.encode()) < 32:
+            raise ValueError("AUTH_EMAIL_OTP_SECRET must contain at least 32 bytes.")
+        if not all((self.auth_smtp_host, self.auth_smtp_username, self.auth_smtp_key, self.auth_smtp_from_email)):
+            raise ValueError("SMTP settings are required when AUTH_EMAIL_OTP_ENABLED is true.")
+        return self
 
 
 @lru_cache

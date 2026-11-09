@@ -5,10 +5,14 @@ import { AccountSettings } from "./account-settings";
 import { PracticeSettings } from "./practice-settings";
 import { SecuritySettings } from "./security-settings";
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), me: vi.fn(), admin: vi.fn(), refresh: vi.fn(), logout: vi.fn(), logoutAll: vi.fn(), replace: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), me: vi.fn(), admin: vi.fn(), refresh: vi.fn(), logout: vi.fn(), logoutAll: vi.fn(), replace: vi.fn(), recoveryEmail: vi.fn() }));
 vi.mock("@/components/auth/auth-provider", () => ({ usePortalAuth: mocks.auth }));
 vi.mock("@/lib/professional/api", () => ({ loadProfessionalMe: mocks.me }));
 vi.mock("@/lib/admin/api", () => ({ loadAdminMe: mocks.admin }));
+vi.mock("@/lib/auth/email-codes", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/auth/email-codes")>(),
+  loadRecoveryEmail: mocks.recoveryEmail,
+}));
 vi.mock("next/navigation", () => ({ usePathname: () => "/professional/settings", useRouter: () => ({ replace: mocks.replace }) }));
 vi.mock("@/components/citizen/citizen-profile-manager", () => ({ CitizenProfileManager: ({ embedded }: { embedded: boolean }) => <p>{embedded ? "Embedded profile" : "Standalone profile"}</p> }));
 vi.mock("@/components/professional/practice-schedule-editor", () => ({ PracticeScheduleEditor: () => <p>Schedule editor</p> }));
@@ -18,6 +22,7 @@ beforeEach(() => {
   mocks.auth.mockReturnValue({ status: "authenticated", isRequiredPortal: true, claims: { sid: "session1" }, refreshSession: mocks.refresh, logout: mocks.logout, logoutAll: mocks.logoutAll });
   mocks.me.mockResolvedValue(doctor);
   mocks.admin.mockResolvedValue({ ...doctor, is_super_admin: false });
+  mocks.recoveryEmail.mockResolvedValue({ enabled: false, verified: false, email: doctor.email });
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 it("shows doctor-specific settings and the verified facility without editing controls", async () => {

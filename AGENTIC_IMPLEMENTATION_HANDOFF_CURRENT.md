@@ -6,6 +6,12 @@
 > for architecture/history, but this file supersedes their phase-start, storage,
 > scheduler, route, and release-state statements wherever they conflict.
 
+The 2026-11-09 email verification and recovery increment is described in
+[Email verification and password recovery](docs/EMAIL_VERIFICATION_AND_PASSWORD_RECOVERY.md).
+It adds Alembic revision `0032_auth_email_codes` and requires private production
+SMTP and OTP settings for activation. The release receipt below describes the
+last confirmed Phase 32 deployment.
+
 ## 1. Resume point
 
 ```text

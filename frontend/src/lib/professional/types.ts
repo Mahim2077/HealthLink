@@ -32,6 +32,8 @@ export type ProfessionalApplicationFields =
     });
 
 export type ProfessionalRegistrationRequest = ProfessionalApplicationFields & {
+  challenge_id?: string;
+  code?: string;
   email: string;
   password: string;
   first_name: string;

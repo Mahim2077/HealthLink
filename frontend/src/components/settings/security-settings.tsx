@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { usePortalAuth } from "@/components/auth/auth-provider";
 import { useSettingsContext } from "./settings-layout";
+import { RecoveryEmailSettings } from "./recovery-email-settings";
 
 export function SecuritySettings() {
   const { portal, professional } = useSettingsContext();
@@ -35,6 +36,6 @@ export function SecuritySettings() {
       <div className="hl-setting-row border-t border-slate-100"><div><h3 className="font-semibold">Sign out everywhere</h3><p className="hl-setting-help">Revoke all sessions for this account across devices and portals, including this session.</p></div><button className="hl-button-secondary hl-button-danger shrink-0" disabled={pending !== null} onClick={() => void signOut("all")} type="button">{pending === "all" ? "Signing out everywhere…" : "Sign out all sessions"}</button></div>
       {error ? <p role="alert" className="mt-4 text-sm text-rose-800">{error}</p> : null}
     </section>
-    <aside className="rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm leading-6 text-slate-600">Password changes and two-factor authentication are not available in HealthLink yet. Never share your password or medical records with untrusted people.</aside>
+    <RecoveryEmailSettings />
   </div>;
 }

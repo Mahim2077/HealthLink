@@ -62,10 +62,10 @@ function fillRequiredFields(
     target: { value: " AMINA@EXAMPLE.COM " },
   });
   fireEvent.change(screen.getByLabelText(/^Password/i), {
-    target: { value: "strong-password" },
+    target: { value: "Aa!23456" },
   });
   fireEvent.change(screen.getByLabelText(/Confirm password/i), {
-    target: { value: "strong-password" },
+    target: { value: "Aa!23456" },
   });
 }
 
@@ -93,7 +93,7 @@ describe("CitizenRegisterForm", () => {
       gender: "FEMALE",
       last_name: "Rahman",
       nid_number: "00A-19/BD",
-      password: "strong-password",
+      password: "Aa!23456",
     });
     expect(registerAction.mock.calls[0][0]).not.toHaveProperty(
       "birth_certificate_number",
@@ -157,6 +157,17 @@ describe("CitizenRegisterForm", () => {
 
     expect(screen.getByText("National ID is required.")).toBeInTheDocument();
     expect(screen.getByText("Date of birth is required.")).toBeInTheDocument();
+    expect(registerAction).not.toHaveBeenCalled();
+  });
+
+  it("blocks a weak password before submitting registration", () => {
+    const registerAction = vi.fn();
+    render(<CitizenRegisterForm registerAction={registerAction} />);
+    fillRequiredFields();
+    fireEvent.change(screen.getByLabelText(/^Password/i), { target: { value: "weakpassword" } });
+    fireEvent.change(screen.getByLabelText(/Confirm password/i), { target: { value: "weakpassword" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create citizen account" }));
+    expect(screen.getByLabelText(/^Password/i)).toHaveAttribute("aria-invalid", "true");
     expect(registerAction).not.toHaveBeenCalled();
   });
 

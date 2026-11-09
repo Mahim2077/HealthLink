@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { AdminPortalGuard } from "@/components/admin/admin-portal-guard";
+import { CitizenProfileEditor } from "@/components/admin/citizen-profile-editor";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import {
   correctCitizenIdentity,
@@ -41,15 +42,11 @@ function CitizenIdentityDetailContent({ userId }: { userId: string }) {
       const result = await loadCitizenIdentity(userId);
       setError(null);
       setDetail(result);
-      setNewValue(
-        correctionType === "NID"
-          ? result.nid_number ?? ""
-          : result.birth_certificate_number ?? "",
-      );
+      setNewValue(result.nid_number ?? "");
     } catch (cause) {
       setError(citizenErrorMessage(cause, "We could not load this citizen identity."));
     }
-  }, [userId, correctionType]);
+  }, [userId]);
 
   useEffect(() => {
     let active = true;
@@ -58,11 +55,7 @@ function CitizenIdentityDetailContent({ userId }: { userId: string }) {
         if (!active) return;
         setError(null);
         setDetail(result);
-        setNewValue(
-          correctionType === "NID"
-            ? result.nid_number ?? ""
-            : result.birth_certificate_number ?? "",
-        );
+        setNewValue(result.nid_number ?? "");
       },
       (cause: unknown) => {
         if (active) setError(citizenErrorMessage(cause, "We could not load this citizen identity."));
@@ -71,7 +64,7 @@ function CitizenIdentityDetailContent({ userId }: { userId: string }) {
     return () => {
       active = false;
     };
-  }, [userId, correctionType]);
+  }, [userId]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -167,6 +160,9 @@ function CitizenIdentityDetailContent({ userId }: { userId: string }) {
             </h1>
             <p className="mt-2 break-words text-sm text-slate-600">{detail.email}</p>
           </header>
+          <div className="mt-7">
+            <CitizenProfileEditor key={detail.user_id} detail={detail} onSaved={setDetail} />
+          </div>
           <div className="mt-7 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
             <section className="hl-card p-6">
               <h2 className="text-xl font-bold text-slate-950">Identity record</h2>
@@ -236,6 +232,7 @@ function CitizenIdentityDetailContent({ userId }: { userId: string }) {
                     <label className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700">
                       <input
                         checked={correctionType === "NID"}
+                        disabled={saving}
                         name="correction_type"
                         onChange={() => switchType("NID")}
                         type="radio"
@@ -245,6 +242,7 @@ function CitizenIdentityDetailContent({ userId }: { userId: string }) {
                     <label className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700">
                       <input
                         checked={correctionType === "BCN"}
+                        disabled={saving}
                         name="correction_type"
                         onChange={() => switchType("BCN")}
                         type="radio"
@@ -258,6 +256,7 @@ function CitizenIdentityDetailContent({ userId }: { userId: string }) {
                   <input
                     className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"
                     maxLength={64}
+                    disabled={saving}
                     onChange={(event) => setNewValue(event.target.value)}
                     required
                     value={newValue}
@@ -268,6 +267,7 @@ function CitizenIdentityDetailContent({ userId }: { userId: string }) {
                   <textarea
                     className="mt-2 min-h-28 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm"
                     maxLength={2000}
+                    disabled={saving}
                     onChange={(event) => setReason(event.target.value)}
                     required
                     value={reason}

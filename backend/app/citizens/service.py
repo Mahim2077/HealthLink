@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.constants import Portal
+from app.auth.email_codes import EmailCodeService
 from app.auth.models import User
 from app.auth.service import AuthenticationError, AuthService, IssuedTokens
 from app.citizens.constants import CitizenRegistrationMethod
@@ -103,13 +104,13 @@ class CitizenService:
         )
         email = str(request.email).strip().lower()
         if self.repository.get_user_by_email(email) is not None:
-            raise CitizenConflictError("Email is already registered.")
+            raise CitizenConflictError("Account already exists. This email is already registered.")
         if (
             nid_number is not None
             and self.repository.get_national_identifier_by_number(nid_number)
             is not None
         ):
-            raise CitizenConflictError("NID is already registered.")
+            raise CitizenConflictError("Account already exists. This NID is already registered.")
         if (
             birth_certificate_number is not None
             and self.repository.get_identity_by_birth_certificate(
@@ -118,11 +119,14 @@ class CitizenService:
             is not None
         ):
             raise CitizenConflictError(
-                "Birth Certificate Number is already registered."
+                "Account already exists. This Birth Certificate Number is already registered."
             )
 
         user = User(
             email=email,
+            email_verified_at=EmailCodeService(self.db, self.settings).verify_signup(
+                Portal.CITIZEN, email, request.challenge_id, request.code,
+            ),
             password_hash=hash_password(request.password.get_secret_value()),
             first_name=request.first_name,
             last_name=request.last_name,
@@ -166,7 +170,7 @@ class CitizenService:
         except IntegrityError as error:
             self.db.rollback()
             raise CitizenConflictError(
-                "Email or citizen identity is already registered."
+                "Account already exists. This email or citizen identity is already registered."
             ) from error
         except Exception:
             self.db.rollback()
@@ -174,7 +178,7 @@ class CitizenService:
 
     def login(self, request: CitizenLoginRequest) -> IssuedTokens:
         email = str(request.email).strip().lower()
-        user = self.repository.get_user_by_email(email)
+        user = self.repository.get_user_by_email(email, for_update=True)
         password_matches = verify_password(
             request.password.get_secret_value(),
             user.password_hash if user is not None else _DUMMY_PASSWORD_HASH,
@@ -190,6 +194,7 @@ class CitizenService:
             or not password_matches
             or profile is None
         ):
+            self.db.rollback()
             raise AuthenticationError("Invalid email or password.")
         return AuthService(self.db, self.settings).create_session(
             user.id,

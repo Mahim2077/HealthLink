@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, ValidationError, field_validator
 
 from app.citizens.constants import CitizenRegistrationMethod
+from app.citizens.schemas import CitizenProfileUpdateRequest
 
 
 class CitizenIdentitySearchQuery(BaseModel):
@@ -84,6 +85,16 @@ class CitizenIdentityDetail(CitizenIdentitySummary):
     auth_session_count: int
     created_at: datetime
     updated_at: datetime
+
+
+class AdminCitizenProfileUpdateRequest(CitizenProfileUpdateRequest):
+    email: EmailStr
+    reason: Annotated[str, Field(min_length=1, max_length=2000)]
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def strip_reason(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
 
 class CitizenIdentityCorrectionRequest(BaseModel):

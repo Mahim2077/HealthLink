@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.auth.constants import Portal
+from app.auth.email_codes import EmailCodeService
 from app.auth.service import AuthenticationError, AuthService, IssuedTokens
 from app.citizens.models import UserNationalIdentifier
 from app.core.config import Settings
@@ -129,13 +130,16 @@ class ProfessionalService:
         nid_number = request.nid_number.strip()
         if self.repository.get_nid_by_number(nid_number) is not None:
             raise ProfessionalConflictError(
-                "This NID belongs to an existing HealthLink account. Sign in and use professional onboarding."
+                "Account already exists. Sign in and use professional onboarding with this NID."
             )
         if self.repository.get_user_by_email(email) is not None:
-            raise ProfessionalConflictError("Email is already registered.")
+            raise ProfessionalConflictError("Account already exists. This email is already registered.")
         role = self._active_role(request.role_code)
         user = User(
             email=email,
+            email_verified_at=EmailCodeService(self.db, self.settings).verify_signup(
+                Portal.PROFESSIONAL, email, request.challenge_id, request.code,
+            ),
             password_hash=hash_password(request.password.get_secret_value()),
             first_name=request.first_name,
             last_name=request.last_name,
@@ -163,7 +167,7 @@ class ProfessionalService:
         except IntegrityError as error:
             self.db.rollback()
             raise ProfessionalConflictError(
-                "Email, NID, professional role, or BM&DC number is already registered."
+                "Account or professional registration already exists. Check the email, NID, and BM&DC number."
             ) from error
         except Exception:
             self.db.rollback()

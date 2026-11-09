@@ -1,6 +1,7 @@
 "use client";
 import { PasswordInput } from "@/components/ui/password-input";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
@@ -51,6 +52,7 @@ export function AdminLoginForm({
           {error ? <StatusAlert message={error} /> : null}
           <button className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-indigo-700 px-6 text-sm font-bold text-white hover:bg-indigo-800 disabled:cursor-wait disabled:opacity-60" disabled={submitting} type="submit">{submitting ? "Signing in…" : "Sign in to Admin Portal"}</button>
         </form>
+        <Link className="mt-4 inline-block text-sm font-bold text-indigo-700 hover:underline" href="/admin/forgot-password">Forgot password?</Link>
       </section>
     </main>
   );

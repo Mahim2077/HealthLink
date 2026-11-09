@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.admins.identity_schemas import (
+    AdminCitizenProfileUpdateRequest,
     CitizenIdentityCorrectionRequest,
     CitizenIdentityCorrectionResponse,
     CitizenIdentityDetail,
@@ -277,6 +278,23 @@ def get_citizen_identity(
 ) -> CitizenIdentityDetail:
     _require_active_admin(request, db, context)
     return CitizenIdentitySupportService(db).detail(user_id)
+
+
+@admin_router.put(
+    "/citizen-identities/{user_id}/profile",
+    response_model=CitizenIdentityDetail,
+)
+def update_citizen_profile(
+    user_id: uuid.UUID,
+    payload: AdminCitizenProfileUpdateRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[AuthContext, Depends(require_portal(Portal.ADMIN))],
+) -> CitizenIdentityDetail:
+    _require_active_admin(request, db, context)
+    return CitizenIdentitySupportService(db).update_profile(
+        user_id, payload, admin_user_id=context.user.id
+    )
 
 
 @admin_router.post(

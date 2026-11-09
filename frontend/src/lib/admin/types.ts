@@ -110,6 +110,17 @@ export type CitizenIdentityDetail = CitizenIdentitySummary & {
   updated_at: string;
 };
 
+export type AdminCitizenProfileUpdateRequest = {
+  email: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  gender: string;
+  blood_group: string | null;
+  address: string | null;
+  reason: string;
+};
+
 export type CitizenIdentityCorrectionType = "NID" | "BCN";
 
 export type CitizenIdentityCorrectionRequest = {

@@ -13,8 +13,11 @@ class AdminRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def get_user_by_email(self, email: str) -> User | None:
-        return self.db.scalar(select(User).where(User.email == email))
+    def get_user_by_email(self, email: str, *, for_update: bool = False) -> User | None:
+        statement = select(User).where(User.email == email)
+        if for_update:
+            statement = statement.with_for_update().execution_options(populate_existing=True)
+        return self.db.scalar(statement)
 
     def get_admin_by_user_id(self, user_id: uuid.UUID) -> AdminAccount | None:
         return self.db.scalar(

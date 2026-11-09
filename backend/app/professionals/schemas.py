@@ -67,6 +67,8 @@ class ProfessionalApplicationFields(BaseModel):
 class ProfessionalRegistrationRequest(ProfessionalApplicationFields):
     email: EmailStr
     password: ProfessionalPassword
+    challenge_id: uuid.UUID | None = None
+    code: Annotated[str | None, Field(pattern=r"^[0-9]{6}$")] = None
     first_name: Annotated[str, Field(min_length=1, max_length=100)]
     last_name: Annotated[str, Field(min_length=1, max_length=100)]
     nid_number: Annotated[str, Field(min_length=1, max_length=32)]

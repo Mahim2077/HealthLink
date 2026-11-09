@@ -76,6 +76,18 @@ describe("ProfessionalApplicationForm", () => {
     expect(registerAction.mock.calls[0][0]).not.toHaveProperty("bmdc_registration_number");
   });
 
+  it("rejects a weak password in new professional registration", async () => {
+    const registerAction = vi.fn();
+    render(<ProfessionalApplicationForm mode="new" registerAction={registerAction} />);
+    fillNewAccount();
+    fillRoleFields("NURSE");
+    fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: "weakpassword" } });
+    fireEvent.change(screen.getByLabelText(/Confirm password/), { target: { value: "weakpassword" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit professional application" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Use 8–128 characters");
+    expect(registerAction).not.toHaveBeenCalled();
+  });
+
   it("shows the existing-account onboarding conflict without losing the form", async () => {
     const registerAction = vi.fn().mockRejectedValue(
       new ApiError(409, "This NID belongs to an existing HealthLink account. Sign in and use professional onboarding."),

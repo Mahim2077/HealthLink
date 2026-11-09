@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   correctCitizenIdentity: vi.fn(),
   loadCitizenIdentity: vi.fn(),
+  updateAdminCitizenProfile: vi.fn(),
   logout: vi.fn(),
   refreshSession: vi.fn(),
   replace: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("@/lib/admin/api", () => ({
   correctCitizenIdentity: mocks.correctCitizenIdentity,
   loadCitizenIdentity: mocks.loadCitizenIdentity,
   searchCitizenIdentities: vi.fn(),
+  updateAdminCitizenProfile: mocks.updateAdminCitizenProfile,
 }));
 
 import { CitizenIdentityDetail } from "./citizen-identity-detail";
@@ -48,6 +50,7 @@ describe("CitizenIdentityDetail", () => {
   beforeEach(() => {
     mocks.loadCitizenIdentity.mockReset();
     mocks.correctCitizenIdentity.mockReset();
+    mocks.updateAdminCitizenProfile.mockReset();
     mocks.logout.mockReset();
     mocks.refreshSession.mockReset();
     mocks.replace.mockReset();
@@ -108,6 +111,21 @@ describe("CitizenIdentityDetail", () => {
     );
     expect(await screen.findByText(/Recorded NID correction/)).toBeInTheDocument();
     expect(await screen.findByText("9999999999")).toBeInTheDocument();
+  });
+
+  it("edits the citizen profile from the search result detail", async () => {
+    mocks.updateAdminCitizenProfile.mockResolvedValue({ ...baseDetail, first_name: "Amina" });
+    render(<CitizenIdentityDetail userId={baseDetail.user_id} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Edit citizen profile" }));
+    fireEvent.change(screen.getByLabelText(/First name/), { target: { value: "Amina" } });
+    fireEvent.change(screen.getByLabelText(/Reason for profile change/), { target: { value: "Correct spelling" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save profile changes" }));
+    expect(await screen.findByText("Citizen profile updated.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Amina Citizen" })).toBeInTheDocument();
+    expect(mocks.updateAdminCitizenProfile).toHaveBeenCalledWith(baseDetail.user_id, expect.objectContaining({
+      first_name: "Amina",
+      reason: "Correct spelling",
+    }));
   });
 
   it("requires a reason before submitting", async () => {

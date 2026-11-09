@@ -7,7 +7,9 @@ import { useState, type FormEvent } from "react";
 import { citizenInputClassName, FormField } from "./form-field";
 import { StatusAlert } from "./status-alert";
 import { registerCitizen } from "@/lib/citizen/api";
-import { citizenErrorMessage } from "@/lib/citizen/presentation";
+import { EmailCodeForm } from "@/components/auth/email-code-form";
+import { requestSignupCode, requiresEmailVerification, type EmailChallenge } from "@/lib/auth/email-codes";
+import { registrationErrorMessage, registrationPasswordError, registrationPasswordHint } from "@/lib/auth/registration-validation";
 import type {
   CitizenIdentityKind,
   CitizenRegistrationRequest,
@@ -62,11 +64,8 @@ export function validateCitizenRegistration(
   if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) {
     errors.email = "Enter a valid email address.";
   }
-  if (values.password.length < 8) {
-    errors.password = "Use at least 8 characters.";
-  } else if (values.password.length > 128) {
-    errors.password = "Password cannot exceed 128 characters.";
-  }
+  const passwordError = registrationPasswordError(values.password);
+  if (passwordError) errors.password = passwordError;
   if (values.password !== values.confirmPassword) {
     errors.confirmPassword = "Passwords do not match.";
   }
@@ -138,6 +137,12 @@ export function CitizenRegisterForm({
   const [errors, setErrors] = useState<RegistrationErrors>({});
   const [apiError, setApiError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [verification, setVerification] = useState<{ payload: CitizenRegistrationRequest; challenge: EmailChallenge } | null>(null);
+
+  const finishRegistration = (response: CitizenRegistrationResponse) => {
+    if (onRegistered) onRegistered(response);
+    else router.replace("/citizen/login?registered=1");
+  };
 
   const updateValue = <Field extends keyof RegistrationValues>(
     field: Field,
@@ -171,24 +176,40 @@ export function CitizenRegisterForm({
     setIsSubmitting(true);
     setApiError(null);
 
+    const payload = registrationPayload(values);
     try {
-      const response = await registerAction(registrationPayload(values));
-      if (onRegistered) {
-        onRegistered(response);
-      } else {
-        router.replace("/citizen/login?registered=1");
+      try {
+        finishRegistration(await registerAction(payload));
+      } catch (error) {
+        if (!requiresEmailVerification(error)) throw error;
+        const challenge = await requestSignupCode("CITIZEN", payload.email);
+        setVerification({ payload, challenge });
       }
     } catch (error) {
       setApiError(
-        citizenErrorMessage(
+        registrationErrorMessage(
           error,
-          "We could not create your account. Please review your information and try again.",
+          "We could not create your account. Please try again. If you have already registered, sign in.",
         ),
       );
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (verification) {
+    const { payload, challenge } = verification;
+    return (
+      <EmailCodeForm
+        backLabel="Back to registration"
+        description={`Enter the code sent to ${payload.email} to finish creating your account.`}
+        initialChallenge={challenge}
+        onBack={() => setVerification(null)}
+        onResend={() => requestSignupCode("CITIZEN", payload.email)}
+        onVerify={async (proof) => finishRegistration(await registerAction({ ...payload, ...proof }))}
+      />
+    );
+  }
 
   const identityLabel =
     values.identityKind === "NID" ? "National ID" : "Birth Certificate Number";
@@ -375,7 +396,7 @@ export function CitizenRegisterForm({
               />
             </FormField>
             <div className="hidden sm:block" />
-            <FormField error={errors.password} hint="Use at least 8 characters." htmlFor="password" label="Password" required>
+            <FormField error={errors.password} hint={registrationPasswordHint} htmlFor="password" label="Password" required>
               <input
                 aria-describedby={errors.password ? "password-error" : "password-hint"}
                 aria-invalid={Boolean(errors.password)}

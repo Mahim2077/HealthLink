@@ -138,6 +138,8 @@ export function CitizenLoginForm({
           />
         </FormField>
 
+        <Link className="block text-sm font-bold text-teal-700 hover:underline" href="/citizen/forgot-password">Forgot password?</Link>
+
         <button
           className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-teal-700 px-6 text-sm font-bold text-white shadow-lg shadow-teal-900/15 transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 disabled:cursor-wait disabled:opacity-65"
           disabled={isSubmitting}

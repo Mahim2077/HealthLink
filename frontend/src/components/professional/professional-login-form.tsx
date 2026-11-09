@@ -124,6 +124,7 @@ export function ProfessionalLoginForm() {
             {submitting ? "Signing in…" : "Sign in to Professional Portal"}
           </button>
         </form>
+        <Link className="mt-4 inline-block text-sm font-bold text-sky-700 hover:underline" href="/professional/forgot-password">Forgot password?</Link>
         <p className="mt-5 text-sm text-slate-600">
           Not registered?{" "}
           <Link className="font-bold text-sky-700" href="/professional/register">

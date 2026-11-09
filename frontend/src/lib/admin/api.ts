@@ -8,6 +8,7 @@ import type {
   AdminLoginRequest,
   AdminLoginResponse,
   AdminMe,
+  AdminCitizenProfileUpdateRequest,
   CitizenIdentityCorrectionRequest,
   CitizenIdentityCorrectionResponse,
   CitizenIdentityDetail,
@@ -143,6 +144,16 @@ export async function searchCitizenIdentities(
 
 export async function loadCitizenIdentity(userId: string): Promise<CitizenIdentityDetail> {
   return apiClient.get<CitizenIdentityDetail>(`admin/citizen-identities/${userId}`);
+}
+
+export async function updateAdminCitizenProfile(
+  userId: string,
+  payload: AdminCitizenProfileUpdateRequest,
+): Promise<CitizenIdentityDetail> {
+  return apiClient.put<CitizenIdentityDetail, AdminCitizenProfileUpdateRequest>(
+    `admin/citizen-identities/${userId}/profile`,
+    payload,
+  );
 }
 
 export async function correctCitizenIdentity(

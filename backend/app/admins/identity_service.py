@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.admins.identity_repository import CitizenIdentitySupportRepository
 from app.admins.identity_schemas import (
+    AdminCitizenProfileUpdateRequest,
     CitizenIdentityCorrectionResponse,
     CitizenIdentityDetail,
     CitizenIdentitySummary,
@@ -19,6 +20,7 @@ from app.auth.models import User
 from app.auth.service import utc_now
 from app.citizens.constants import CitizenRegistrationMethod
 from app.citizens.models import CitizenIdentifier, UserNationalIdentifier
+from app.citizens.repository import CitizenRepository
 from app.core.exceptions import HealthLinkError
 
 
@@ -180,6 +182,53 @@ class CitizenIdentitySupportService:
             corrected_at=utc_now(),
             audit_log_id=audit_log.id,
         )
+
+    def update_profile(
+        self,
+        user_id: uuid.UUID,
+        request: AdminCitizenProfileUpdateRequest,
+        *,
+        admin_user_id: uuid.UUID,
+    ) -> CitizenIdentityDetail:
+        citizens = CitizenRepository(self.db)
+        user = citizens.get_user_by_id(user_id, for_update=True)
+        profile = citizens.get_profile_by_user_id(user_id, for_update=True)
+        if user is None or profile is None or self.repository.get_identity_by_user_id(user_id) is None:
+            raise CitizenNotFoundError()
+
+        email = str(request.email).strip().lower()
+        owner = citizens.get_user_by_email(email)
+        if owner is not None and owner.id != user_id:
+            raise CitizenIdentityConflictError("Account already exists. This email is already registered.")
+
+        if user.email != email:
+            user.email_verified_at = None
+            user.email = email
+        user.first_name = request.first_name
+        user.last_name = request.last_name
+        profile.date_of_birth = request.date_of_birth
+        profile.gender = request.gender
+        profile.blood_group = request.blood_group
+        profile.address = request.address
+        self.db.add(AdminActionLog(
+            admin_user_id=admin_user_id,
+            action_type="CITIZEN_PROFILE_UPDATE",
+            target_user_id=user_id,
+            target_resource_type="CITIZEN_PROFILE",
+            target_resource_id=profile.id,
+            reason=request.reason,
+        ))
+        try:
+            self.db.flush()
+            updated = self.detail(user_id)
+            self.db.commit()
+        except IntegrityError as error:
+            self.db.rollback()
+            raise CitizenIdentityConflictError("The profile update conflicts with an existing record.") from error
+        except Exception:
+            self.db.rollback()
+            raise
+        return updated
 
     def _correct_nid(
         self,

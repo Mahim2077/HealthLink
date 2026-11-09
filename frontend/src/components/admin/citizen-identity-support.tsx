@@ -84,7 +84,7 @@ function CitizenIdentitySupportContent() {
   return (
     <main className="hl-page" id="main-content">
       <AdminSectionHeader
-        description="Search by NID, Birth Certificate Number, email, or User ID. Corrections are recorded with the acting administrator's identity and are not auto-merged."
+        description="Search by NID, Birth Certificate Number, email, or User ID. Open a result to edit the citizen profile or record an identity correction."
         eyebrow="Citizen identity support"
         title="Find a citizen identity"
       />

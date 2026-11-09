@@ -18,6 +18,7 @@ from app.appointments.routes import (
     chamber_router,
 )
 from app.auth.routes import router as auth_router
+from app.auth.email_code_routes import router as email_code_router
 from app.citizens.routes import auth_router as citizen_auth_router
 from app.citizens.routes import citizen_router
 from app.doctors.routes import doctor_router
@@ -52,6 +53,7 @@ api_router.include_router(ai_clinical_router)
 api_router.include_router(ai_assistant_router)
 
 api_router.include_router(auth_router)
+api_router.include_router(email_code_router)
 api_router.include_router(citizen_auth_router)
 api_router.include_router(citizen_router)
 api_router.include_router(citizen_medical_history_router)

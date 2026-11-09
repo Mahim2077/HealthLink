@@ -42,10 +42,11 @@ def _register_citizen(
     email: str = "citizen@example.com",
     nid_number: str | None = "NID-INIT-0001",
     birth_certificate_number: str | None = None,
+    password: str = CITIZEN_PASSWORD,
 ) -> dict:
     payload = {
         "email": email,
-        "password": CITIZEN_PASSWORD,
+        "password": password,
         "first_name": "Amina",
         "last_name": "Rahman",
         "date_of_birth": "1995-05-20",
@@ -78,6 +79,54 @@ def _citizen_token(
     )
     assert response.status_code == 200
     return response.json()["access_token"]
+
+
+def test_admin_can_edit_a_citizen_search_result_without_changing_password(
+    client: TestClient, db_session
+) -> None:
+    _provision_admin(db_session)
+    legacy_password = "weakpass"
+    citizen = _register_citizen(client, password=legacy_password)
+    user_id = uuid.UUID(citizen["user_id"])
+    original_hash = db_session.get(User, user_id).password_hash
+    path = f"/api/v1/admin/citizen-identities/{user_id}/profile"
+    payload = {
+        "email": "corrected@example.com",
+        "first_name": "Aminah",
+        "last_name": "Rahman",
+        "date_of_birth": "1995-05-21",
+        "gender": "FEMALE",
+        "blood_group": None,
+        "address": "Updated address",
+        "reason": "Correct the citizen's contact and profile record.",
+    }
+    assert client.put(path, json=payload).status_code == 401
+    headers = {"Authorization": f"Bearer {_admin_token(client)}"}
+    duplicate = client.put(path, headers=headers, json={**payload, "email": "ADMIN@EXAMPLE.COM"})
+    assert duplicate.status_code == 409
+    assert "Account already exists" in duplicate.json()["detail"]
+    assert client.put(path, headers=headers, json={**payload, "password": "ignored"}).status_code == 422
+
+    updated = client.put(path, headers=headers, json=payload)
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["first_name"] == "Aminah"
+    assert updated.json()["address"] == "Updated address"
+    assert updated.json()["nid_number"] == "NID-INIT-0001"
+    audit = db_session.scalars(
+        select(AdminActionLog).where(AdminActionLog.action_type == "CITIZEN_PROFILE_UPDATE")
+    ).one()
+    assert audit.target_user_id == user_id
+    assert audit.reason == payload["reason"]
+    assert db_session.get(User, user_id).password_hash == original_hash
+    login = client.post(
+        "/api/v1/auth/citizen/login",
+        json={"email": payload["email"], "password": legacy_password},
+    )
+    assert login.status_code == 200
+    forbidden = client.put(
+        path, headers={"Authorization": f"Bearer {login.json()['access_token']}"}, json=payload
+    )
+    assert forbidden.status_code == 403
 
 
 # ---------------------------------------------------------------------------

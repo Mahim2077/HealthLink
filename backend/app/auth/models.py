@@ -15,6 +15,7 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     is_active: Mapped[bool] = mapped_column(
@@ -76,3 +77,27 @@ class AuthSession(Base):
     active_professional_role_registration = relationship(
         "ProfessionalRoleRegistration"
     )
+
+
+class EmailCodeChallenge(Base):
+    __tablename__ = "auth_email_code_challenges"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    purpose: Mapped[str] = mapped_column(String(16), nullable=False)
+    scope_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True,
+    )
+    account_hash: Mapped[str | None] = mapped_column(String(64))
+    code_hash: Mapped[str | None] = mapped_column(String(64))
+    reset_hash: Mapped[str | None] = mapped_column(String(64))
+    attempts: Mapped[int] = mapped_column(default=0, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class EmailCodeRateLimit(Base):
+    __tablename__ = "auth_email_code_limits"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    count: Mapped[int] = mapped_column(nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
