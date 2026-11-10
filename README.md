@@ -29,6 +29,20 @@ prescription PDFs are regenerated in memory from authorized structured records.
 The three Markdown files at the repository root are the governing project
 documents and are preserved under their attached filenames.
 
+## Release versions
+
+HealthLink uses `MAJOR.MINOR.PATCH` in addition to Git commit SHAs, phase tags,
+and Alembic migration revisions. Update the version in
+`backend/app/__init__.py`, update the frontend package and lockfile together
+with `npm version <version> --no-git-tag-version --ignore-scripts` from
+`frontend/`, and record the release in the [changelog](CHANGELOG.md).
+Use a patch increment for compatible fixes, a minor increment for compatible
+features, and a major increment for breaking changes.
+
+CI checks that the version files agree, verifies the running version through
+`/health`, and records the version and commit in the production deployment
+summary. After verifying production, tag the deployed commit as `vMAJOR.MINOR.PATCH`.
+
 ## Implemented product and preserved foundations
 
 - Citizen registration, authentication, profile and protected identity

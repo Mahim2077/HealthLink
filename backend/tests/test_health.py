@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
 
+from app import __version__
+
 
 def test_health_endpoint(client: TestClient) -> None:
     response = client.get("/health")
@@ -9,6 +11,7 @@ def test_health_endpoint(client: TestClient) -> None:
         "status": "healthy",
         "service": "HealthLink Test",
         "environment": "test",
+        "version": __version__,
     }
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["x-frame-options"] == "SAMEORIGIN"

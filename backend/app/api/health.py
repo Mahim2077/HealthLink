@@ -11,6 +11,7 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     environment: str
+    version: str
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -22,4 +23,5 @@ def health_check(request: Request) -> HealthResponse:
         status="healthy",
         service=settings.app_name,
         environment=settings.app_env,
+        version=request.app.version,
     )

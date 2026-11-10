@@ -55,6 +55,15 @@ def test_wrong_environment_error_page_and_oversized_body_fail(monkeypatch, path,
         smoke.probe(ORIGIN, path)
 
 
+def test_release_smoke_requires_the_expected_version_when_provided(monkeypatch):
+    body = b'{"status":"healthy","environment":"production","version":"1.0.0"}'
+    monkeypatch.setattr(smoke, "urlopen", lambda req, timeout: Response(req.full_url, body))
+
+    smoke.probe(ORIGIN, "/health", expected_version="1.0.0")
+    with pytest.raises(RuntimeError, match="does not match the release version"):
+        smoke.probe(ORIGIN, "/health", expected_version="1.0.1")
+
+
 def test_redirect_and_unprotected_clinical_endpoint_fail(monkeypatch):
     monkeypatch.setattr(smoke, "urlopen", lambda req, timeout: Response(ORIGIN + "/admin/login", b"<title>HealthLink</title>"))
     with pytest.raises(RuntimeError):

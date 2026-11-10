@@ -14,6 +14,8 @@ jobs:
   backend-quality:
     name: Backend quality gates
     runs-on: ubuntu-latest
+    outputs:
+      release_version: ${{ steps.version.outputs.release_version }}
     services:
       postgres:
         image: postgres:17
@@ -55,6 +57,12 @@ jobs:
           cache-dependency-path: |
             backend/requirements.txt
             backend/requirements-dev.txt
+
+      - name: Verify application version metadata
+        id: version
+        run: |
+          version="$(python scripts/check_release_version.py)"
+          printf 'release_version=%s\n' "$version" >> "$GITHUB_OUTPUT"
 
       - name: Set up pinned dependency lock tool
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -142,6 +150,8 @@ jobs:
       - frontend-quality
     runs-on: ubuntu-latest
     environment: production
+    env:
+      HEALTHLINK_RELEASE_VERSION: ${{ needs.backend-quality.outputs.release_version }}
     # One non-cancelling lock covers migration, staging, smoke and promotion.
     # Never split this lifecycle into separately locked jobs.
     concurrency:
@@ -240,7 +250,7 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: python scripts/smoke_release.py --vercel-auth "$DEPLOYMENT_URL"
+        run: python scripts/smoke_release.py --vercel-auth --expected-version "$HEALTHLINK_RELEASE_VERSION" "$DEPLOYMENT_URL"
 
       - name: Reject stale release before promotion
         run: python scripts/check_release_head.py
@@ -257,7 +267,7 @@ jobs:
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
         run: |
-          python scripts/smoke_release.py https://healthlink-sd.vercel.app
+          python scripts/smoke_release.py --expected-version "$HEALTHLINK_RELEASE_VERSION" https://healthlink-sd.vercel.app
 
       - name: Publish deployment summary
         env:
@@ -267,6 +277,8 @@ jobs:
           {
             echo "### HealthLink production deployment"
             echo ""
+            echo "- Version: $HEALTHLINK_RELEASE_VERSION"
+            echo "- Commit: $GITHUB_SHA"
             echo "- Application: $DEPLOYMENT_URL"
             echo "- Stable production: https://healthlink-sd.vercel.app/"
             echo "- Health check: $DEPLOYMENT_URL/health"

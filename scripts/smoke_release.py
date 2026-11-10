@@ -64,7 +64,7 @@ def vercel_response(origin: str, path: str) -> tuple[int, str, bytes]:
     return status, final_url, body if status < 400 else b""
 
 
-def probe(origin: str, path: str, *, vercel_auth: bool = False) -> None:
+def probe(origin: str, path: str, *, vercel_auth: bool = False, expected_version: str | None = None) -> None:
     expected = 401 if path in PROTECTED_PATHS else 200
     request = Request(origin + path, headers={"User-Agent": "HealthLink-release-smoke/1"})
     if vercel_auth:
@@ -85,19 +85,18 @@ def probe(origin: str, path: str, *, vercel_auth: bool = False) -> None:
         payload = json.loads(body)
         if not isinstance(payload, dict) or payload.get("status") != "healthy" or payload.get("environment") != "production":
             raise RuntimeError("Health did not confirm a healthy production process.")
+        if expected_version is not None and payload.get("version") != expected_version:
+            raise RuntimeError("The running HealthLink version does not match the release version.")
     elif path in PUBLIC_PAGES and (b"<title>" not in body or b"HealthLink" not in body):
         raise RuntimeError(f"Frontend HTML contract failed for {path}.")
 
 
-def smoke(url: str, attempts: int = 8, *, vercel_auth: bool = False) -> None:
+def smoke(url: str, attempts: int = 8, *, vercel_auth: bool = False, expected_version: str | None = None) -> None:
     origin = validate_target(url)
     for path in ("/health", *PUBLIC_PAGES, *PROTECTED_PATHS):
         for attempt in range(attempts):
             try:
-                if vercel_auth:
-                    probe(origin, path, vercel_auth=True)
-                else:
-                    probe(origin, path)
+                probe(origin, path, vercel_auth=vercel_auth, expected_version=expected_version)
                 break
             except (HTTPError, URLError, RuntimeError, ValueError, TimeoutError):
                 if attempt + 1 == attempts:
@@ -111,6 +110,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("urls", nargs="+", help="Deployment and stable production origins")
     parser.add_argument("--vercel-auth", action="store_true", help="Use existing linked Vercel CLI identity for protected staging")
+    parser.add_argument("--expected-version", help="Require this HealthLink version in the health response")
     args = parser.parse_args()
     for target in dict.fromkeys(args.urls):
-        smoke(target, vercel_auth=args.vercel_auth)
+        smoke(target, vercel_auth=args.vercel_auth, expected_version=args.expected_version)

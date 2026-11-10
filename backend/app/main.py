@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import __version__
 from app.api.health import router as health_router
 from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
@@ -12,7 +13,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application = FastAPI(
         title=application_settings.app_name,
         debug=application_settings.debug,
-        version="0.1.0",
+        version=__version__,
     )
     application.state.settings = application_settings
     application.state.ai_provider = None
