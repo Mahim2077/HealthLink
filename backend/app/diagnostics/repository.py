@@ -7,9 +7,19 @@ from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.diagnostics.models import DiagnosticTest
+from app.diagnostics.session_models import DiagnosticPdf, LabSession
 from app.facilities.models import HealthcareFacility
 from app.professionals.constants import ProfessionalRoleCode, VerificationStatus
 from app.professionals.models import HealthcareProfessionalProfile, ProfessionalRole, ProfessionalRoleRegistration
+
+
+def qualifying_lab_sessions(citizen_id, catalog_code, requested_at):
+    return (
+        select(LabSession.id)
+        .join(DiagnosticPdf, (DiagnosticPdf.session_id == LabSession.id) & (DiagnosticPdf.version == LabSession.current_report_version))
+        .where(LabSession.citizen_id == citizen_id, DiagnosticPdf.catalog_code == catalog_code,
+               DiagnosticPdf.tested_at > requested_at)
+    )
 
 
 class DiagnosticsRepository:

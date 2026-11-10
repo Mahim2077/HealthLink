@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     )
     debug: bool = Field(default=False, validation_alias="DEBUG")
     cron_secret: str = Field(default="", validation_alias="CRON_SECRET", repr=False)
+    diagnostic_clamav_host: str = ""
+    diagnostic_clamav_port: int = Field(default=3310, ge=1, le=65535)
     database_url: str = Field(
         default="",
         validation_alias="DATABASE_URL",

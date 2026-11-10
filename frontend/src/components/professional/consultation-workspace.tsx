@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useUnsavedChanges } from "@/components/ui/use-unsaved-changes";
 import { MedicalHistoryTimeline } from "@/components/medical-records/medical-history-timeline";
 import { DiagnosticRequestPanel } from "@/components/diagnostics/diagnostic-request-panel";
+import { PatientDiagnosticReports } from "@/components/diagnostics/patient-diagnostic-reports";
 import { EmergencyProfileContext } from "@/components/emergency/emergency-profile";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
@@ -296,6 +297,7 @@ export function ConsultationWorkspace({
         )}
       </div>
       <div className="mt-6"><EmergencyProfileContext key={`${current.citizen_id}-${current.queue_id}`} citizenId={current.citizen_id} /></div>
+      <div className="mt-6"><PatientDiagnosticReports key={current.citizen_id} citizenId={current.citizen_id} /></div>
       {historyLoadAction ? (
         <div className="mt-8 border-t border-slate-200 pt-8">
           <MedicalHistoryTimeline

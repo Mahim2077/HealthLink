@@ -36,6 +36,7 @@ class DiagnosticTest(Base):
     assigned_to_role_registration_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("professional_role_registrations.id", ondelete="RESTRICT"))
     facility_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("healthcare_facilities.id", ondelete="RESTRICT"))
     test_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    catalog_code: Mapped[str | None] = mapped_column(String(40))
     instructions: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default=DiagnosticTestStatus.REQUESTED.value, server_default=DiagnosticTestStatus.REQUESTED.value)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

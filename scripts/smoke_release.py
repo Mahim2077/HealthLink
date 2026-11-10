@@ -16,6 +16,9 @@ PROTECTED_PATHS = (
     "/api/v1/professionals/me/overview",
     "/api/v1/admin/overview",
     "/api/v1/citizens/me/ai/status",
+    "/api/v1/diagnostics/test-catalog",
+    "/api/v1/citizens/me/diagnostic-sessions",
+    "/api/v1/diagnostic-sessions/00000000-0000-0000-0000-000000000000/pdf",
 )
 MAX_RESPONSE_BYTES = 512_000
 

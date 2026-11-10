@@ -4,9 +4,12 @@ import { DiagnosticRequestPanel } from "./diagnostic-request-panel";
 import { DiagnosticList } from "./diagnostic-list";
 import { DiagnosticsPage } from "./diagnostics-page";
 
-const mocks = vi.hoisted(() => ({ create: vi.fn(), search: vi.fn(), assign: vi.fn(), citizen: vi.fn(), professional: vi.fn(), trends: vi.fn(), me: vi.fn(), auth: vi.fn() }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), search: vi.fn(), assign: vi.fn(), citizen: vi.fn(), professional: vi.fn(), trends: vi.fn(), me: vi.fn(), auth: vi.fn(), catalog: vi.fn(), sessions: vi.fn() }));
 vi.mock("@/lib/diagnostics/api", () => ({ createDiagnosticTest: mocks.create, listDiagnosticTechnicians: mocks.search, assignDiagnosticTest: mocks.assign, listCitizenDiagnostics: mocks.citizen, listProfessionalDiagnostics: mocks.professional, transitionDiagnosticTest: vi.fn() }));
 vi.mock("@/lib/diagnostics/report-api", () => ({ listLabTrends: mocks.trends }));
+vi.mock("@/lib/diagnostics/session-api", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/diagnostics/session-api")>(), getTestCatalog: mocks.catalog, getLabSessions: mocks.sessions,
+}));
 vi.mock("@/lib/professional/api", () => ({ loadProfessionalMe: mocks.me }));
 vi.mock("@/components/auth/auth-provider", () => ({ usePortalAuth: mocks.auth }));
 
@@ -17,17 +20,24 @@ const testRecord = {
 };
 
 describe("Diagnostic safety and assignment", () => {
-  beforeEach(() => { vi.clearAllMocks(); mocks.search.mockResolvedValue([]); mocks.trends.mockResolvedValue([]); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.search.mockResolvedValue([]);
+    mocks.trends.mockResolvedValue([]);
+    mocks.sessions.mockResolvedValue([]);
+    mocks.catalog.mockResolvedValue([{ code: "CBC", name: "Complete blood count", aliases: ["CBC"] }]);
+  });
 
   it("keeps failed requests and binds submission to the displayed visit", async () => {
     mocks.create.mockRejectedValue(new Error("Consultation changed"));
     const onEditStateChange = vi.fn();
     render(<DiagnosticRequestPanel visitId="visit-1" onEditStateChange={onEditStateChange} />);
     fireEvent.change(screen.getByLabelText("Test name"), { target: { value: "CBC" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Complete blood count" }));
     fireEvent.click(screen.getByRole("button", { name: "Request test" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Consultation changed");
-    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ visit_id: "visit-1", test_name: "CBC" }));
-    expect(screen.getByLabelText("Test name")).toHaveValue("CBC");
+    expect(mocks.create).toHaveBeenCalledWith({ visit_id: "visit-1", catalog_code: "CBC", instructions: null });
+    expect(screen.getByText("Complete blood count")).toBeInTheDocument();
     await waitFor(() => expect(onEditStateChange).toHaveBeenLastCalledWith({ dirty: true, saving: false }));
   });
 
@@ -36,8 +46,9 @@ describe("Diagnostic safety and assignment", () => {
     mocks.create.mockReturnValue(new Promise(r => { resolve = r; }));
     render(<DiagnosticRequestPanel visitId="visit-1" onEditStateChange={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("Test name"), { target: { value: "CBC" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Complete blood count" }));
     fireEvent.click(screen.getByRole("button", { name: "Request test" }));
-    expect(screen.getByLabelText("Test name")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Change test" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Requesting…" }));
     expect(mocks.create).toHaveBeenCalledTimes(1);
     await act(async () => resolve({}));

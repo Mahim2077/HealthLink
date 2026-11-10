@@ -24,6 +24,7 @@ from app.visits import models as visit_models  # noqa: F401
 from app.prescriptions import models as prescription_models  # noqa: F401
 from app.diagnostics import models as diagnostic_models  # noqa: F401
 from app.diagnostics import report_models  # noqa: F401
+from app.diagnostics import session_models  # noqa: F401
 
 
 config = context.config

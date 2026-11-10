@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePortalAuth } from "@/components/auth/auth-provider";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import { listCitizenDiagnostics, listProfessionalDiagnostics, transitionDiagnosticTest } from "@/lib/diagnostics/api";
 import { loadProfessionalMe } from "@/lib/professional/api";
 import type { ProfessionalMe } from "@/lib/professional/types";
+import type { TestChoice } from "@/lib/diagnostics/session-api";
 import { CitizenDiagnosticTrends } from "./citizen-lab-reports";
 import { DiagnosticList } from "./diagnostic-list";
+import { DiagnosticSessions } from "./diagnostic-sessions";
 
 function ProfessionalDiagnostics() {
   const [me, setMe] = useState<ProfessionalMe | null>(null);
@@ -26,18 +28,29 @@ function ProfessionalDiagnostics() {
   if (me.verification_status !== "VERIFIED" || !["DOCTOR", "LAB_TECHNICIAN"].includes(me.role_code)) {
     return <EmptyState title="Diagnostics unavailable" message="A verified Doctor or Lab Technician role is required." />;
   }
-  return <DiagnosticList loadAction={listProfessionalDiagnostics} role={me.role_code === "LAB_TECHNICIAN" ? "lab" : "doctor"} transitionAction={transitionDiagnosticTest} />;
+  if (me.role_code === "DOCTOR") return <DiagnosticList loadAction={listProfessionalDiagnostics} role="doctor" transitionAction={transitionDiagnosticTest} />;
+  return <div className="space-y-8">
+    <DiagnosticSessions lab />
+    <details><summary className="min-h-11 cursor-pointer font-semibold">Previously assigned diagnostic tests</summary>
+      <DiagnosticList loadAction={listProfessionalDiagnostics} role="lab" transitionAction={transitionDiagnosticTest} />
+    </details>
+  </div>;
 }
 
 function CitizenDiagnostics() {
+  const [selection, setSelection] = useState<TestChoice | null>(null);
+  const [requestRevision, setRequestRevision] = useState(0);
+  const refreshRequests = useCallback(() => setRequestRevision(value => value + 1), []);
   return <div className="space-y-12">
     <section aria-labelledby="diagnostic-requests-heading" className="space-y-5">
       <div>
         <h2 className="text-2xl font-bold text-slate-950" id="diagnostic-requests-heading">Requests and results</h2>
-        <p className="mt-2 text-sm text-slate-600">Follow each request from submission to completion and open finalized results directly from the completed test.</p>
+        <p className="mt-2 text-sm text-slate-600">Follow requests from your doctor and open finalized results.</p>
+        <a href="#diagnostic-new" className="inline-flex min-h-11 items-center text-sm font-semibold text-sky-800 underline">Request a test</a>
       </div>
-      <DiagnosticList loadAction={listCitizenDiagnostics} role="citizen" />
+      <DiagnosticList loadAction={listCitizenDiagnostics} role="citizen" onStart={setSelection} refreshKey={requestRevision} />
     </section>
+    <DiagnosticSessions selection={selection} onSelection={setSelection} onRefresh={refreshRequests} />
     <CitizenDiagnosticTrends />
   </div>;
 }

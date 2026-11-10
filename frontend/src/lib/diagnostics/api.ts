@@ -10,6 +10,7 @@ export const listDiagnosticTechnicians = (search = "", context?: { test_id?: str
   if (context?.visit_id) params.set("visit_id", context.visit_id);
   return apiClient.get<TechnicianChoice[]>(`professionals/diagnostic-technicians?${params}`);
 };
-export const createDiagnosticTest = (payload: { visit_id: string; test_name: string; instructions?: string | null; assigned_to_role_registration_id?: string | null }) => apiClient.post<DiagnosticTest, typeof payload>("professionals/current-patient/diagnostic-tests", payload);
+export const createDiagnosticTest = (payload: { visit_id: string; catalog_code: string; instructions?: string | null }) =>
+  apiClient.post<DiagnosticTest, typeof payload>("professionals/current-patient/diagnostic-tests", payload);
 export const assignDiagnosticTest = (id: string, assignee: string | null) => apiClient.put<DiagnosticTest, { assigned_to_role_registration_id: string | null }>(`professionals/me/diagnostic-tests/${id}/assignment`, { assigned_to_role_registration_id: assignee });
 export const transitionDiagnosticTest = (id: string, status: DiagnosticStatus) => apiClient.post<DiagnosticTest>(`professionals/me/diagnostic-tests/${id}/transitions/${status}`);

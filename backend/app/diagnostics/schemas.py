@@ -12,7 +12,8 @@ from app.diagnostics.models import DiagnosticTestStatus
 class DiagnosticTestCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     visit_id: uuid.UUID
-    test_name: Annotated[str, Field(min_length=1, max_length=255)]
+    test_name: Annotated[str, Field(min_length=1, max_length=255)] | None = None
+    catalog_code: Annotated[str, Field(min_length=1, max_length=40)] | None = None
     instructions: str | None = None
     assigned_to_role_registration_id: uuid.UUID | None = None
 
@@ -38,6 +39,8 @@ class DiagnosticTestView(BaseModel):
     facility_id: uuid.UUID | None
     facility_name: str | None
     test_name: str
+    catalog_code: str | None = None
+    result_session_id: uuid.UUID | None = None
     instructions: str | None
     status: DiagnosticTestStatus
     requested_by_name: str

@@ -10,7 +10,9 @@ from app.auth.dependencies import AuthContext, get_current_auth_context
 from app.clinical_audit.service import AuditService
 from app.core.exceptions import HealthLinkError
 from app.db.session import get_db
+from app.diagnostics.catalog import test_name
 from app.diagnostics.report_models import LabReport
+from app.diagnostics.session_models import DiagnosticPdf, LabSession
 from app.emergency.service import EmergencyProfileService
 from app.prescriptions.models import Prescription
 from app.visits.models import MedicalVisit
@@ -31,19 +33,24 @@ def history(citizen_id: UUID, auth: Auth, db: Database,
     if record_type in (None, "VISIT"):
         statements.append(select(MedicalVisit.id.label("id"), literal("VISIT").label("resource_type"),
             literal("Medical visit").label("title"), MedicalVisit.finalized_at.label("occurred_at"),
-            MedicalVisit.chief_complaint.label("summary"), cast(literal(None), String).label("detail_id"))
+            MedicalVisit.chief_complaint.label("summary"), cast(literal(None), String).label("detail_id"), literal(False).label("is_pdf"))
             .where(MedicalVisit.citizen_id == citizen_id, MedicalVisit.status == "FINALIZED", MedicalVisit.finalized_at.is_not(None)))
     if record_type in (None, "PRESCRIPTION"):
         statements.append(select(Prescription.id.label("id"), literal("PRESCRIPTION").label("resource_type"),
             literal("Prescription").label("title"), Prescription.created_at.label("occurred_at"),
-            Prescription.diagnostic_information.label("summary"), cast(Prescription.id, String).label("detail_id"))
+            Prescription.diagnostic_information.label("summary"), cast(Prescription.id, String).label("detail_id"), literal(False).label("is_pdf"))
             .join(MedicalVisit, MedicalVisit.id == Prescription.visit_id).where(Prescription.citizen_id == citizen_id,
                 MedicalVisit.status == "FINALIZED", MedicalVisit.finalized_at.is_not(None)))
     if record_type in (None, "LAB_REPORT"):
         statements.append(select(LabReport.id.label("id"), literal("LAB_REPORT").label("resource_type"),
             literal("Lab report").label("title"), LabReport.finalized_at.label("occurred_at"),
-            LabReport.summary.label("summary"), cast(LabReport.diagnostic_test_id, String).label("detail_id"))
+            LabReport.summary.label("summary"), cast(LabReport.diagnostic_test_id, String).label("detail_id"), literal(False).label("is_pdf"))
             .where(LabReport.citizen_id == citizen_id, LabReport.status == "FINALIZED", LabReport.finalized_at.is_not(None)))
+        statements.append(select(LabSession.id.label("id"), literal("LAB_REPORT").label("resource_type"),
+            literal("Diagnostic report PDF").label("title"), DiagnosticPdf.tested_at.label("occurred_at"),
+            DiagnosticPdf.catalog_code.label("summary"), cast(LabSession.id, String).label("detail_id"), literal(True).label("is_pdf"))
+            .join(DiagnosticPdf, (DiagnosticPdf.session_id == LabSession.id) & (DiagnosticPdf.version == LabSession.current_report_version))
+            .where(LabSession.citizen_id == citizen_id))
     combined = union_all(*statements).subquery()
     rows = db.execute(select(combined).order_by(combined.c.occurred_at.desc(), combined.c.resource_type, combined.c.id)
         .offset((page - 1) * 20).limit(21)).mappings().all()
@@ -52,8 +59,12 @@ def history(citizen_id: UUID, auth: Auth, db: Database,
         resource = row["resource_type"]
         detail_id = str(UUID(row["detail_id"])) if row["detail_id"] else None
         url = f"/professional/prescriptions/{detail_id}" if resource == "PRESCRIPTION" else f"/professional/diagnostics/{detail_id}/report" if resource == "LAB_REPORT" else None
-        records.append({"id": row["id"], "resource_type": resource, "title": row["title"],
-                        "occurred_at": row["occurred_at"], "summary": row["summary"], "detail_url": url})
+        title, summary = row["title"], row["summary"]
+        if row["is_pdf"]:
+            url = f"/professional/diagnostics/{detail_id}/pdf"
+            title, summary = test_name(summary), None
+        records.append({"id": row["id"], "resource_type": resource, "title": title,
+                        "occurred_at": row["occurred_at"], "summary": summary, "detail_url": url})
     AuditService(db).record(auth=auth, citizen_id=citizen_id, resource_type=record_type or "MEDICAL_HISTORY", access_source=decision.source)
     return {"records": records, "page": page, "has_next": len(rows) > 20}
 

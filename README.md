@@ -91,6 +91,8 @@ Set-Location backend
 
 The API health check is available at `http://localhost:8000/health`.
 
+Diagnostic PDF uploads use format and size checks by default. To require malware screening, configure `DIAGNOSTIC_CLAMAV_HOST` and `DIAGNOSTIC_CLAMAV_PORT` for a private ClamAV daemon reachable from the backend. Once a host is configured, uploads require a clean scan result. Keep the scanner on a private network because the backend sends the original report for screening.
+
 ## Frontend quick start
 
 ```powershell

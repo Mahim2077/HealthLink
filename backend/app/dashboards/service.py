@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -6,8 +6,12 @@ from sqlalchemy.orm import Session
 from app.appointments.models import Appointment, AppointmentQueueEntry, DoctorPracticeSession
 from app.clinical_audit.service import AuditService
 from app.dashboards.schemas import AdminOverview, ChamberOverview, CitizenOverview, ProfessionalOverview, RecentPrescription, RecentReport, UpcomingAppointment
+from app.diagnostics.catalog import test_name
 from app.diagnostics.models import DiagnosticTest
 from app.diagnostics.report_models import LabReport
+from app.diagnostics.repository import qualifying_lab_sessions
+from app.diagnostics.session_models import DiagnosticPdf, LabSession
+from app.diagnostics.session_service import utc
 from app.emergency.models import EmergencyProfile
 from app.facilities.models import HealthcareFacility
 from app.prescriptions.models import Prescription
@@ -45,12 +49,20 @@ class DashboardService:
             .join(DiagnosticTest, DiagnosticTest.id == LabReport.diagnostic_test_id)
             .where(LabReport.citizen_id == citizen_id, DiagnosticTest.citizen_id == citizen_id, LabReport.status == "FINALIZED")
             .order_by(LabReport.report_date.desc(), LabReport.finalized_at.desc(), LabReport.id.desc()).limit(1)).first()
+        latest_report = RecentReport(diagnostic_test_id=report[0].diagnostic_test_id, test_name=report[1], report_date=report[0].report_date) if report else None
+        pdf = self.db.execute(select(LabSession.id, DiagnosticPdf.catalog_code, DiagnosticPdf.tested_at)
+            .join(DiagnosticPdf, (DiagnosticPdf.session_id == LabSession.id) & (DiagnosticPdf.version == LabSession.current_report_version))
+            .where(LabSession.citizen_id == citizen_id).order_by(DiagnosticPdf.tested_at.desc(), LabSession.id).limit(1)).first()
+        if pdf:
+            report_date = utc(pdf.tested_at).astimezone(ZoneInfo("Asia/Dhaka")).date()
+            if latest_report is None or report_date >= latest_report.report_date:
+                latest_report = RecentReport(diagnostic_test_id=pdf.id, test_name=test_name(pdf.catalog_code), report_date=report_date, is_pdf=True)
         updated = self.db.scalar(select(EmergencyProfile.updated_at).where(EmergencyProfile.citizen_id == citizen_id))
         result = CitizenOverview(today=today,
             upcoming_appointment=UpcomingAppointment(id=upcoming[0].id, appointment_date=upcoming[0].appointment_date,
                 serial_number=upcoming[0].serial_number, facility_name=upcoming[1]) if upcoming else None,
             recent_prescription=RecentPrescription.model_validate(prescription, from_attributes=True) if prescription else None,
-            latest_report=RecentReport(diagnostic_test_id=report[0].diagnostic_test_id, test_name=report[1], report_date=report[0].report_date) if report else None,
+            latest_report=latest_report,
             active_reminders=self._count(MedicineReminder, MedicineReminder.citizen_id == citizen_id,
                 MedicineReminder.is_active.is_(True), MedicineReminder.start_date <= today,
                 or_(MedicineReminder.end_date.is_(None), MedicineReminder.end_date >= today)),
@@ -100,11 +112,23 @@ class DashboardService:
                 *scope, LabReport.created_by_role_registration_id == registration.id,
                 LabReport.facility_id == registration.facility_id, LabReport.status == status)
             return self.db.scalar(select(func.count()).select_from(bounded.subquery())) or 0
+        requested_scope = scope
+        if doctor:
+            has_result = qualifying_lab_sessions(DiagnosticTest.citizen_id, DiagnosticTest.catalog_code, DiagnosticTest.created_at).correlate(DiagnosticTest).exists()
+            requested_scope = [*scope, ~has_result]
+        requested = self._count(DiagnosticTest, *requested_scope, DiagnosticTest.status == "REQUESTED")
+        working = self._count(DiagnosticTest, *scope, DiagnosticTest.status == "IN_PROGRESS")
+        drafts, finalized = (0, 0) if doctor else (report_count("DRAFT"), report_count("FINALIZED"))
+        if not doctor and facility and facility.is_active:
+            assigned = (LabSession.technician_id == registration.id, LabSession.facility_id == facility.id)
+            requested += self._count(LabSession, *assigned, LabSession.status == "ACCEPTED", LabSession.attendance_deadline > datetime.now(UTC))
+            working += self._count(LabSession, *assigned, LabSession.status.in_(("CHECKED_IN", "COLLECTED", "PERFORMED")))
+            drafts += self.db.scalar(select(func.count()).select_from(DiagnosticPdf).join(LabSession)
+                .where(*assigned, DiagnosticPdf.published_at.is_(None), LabSession.status.in_(("PERFORMED", "PUBLISHED")))) or 0
+            finalized += self._count(LabSession, *assigned, LabSession.current_report_version.is_not(None))
         return ProfessionalOverview(today=today, role_code=registration.role.code, chambers=chambers, chambers_has_more=has_more,
-            requested_tests=self._count(DiagnosticTest, *scope, DiagnosticTest.status == "REQUESTED"),
-            in_progress_tests=self._count(DiagnosticTest, *scope, DiagnosticTest.status == "IN_PROGRESS"),
-            draft_reports=report_count("DRAFT") if not doctor else 0,
-            finalized_reports=report_count("FINALIZED") if not doctor else 0, recent_prescription=recent)
+            requested_tests=requested, in_progress_tests=working, draft_reports=drafts,
+            finalized_reports=finalized, recent_prescription=recent)
 
     def admin(self):
         return AdminOverview(

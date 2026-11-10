@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import { assignDiagnosticTest } from "@/lib/diagnostics/api";
 import type { DiagnosticStatus, DiagnosticTest, DiagnosticTestList } from "@/lib/diagnostics/types";
+import type { TestChoice } from "@/lib/diagnostics/session-api";
 import { TechnicianSelector } from "./technician-selector";
 
 function AssignmentEditor({ test, onSaved, disabled }: {
@@ -34,10 +35,12 @@ function AssignmentEditor({ test, onSaved, disabled }: {
   </div>;
 }
 
-export function DiagnosticList({ loadAction, transitionAction, role }: {
+export function DiagnosticList({ loadAction, transitionAction, role, onStart, refreshKey }: {
   loadAction: (page?: number) => Promise<DiagnosticTestList>;
   transitionAction?: (id: string, status: DiagnosticStatus) => Promise<unknown>;
   role: "citizen" | "doctor" | "lab";
+  onStart?: (choice: TestChoice) => void;
+  refreshKey?: number;
 }) {
   const [data, setData] = useState<DiagnosticTestList | null>(null);
   const [error, setError] = useState("");
@@ -51,7 +54,7 @@ export function DiagnosticList({ loadAction, transitionAction, role }: {
     void loadAction(page).then(value => { if (active) { setData(value); setError(""); } },
       reason => { if (active) setError(reason instanceof Error ? reason.message : "Unable to load diagnostic tests"); });
     return () => { active = false; };
-  }, [loadAction, version, page]);
+  }, [loadAction, version, page, refreshKey]);
   const transition = async (id: string, status: DiagnosticStatus) => {
     if (!transitionAction || inFlight.current) return;
     if (status === "CANCELLED" && !window.confirm("Cancel this diagnostic request?")) return;
@@ -72,15 +75,18 @@ export function DiagnosticList({ loadAction, transitionAction, role }: {
           <h2 className="text-lg font-bold text-slate-950">{test.test_name}</h2>
           <p className="mt-1 text-sm text-slate-600">Requested by Dr {test.requested_by_name}{test.facility_name ? " · " + test.facility_name : ""}</p>
           {test.instructions ? <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{test.instructions}</p> : null}
-          <p className="mt-2 text-xs text-slate-500">Assigned to: {test.assigned_to_name ?? "Not assigned"}</p>
+          {!test.catalog_code && <p className="mt-2 text-xs text-slate-500">Assigned to: {test.assigned_to_name ?? "Not assigned"}</p>}
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{test.status.replace("_", " ")}</span>
       </div>
       {role === "lab" && transitionAction && test.status === "REQUESTED" ? <button type="button" className="mt-4 min-h-11 rounded-xl bg-sky-700 px-4 text-sm font-bold text-white disabled:opacity-50" disabled={Boolean(pending)} onClick={() => void transition(test.id, "IN_PROGRESS")}>Begin work</button> : null}
       {role === "lab" && ["IN_PROGRESS", "COMPLETED"].includes(test.status) ? <Link className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-sky-700 px-4 text-sm font-bold text-white" href={`/professional/diagnostics/${test.id}/report`}>Open lab report</Link> : null}
-      {role === "citizen" && test.status === "COMPLETED" ? <Link className="mt-4 inline-flex min-h-11 items-center text-sm font-bold text-sky-800 underline" href={`/citizen/diagnostic-tests/${test.id}`}>View results</Link> : null}
+      {role === "citizen" && test.status === "COMPLETED" ? <Link className="mt-4 inline-flex min-h-11 items-center text-sm font-bold text-sky-800 underline" href={test.result_session_id ? `/citizen/diagnostic-tests/${test.result_session_id}/pdf` : `/citizen/diagnostic-tests/${test.id}`}>View results</Link> : null}
+      {role === "citizen" && test.status === "REQUESTED" && test.catalog_code && onStart ? <a href="#diagnostic-new" className="mt-4 inline-flex min-h-11 items-center text-sm font-bold text-sky-800 underline" onClick={() => {
+        if (test.catalog_code) onStart({ code: test.catalog_code, name: test.test_name, aliases: [] });
+      }}>Use this test</a> : null}
       {role === "doctor" && test.status === "REQUESTED" ? <>
-        <AssignmentEditor test={test} disabled={Boolean(pending)} onSaved={updated => setData(current => current ? { ...current, tests: current.tests.map(item => item.id === updated.id ? updated : item) } : current)} />
+        {!test.catalog_code && <AssignmentEditor test={test} disabled={Boolean(pending)} onSaved={updated => setData(current => current ? { ...current, tests: current.tests.map(item => item.id === updated.id ? updated : item) } : current)} />}
         {transitionAction ? <button type="button" className="mt-4 min-h-11 rounded-xl border border-rose-200 px-4 text-sm font-bold text-rose-700 disabled:opacity-50" disabled={Boolean(pending)} onClick={() => void transition(test.id, "CANCELLED")}>Cancel request</button> : null}
       </> : null}
     </article>)}

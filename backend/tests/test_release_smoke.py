@@ -45,7 +45,7 @@ def test_stable_frontend_health_and_anonymous_denials(monkeypatch):
 
     monkeypatch.setattr(smoke, "urlopen", request)
     smoke.smoke(ORIGIN, attempts=1)
-    assert len(seen) == len(set(seen)) == 9
+    assert len(seen) == len(set(seen)) == 12
 
 
 @pytest.mark.parametrize("path,body", [("/health", b'{"status":"healthy","environment":"test"}'), ("/health", b'[]'), ("/", b"error page"), ("/", b"x" * (smoke.MAX_RESPONSE_BYTES + 1))], ids=["wrong-environment", "invalid-health-shape", "error-page", "oversized-body"])
@@ -79,7 +79,7 @@ def test_protected_staging_uses_existing_cli_identity_without_secret_arguments(m
         return subprocess.CompletedProcess(args, 0, body + f"\nHEALTHLINK_SMOKE_META:{status}:{ORIGIN}{path}".encode())
     monkeypatch.setattr(smoke.subprocess, "run", run)
     smoke.smoke(ORIGIN, attempts=1, vercel_auth=True)
-    assert len(seen) == 9
+    assert len(seen) == 12
 
 
 @pytest.mark.parametrize("output", [b"", b"secret-cli-output", b"\nHEALTHLINK_SMOKE_META:bad:url", b"\nHEALTHLINK_SMOKE_META:0:url", b"x" * (smoke.MAX_RESPONSE_BYTES + 1) + f"\nHEALTHLINK_SMOKE_META:200:{ORIGIN}/health".encode()], ids=["empty", "missing-metadata", "bad-status", "zero-status", "oversized"])

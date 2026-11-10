@@ -20,6 +20,7 @@ class RecentReport(BaseModel):
     diagnostic_test_id: uuid.UUID
     test_name: str
     report_date: date
+    is_pdf: bool = False
 
 
 class CitizenOverview(BaseModel):

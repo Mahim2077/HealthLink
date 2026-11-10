@@ -6,7 +6,7 @@ import { accessTokenStore } from "@/lib/auth/token-store";
 import type { AppointmentListResponse } from "@/lib/appointments/types";
 import type { Portal } from "@/lib/auth/types";
 
-import { AppointmentsView } from "./page";
+import { AppointmentsView } from "./appointments-view";
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),

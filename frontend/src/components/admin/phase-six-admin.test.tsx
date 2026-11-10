@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/components/admin/admin-portal-guard", () => ({ AdminPortalGuard: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock("@/lib/admin/api", () => ({
+  loadAdminMe: vi.fn().mockResolvedValue({ is_super_admin: false }),
   confirmFacilityLocation: mocks.confirmFacilityLocation, createFacility: mocks.createFacility, loadFacilities: mocks.loadFacilities,
   loadProfessionalRegistration: mocks.loadRegistration,
   loadProfessionalRegistrations: mocks.loadRegistrations,

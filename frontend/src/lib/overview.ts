@@ -7,7 +7,7 @@ export type CitizenOverview = {
   today: string;
   upcoming_appointment: { id: string; appointment_date: string; facility_name: string; serial_number: number } | null;
   recent_prescription: RecentPrescription | null;
-  latest_report: { diagnostic_test_id: string; test_name: string; report_date: string } | null;
+  latest_report: { diagnostic_test_id: string; test_name: string; report_date: string; is_pdf?: boolean } | null;
   active_reminders: number;
   unread_notifications: number;
   emergency_profile_updated_at: string | null;

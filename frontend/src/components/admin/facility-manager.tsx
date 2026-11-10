@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 
 import { AdminPortalGuard } from "@/components/admin/admin-portal-guard";
 import { AdminSectionHeader } from "@/components/admin/admin-section-header";
+import { LabSessionRecovery } from "@/components/admin/lab-session-recovery";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-state";
 import { confirmFacilityLocation, createFacility, loadFacilities, updateFacility } from "@/lib/admin/api";
 import type { Facility, FacilityType, FacilityWriteRequest } from "@/lib/admin/types";
@@ -138,6 +139,7 @@ function FacilityManagerContent() {
         <div className="grid gap-4">{visibleFacilities?.map((facility) => <article className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-sm" key={facility.id}><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold text-slate-950">{facility.name}</h2><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${facility.is_active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{facility.is_active ? "Active" : "Inactive"}</span><span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${facility.location_status === "CONFIRMED" ? "bg-sky-50 text-sky-800" : "bg-amber-50 text-amber-800"}`}>{facility.location_status === "CONFIRMED" ? <CheckBadgeIcon aria-hidden="true" className="size-4" /> : <MapPinIcon aria-hidden="true" className="size-4" />}{facility.location_status === "CONFIRMED" ? "Location confirmed" : "Needs location confirmation"}</span></div><p className="mt-2 text-sm text-slate-600">{facility.facility_type.replaceAll("_", " ")} · {areaLabel(facility)}</p><p className="mt-1 text-sm text-slate-600">{facility.address}</p>{facility.registration_number ? <p className="mt-1 text-xs text-slate-500">Registration: {facility.registration_number}</p> : null}{facility.location_matched_address ? <p className="mt-2 text-xs leading-5 text-slate-500">Matched address: {facility.location_matched_address}</p> : null}</div><div className="flex shrink-0 flex-wrap gap-2"><button className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-bold text-slate-700" onClick={() => edit(facility)} type="button">Edit</button>{facility.location_status === "PENDING" && facility.district_code && facility.upazila_code ? <button className="min-h-11 rounded-xl bg-indigo-700 px-4 text-sm font-bold text-white disabled:opacity-60" disabled={confirmingId === facility.id} onClick={() => void confirmLocation(facility)} type="button">{confirmingId === facility.id ? "Matching…" : "Confirm location"}</button> : null}</div></div></article>)}</div>
       </section>
     </div>
+    {facilities && <LabSessionRecovery facilities={facilities} />}
   </main>;
 }
 
