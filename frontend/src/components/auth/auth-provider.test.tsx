@@ -2,8 +2,15 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { accessTokenStore } from "@/lib/auth/token-store";
+import { refreshSession } from "@/lib/auth/actions";
 
 import { AuthProvider, usePortalAuth } from "./auth-provider";
+
+vi.mock("@/lib/auth/actions", () => ({
+  logout: vi.fn(),
+  logoutAll: vi.fn(),
+  refreshSession: vi.fn(),
+}));
 
 function createCitizenToken(expiresInSeconds = 600): string {
   const issuedAt = Math.floor(Date.now() / 1000);
@@ -51,6 +58,7 @@ function AuthProbe() {
 describe("AuthProvider", () => {
   beforeEach(() => {
     accessTokenStore.clear();
+    vi.mocked(refreshSession).mockReset().mockResolvedValue("test");
   });
 
   afterEach(() => {
@@ -106,5 +114,20 @@ describe("AuthProvider", () => {
     expect(screen.getByText("unauthenticated")).toBeInTheDocument();
 
     unmount();
+  });
+
+  it("refreshes a visible session before access-token expiry", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2030-01-01T00:00:00.000Z"));
+    vi.mocked(refreshSession).mockImplementation(async () => {
+      const token = createCitizenToken();
+      accessTokenStore.set(token);
+      return token;
+    });
+    accessTokenStore.set(createCitizenToken(5));
+    render(<AuthProvider><AuthProbe /></AuthProvider>);
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+    expect(refreshSession).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("authenticated")).toBeInTheDocument();
   });
 });

@@ -10,7 +10,7 @@ import { loadProfessionalMe, loginProfessional, onboardProfessional, registerPro
 describe("Professional API", () => {
   beforeEach(() => { mocks.get.mockReset(); mocks.post.mockReset(); mocks.replaceSession.mockReset(); });
 
-  it("registers a new professional without attaching or refreshing auth", async () => {
+  it("establishes a pending professional's new session", async () => {
     const request = {
       additional_info: "Experienced physician",
       bmdc_registration_number: "BMDC-1",
@@ -23,9 +23,12 @@ describe("Professional API", () => {
       password: "StrongPassword123!",
       role_code: "DOCTOR" as const,
     };
-    mocks.post.mockResolvedValue({ verification_status: "PENDING" });
+    const response = { access_token: "new-professional-token", verification_status: "PENDING" };
+    mocks.post.mockResolvedValue(response);
+    mocks.replaceSession.mockImplementation(async (issue: () => Promise<unknown>) => issue());
 
-    await registerProfessional(request);
+    await expect(registerProfessional(request)).resolves.toEqual(response);
+    expect(mocks.replaceSession).toHaveBeenCalledOnce();
 
     expect(mocks.post).toHaveBeenCalledWith(
       "auth/professional/register",

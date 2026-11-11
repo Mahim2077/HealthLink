@@ -75,6 +75,9 @@ def test_signup_requires_email_proof_and_preserves_portal_rules(client, db_sessi
     assert client.post(url, json={**payload, **proof, "code": wrong}).status_code == 400
     result = client.post(url, json={**payload, **proof})
     assert result.status_code == 201, result.text
+    assert result.json()["portal"] == portal
+    assert "HttpOnly" in result.headers["set-cookie"]
+    assert client.post(f"{BASE}/refresh").json()["portal"] == portal
     if portal == "PROFESSIONAL":
         assert result.json()["verification_status"] == "PENDING"
     assert db_session.get(User, uuid.UUID(result.json()["user_id"])).email_verified_at is not None

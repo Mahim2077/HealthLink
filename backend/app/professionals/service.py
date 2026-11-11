@@ -3,9 +3,11 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.admins.models import AdminAccount
 from app.auth.models import User
 from app.auth.constants import Portal
 from app.auth.email_codes import EmailCodeService
@@ -28,6 +30,7 @@ from app.professionals.schemas import (
     ProfessionalRegistrationRequest,
     ProfessionalLoginRequest,
 )
+from app.reminders.inbox import record_notice
 
 
 _DUMMY_PROFESSIONAL_PASSWORD_HASH = (
@@ -116,6 +119,17 @@ class ProfessionalService:
                     qualification=request.qualification,
                 )
             )
+        reviewers = list(self.db.scalars(
+            select(AdminAccount.user_id).join(User).where(
+                AdminAccount.is_active.is_(True), User.is_active.is_(True),
+            ).order_by(AdminAccount.user_id)
+        ))
+        for reviewer_id in reviewers:
+            record_notice(
+                self.db, portal=Portal.ADMIN, user_id=reviewer_id, kind="VERIFICATION",
+                message=f"A {role.name} application is ready for review.",
+                dedupe_key=f"application:{registration.id}:{reviewer_id}",
+            )
         return SubmittedProfessionalApplication(
             user=user,
             profile=profile,
@@ -125,7 +139,7 @@ class ProfessionalService:
 
     def register_new(
         self, request: ProfessionalRegistrationRequest
-    ) -> SubmittedProfessionalApplication:
+    ) -> tuple[SubmittedProfessionalApplication, IssuedTokens]:
         email = str(request.email).strip().lower()
         nid_number = request.nid_number.strip()
         if self.repository.get_nid_by_number(nid_number) is not None:
@@ -159,11 +173,16 @@ class ProfessionalService:
                 role=role,
                 request=request,
             )
+            tokens = AuthService(self.db, self.settings).create_session(
+                user.id, Portal.PROFESSIONAL,
+                active_professional_role_registration_id=result.registration.id,
+                commit=False,
+            )
             self.db.commit()
             self.db.refresh(result.user)
             self.db.refresh(result.profile)
             self.db.refresh(result.registration)
-            return result
+            return result, tokens
         except IntegrityError as error:
             self.db.rollback()
             raise ProfessionalConflictError(

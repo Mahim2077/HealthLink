@@ -31,11 +31,11 @@ export function AccessHistoryPanel() {
       {item.access_source ? <p className="mt-1 text-sm">Access through {readable(item.access_source)}</p> : null}
       <time dateTime={item.created_at} className="mt-2 block text-sm text-slate-600">{new Date(item.created_at).toLocaleString("en-GB", { timeZone: "Asia/Dhaka" })} (Dhaka)</time>
     </article>) : <EmptyState title="No access activity" message="Recorded access to your medical information will appear here." />}
-    <nav aria-label="Access history pages" className="flex items-center gap-4">
+    {page > 1 || data.has_next ? <nav aria-label="Access history pages" className="flex items-center gap-4">
       <button className="min-h-11 rounded-xl border px-4 disabled:opacity-50" disabled={page === 1} onClick={() => { setData(null); setPage(p => p - 1); }}>Previous</button>
       <span>Page {page}</span>
       <button className="min-h-11 rounded-xl border px-4 disabled:opacity-50" disabled={!data.has_next} onClick={() => { setData(null); setPage(p => p + 1); }}>Next</button>
-    </nav>
+    </nav> : null}
   </div>;
 }
 

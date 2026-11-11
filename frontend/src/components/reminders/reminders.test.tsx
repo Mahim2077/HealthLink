@@ -2,29 +2,30 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReminderForm } from "./reminder-form";
 import { RemindersPage, RemindersWorkspace } from "./reminders-page";
+import { InboxPage, InboxWorkspace } from "./inbox-page";
 import * as api from "@/lib/reminders/api";
 
 const auth = vi.hoisted(() => ({ status: "authenticated", isRequiredPortal: true, claims: { sid: "citizen-session" }, refreshSession: vi.fn() }));
 vi.mock("@/components/auth/auth-provider", () => ({ usePortalAuth: () => auth }));
-vi.mock("@/lib/reminders/api", () => ({ listPrescriptionChoices: vi.fn(), saveReminder: vi.fn(), listReminders: vi.fn(), listNotifications: vi.fn(), setReminderActive: vi.fn(), markNotification: vi.fn() }));
+vi.mock("@/lib/reminders/api", () => ({ listPrescriptionChoices: vi.fn(), saveReminder: vi.fn(), listReminders: vi.fn(), listNotifications: vi.fn(), syncInbox: vi.fn(), setReminderActive: vi.fn(), markNotification: vi.fn() }));
 
 const reminder: api.Reminder = { id: "reminder", medicine: "Medicine A", prescription_item_id: null, start_date: "2026-09-12", end_date: null, timezone: "Asia/Dhaka", is_active: true, times: ["08:00:00"] };
 beforeEach(() => {
   vi.clearAllMocks(); auth.isRequiredPortal = true;
   vi.mocked(api.listPrescriptionChoices).mockResolvedValue([]);
-  vi.mocked(api.listReminders).mockResolvedValue([reminder]);
-  vi.mocked(api.listNotifications).mockResolvedValue([]);
+  vi.mocked(api.listReminders).mockResolvedValue({ items: [reminder], has_more: false });
+  vi.mocked(api.listNotifications).mockResolvedValue({ items: [], next_cursor: null, unread_count: 0 });
+  vi.mocked(api.syncInbox).mockResolvedValue({ unread_count: 0 });
 });
 
 describe("reminders", () => {
-  it("does not promise automatic delivery for saved or active schedules", async () => {
-    render(<RemindersWorkspace />);
-    expect(await screen.findByText(/Saving or activating a schedule does not send alerts/)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Saved medicine schedules" })).toBeInTheDocument();
-    expect(screen.getByText(/Saved schedules do not generate automatic notifications/)).toBeInTheDocument();
+  it("explains in-app delivery and hides pagination for a single set of schedules", async () => {
+    render(<RemindersPage />);
+    expect(await screen.findByRole("heading", { name: "Medicine schedules" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open inbox" })).toHaveAttribute("href", "/citizen/inbox");
+    expect(screen.queryByRole("button", { name: "Load more schedules" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Create reminder" }));
-    expect(screen.getByText(/This saves a schedule for reference only/)).toHaveTextContent(/automatic reminder delivery is not enabled/);
-    expect(screen.queryByText(/may arrive late|Changes apply to future reminders/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Active schedules create in-app reminders/)).toBeInTheDocument();
   });
   it("preserves a failed draft and submits separate daily times", async () => {
     vi.mocked(api.saveReminder).mockRejectedValue(new Error("Connection unavailable"));
@@ -58,15 +59,13 @@ describe("reminders", () => {
     expect(screen.getByLabelText("Medicine")).toHaveAttribute("readonly");
   });
 
-  it("toggles active reminders and acknowledges notices separately", async () => {
-    vi.mocked(api.listNotifications).mockResolvedValue([{ id: "notice", kind: "MEDICINE", message: "Medicine A reminder", due_at: "2026-09-12T02:00:00Z", read_at: null, acknowledged_at: null }]);
+  it("toggles active reminders without loading inbox history", async () => {
     vi.mocked(api.setReminderActive).mockResolvedValue({ ...reminder, is_active: false });
     render(<RemindersWorkspace />);
     fireEvent.click(await screen.findByRole("button", { name: "Deactivate" }));
     await waitFor(() => expect(api.setReminderActive).toHaveBeenCalledWith("reminder", false));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Acknowledge" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "Acknowledge" }));
-    await waitFor(() => expect(api.markNotification).toHaveBeenCalledWith("notice", "acknowledge"));
+    expect(await screen.findByRole("button", { name: "Activate" })).toBeEnabled();
+    expect(api.listNotifications).not.toHaveBeenCalled();
   });
 
   it("does not fetch reminders for another portal", () => {
@@ -74,5 +73,33 @@ describe("reminders", () => {
     render(<RemindersPage />);
     expect(screen.getByText("Citizen portal required")).toBeInTheDocument();
     expect(api.listReminders).not.toHaveBeenCalled();
+  });
+});
+
+describe("inbox", () => {
+  it("shows persisted notices and acknowledges a medicine reminder", async () => {
+    const date = "2026-09-12T02:00:00Z";
+    const item: api.ReminderNotification = {
+      id: "notice", kind: "MEDICINE", message: "Medicine A reminder", due_at: date,
+      read_at: null, acknowledged_at: null,
+    };
+    vi.mocked(api.listNotifications).mockResolvedValue({ items: [item], next_cursor: null, unread_count: 1 });
+    vi.mocked(api.markNotification).mockResolvedValue({
+      item: { ...item, read_at: date, acknowledged_at: date }, unread_count: 0,
+    });
+    render(<InboxWorkspace portal="CITIZEN" />);
+    expect(await screen.findByText("Medicine A reminder")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Load older notices" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Acknowledge reminder" }));
+    expect(await screen.findByText("Acknowledged")).toBeInTheDocument();
+    expect(screen.getByText("0 unread")).toBeInTheDocument();
+    expect(api.markNotification).toHaveBeenCalledWith("notice", "acknowledge");
+  });
+
+  it("does not load another portal's inbox", () => {
+    auth.isRequiredPortal = false;
+    render(<InboxPage portal="ADMIN" />);
+    expect(screen.getByText("Portal access required")).toBeInTheDocument();
+    expect(api.syncInbox).not.toHaveBeenCalled();
   });
 });

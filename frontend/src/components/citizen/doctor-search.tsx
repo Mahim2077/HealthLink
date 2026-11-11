@@ -312,7 +312,7 @@ function SearchContent({ searchAction }: { searchAction: (filters: DoctorSearchF
       {!loading && !error && results?.items.length === 0 ? <div className="p-6"><EmptyState message={resultFilters.sort === "NEAREST" ? "No confirmed facility was found near this location. Try another area or choose Best match." : "Try another specialty, day, facility, or a broader search."} title="No matching doctors" /></div> : null}
       {!loading && !error ? results?.items.map((doctor) => <DoctorResult doctor={doctor} key={doctor.id} />) : null}
     </section>
-    {results && results.total > 0 ? <nav aria-label="Doctor results pages" className="mt-4 flex flex-wrap items-center justify-between gap-3">
+    {results && (resultOffset > 0 || results.total > resultLimit) ? <nav aria-label="Doctor results pages" className="mt-4 flex flex-wrap items-center justify-between gap-3">
       <button className="min-h-11 rounded-xl border border-slate-300 px-5 text-sm font-bold text-slate-700 disabled:opacity-40" disabled={loading || Boolean(error) || resultOffset === 0} onClick={() => changePage(Math.max(0, resultOffset - resultLimit))} type="button">Previous</button>
       <p aria-live="polite" className="text-sm text-slate-600">Page {Math.floor(resultOffset / resultLimit) + 1} · Showing {results.items.length ? resultOffset + 1 : 0}–{results.items.length ? resultOffset + results.items.length : 0} of {results.total}</p>
       <button className="min-h-11 rounded-xl border border-slate-300 px-5 text-sm font-bold text-slate-700 disabled:opacity-40" disabled={loading || Boolean(error) || !results.items.length || resultOffset + resultLimit >= results.total} onClick={() => changePage(resultOffset + resultLimit)} type="button">Next</button>

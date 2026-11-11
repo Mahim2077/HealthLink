@@ -90,10 +90,10 @@ export function DiagnosticList({ loadAction, transitionAction, role, onStart, re
         {transitionAction ? <button type="button" className="mt-4 min-h-11 rounded-xl border border-rose-200 px-4 text-sm font-bold text-rose-700 disabled:opacity-50" disabled={Boolean(pending)} onClick={() => void transition(test.id, "CANCELLED")}>Cancel request</button> : null}
       </> : null}
     </article>)}
-    <nav aria-label="Diagnostic test pages" className="flex flex-wrap items-center justify-between gap-3">
+    {page > 1 || data.has_next ? <nav aria-label="Diagnostic test pages" className="flex flex-wrap items-center justify-between gap-3">
       <button type="button" className="min-h-11 rounded-xl border border-slate-200 px-4 font-bold disabled:opacity-50" disabled={page === 1 || Boolean(pending)} onClick={() => changePage(page - 1)}>Previous page</button>
       <span className="text-sm text-slate-600">Page {page}</span>
       <button type="button" className="min-h-11 rounded-xl border border-slate-200 px-4 font-bold disabled:opacity-50" disabled={!data.has_next || Boolean(pending)} onClick={() => changePage(page + 1)}>Next page</button>
-    </nav>
+    </nav> : null}
   </div>;
 }

@@ -85,7 +85,8 @@ def test_concurrent_refresh_allows_exactly_one_same_row_rotation(
             assert stored.refresh_token_hash == hash_refresh_token(winning_token)
             assert stored.revoked_at is None
             assert stored.last_used_at is not None
-            assert as_utc(stored.expires_at) == original_expiry
+            assert as_utc(stored.expires_at) > original_expiry
+            assert as_utc(stored.expires_at) == as_utc(stored.last_used_at) + timedelta(days=test_settings.refresh_token_expire_days)
     finally:
         with engine.begin() as connection:
             connection.execute(delete(AuthSession).where(AuthSession.user_id == user_id))

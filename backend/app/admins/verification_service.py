@@ -11,10 +11,12 @@ from app.admins.verification_schemas import (
     ProfessionalRegistrationSummary,
 )
 from app.auth.service import utc_now
+from app.auth.constants import Portal
 from app.core.exceptions import HealthLinkError
 from app.facilities.repository import FacilityRepository
 from app.professionals.constants import VerificationStatus
 from app.professionals.models import ProfessionalRoleRegistration
+from app.reminders.inbox import record_notice
 
 
 class ProfessionalRegistrationNotFoundError(HealthLinkError):
@@ -171,4 +173,10 @@ class ProfessionalVerificationService:
                 target_resource_id=registration.id,
                 reason=reason,
             )
+        )
+        status = "verified" if action_type == "PROFESSIONAL_VERIFY" else "rejected"
+        record_notice(
+            self.db, portal=Portal.PROFESSIONAL, user_id=registration.professional.user_id,
+            kind="VERIFICATION", message=f"Your {registration.role.name} application was {status}. View your application status for details.",
+            dedupe_key=f"application-decision:{registration.id}:{status}",
         )

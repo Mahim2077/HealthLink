@@ -35,11 +35,14 @@ from app.appointments.schemas import (
     ChamberSessionFinishResponse,
     ChamberSessionView,
 )
+from app.auth.constants import Portal
 from app.core.config import Settings
 from app.core.exceptions import HealthLinkError
 from app.doctors.models import PracticeWeekday
 from app.facilities.models import HealthcareFacility
 from app.professionals.dependencies import ProfessionalAuthContext
+from app.professionals.models import HealthcareProfessionalProfile, ProfessionalRoleRegistration
+from app.reminders.inbox import record_notice
 from app.visits.models import MedicalVisit, VisitStatus
 from app.visits.repository import VisitsRepository
 
@@ -252,6 +255,16 @@ class AppointmentService:
         self.repository.add_queue_entry(queue_entry)
 
         try:
+            record_notice(
+                self.db, citizen_id=citizen.id, kind="APPOINTMENT",
+                message=f"Your appointment at {facility.name} on {appointment.appointment_date} is booked. Your serial is {appointment.serial_number}.",
+                dedupe_key=f"booking:{appointment.id}:citizen",
+            )
+            record_notice(
+                self.db, portal=Portal.PROFESSIONAL, user_id=request.doctor_user_id, kind="APPOINTMENT",
+                message=f"A new appointment was booked for {appointment.appointment_date}, serial {appointment.serial_number}.",
+                dedupe_key=f"booking:{appointment.id}:professional",
+            )
             self.db.commit()
         except IntegrityError as error:
             self.db.rollback()
@@ -448,6 +461,15 @@ class AppointmentService:
         locked.queue_entry.queue_status = QueueStatus.CANCELLED.value
         locked.queue_entry.removed_at = now
         try:
+            doctor_user_id = self.db.scalar(
+                select(HealthcareProfessionalProfile.user_id).join(ProfessionalRoleRegistration)
+                .where(ProfessionalRoleRegistration.id == locked.appointment.doctor_role_registration_id)
+            )
+            record_notice(
+                self.db, portal=Portal.PROFESSIONAL, user_id=doctor_user_id, kind="APPOINTMENT",
+                message=f"Appointment serial {appointment.serial_number} for {appointment.appointment_date} was cancelled.",
+                dedupe_key=f"booking-cancelled:{appointment.id}",
+            )
             self.db.commit()
         except IntegrityError as error:
             self.db.rollback()

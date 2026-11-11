@@ -5,6 +5,9 @@ import { ApiError } from "@/lib/api/errors";
 
 import { ProfessionalApplicationForm } from "./professional-application-form";
 
+const replace = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
+
 const response = {
   professional_id: "professional-1",
   role_code: "DOCTOR" as const,
@@ -36,7 +39,7 @@ function fillNewAccount() {
 }
 
 describe("ProfessionalApplicationForm", () => {
-  it("submits a complete doctor application with BM&DC and PENDING success", async () => {
+  it("submits a complete doctor application and opens the application status", async () => {
     const registerAction = vi.fn().mockResolvedValue(response);
     render(<ProfessionalApplicationForm mode="new" registerAction={registerAction} />);
     fillNewAccount();
@@ -58,8 +61,7 @@ describe("ProfessionalApplicationForm", () => {
       role_code: "DOCTOR",
       specialization: "PEDIATRICS",
     });
-    expect(await screen.findByRole("heading", { name: /application is pending/ })).toBeInTheDocument();
-    expect(screen.getByText("PENDING")).toBeInTheDocument();
+    expect(replace).toHaveBeenCalledWith("/professional/status");
   });
 
   it("dynamically removes and clears BM&DC for a non-doctor role", async () => {

@@ -17,7 +17,7 @@ def test_phase_seven_active_role_migration_and_fk() -> None:
     assert scripts.get_revision("0020_medical_visits") is not None
     assert scripts.get_revision("0023_prescription_documents") is not None
     # Later phases append migrations; only require the latest one here.
-    assert scripts.get_heads() == ["0033_diagnostic_sessions"]
+    assert scripts.get_heads() == ["0034_account_inbox"]
     column = Base.metadata.tables["auth_sessions"].c.active_professional_role_registration_id
     assert column.nullable is True
     assert {fk.target_fullname for fk in column.foreign_keys} == {

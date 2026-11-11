@@ -49,7 +49,7 @@ export function CitizenCareOverview({ load = loadCitizenOverview }: { load?: () 
         { title: "Medical history", value: "Your clinical timeline", detail: "Review finalized visits and prescriptions.", href: "/citizen/medical-history" },
         { title: "Privacy & access", value: "You control sharing", detail: "Review record access and manage scoped grants.", href: "/citizen/privacy" },
         { title: "AI assistant", value: "Understand your records", detail: "Educational explanations only—not diagnosis or prescriptions.", href: "/citizen/ai-assistant" },
-        { title: "Saved reminders", value: `${data.active_reminders} active today`, detail: `${data.unread_notifications} unread notifications. Automatic reminder delivery is not enabled.`, href: "/citizen/reminders" },
+        { title: "Reminders", value: `${data.active_reminders} active today`, detail: "Due reminders appear in your inbox.", href: "/citizen/reminders" },
       ]} />
     </>;
   }}</OverviewLoader>;

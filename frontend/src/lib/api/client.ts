@@ -3,10 +3,35 @@
 import { API_BASE_URL, joinApiUrl } from "./config";
 import { ApiError } from "./errors";
 import { requestAccessTokenRefresh } from "@/lib/auth/refresh";
+import { decodeAccessTokenClaims } from "@/lib/auth/portal";
 import {
   AccessTokenStore,
   accessTokenStore,
 } from "@/lib/auth/token-store";
+
+const SESSION_CHANNEL = "healthlink:session";
+let browserSessionChannel: BroadcastChannel | undefined;
+
+async function withBrowserSessionLock<T>(run: () => Promise<T>): Promise<T> {
+  return typeof navigator !== "undefined" && navigator.locks
+    ? navigator.locks.request(SESSION_CHANNEL, run)
+    : run();
+}
+
+function sessionChannel(): BroadcastChannel | undefined {
+  if (typeof window === "undefined" || !window.BroadcastChannel) return;
+  browserSessionChannel ??= new window.BroadcastChannel(SESSION_CHANNEL);
+  return browserSessionChannel;
+}
+
+export function subscribeToSessionChanges(listener: () => void): () => void {
+  const channel = sessionChannel();
+  const onMessage = (event: MessageEvent) => {
+    if (event.data === "changed") listener();
+  };
+  channel?.addEventListener("message", onMessage);
+  return () => channel?.removeEventListener("message", onMessage);
+}
 
 function isRefreshEndpoint(path: string): boolean {
   const pathWithoutQuery = path.split(/[?#]/, 1)[0];
@@ -142,19 +167,21 @@ export class ApiClient {
           headers,
           retryOnUnauthorized: false,
         });
+        sessionChannel()?.postMessage("changed");
       } finally {
         this.tokenStore.clear();
       }
     });
   }
 
-  async replaceSession(
-    issueSession: () => Promise<string>,
-  ): Promise<string> {
+  async replaceSession<T extends string | { access_token: string }>(
+    issueSession: () => Promise<T>,
+  ): Promise<T> {
     return this.withSessionMutationBarrier(async () => {
-      const accessToken = await issueSession();
-      this.tokenStore.set(accessToken);
-      return accessToken;
+      const result = await issueSession();
+      this.tokenStore.set(typeof result === "string" ? result : result.access_token);
+      sessionChannel()?.postMessage("changed");
+      return result;
     });
   }
 
@@ -207,11 +234,18 @@ export class ApiClient {
 
       if (currentToken !== tokenUsed) {
         if (currentToken !== null) {
-          return this.execute<TResponse>(path, options, false);
+          const previousSession = tokenUsed && decodeAccessTokenClaims(tokenUsed)?.sid;
+          const currentSession = decodeAccessTokenClaims(currentToken)?.sid;
+          if (!previousSession || previousSession === currentSession) {
+            return this.execute<TResponse>(path, options, false);
+          }
         }
       } else if (!isRefreshEndpoint(path)) {
-        await this.refreshOnce();
-        return this.execute<TResponse>(path, options, false);
+        const refreshedToken = await this.refreshOnce();
+        const previousSession = tokenUsed && decodeAccessTokenClaims(tokenUsed)?.sid;
+        if (!previousSession || previousSession === decodeAccessTokenClaims(refreshedToken)?.sid) {
+          return this.execute<TResponse>(path, options, false);
+        }
       }
     }
 
@@ -242,7 +276,7 @@ export class ApiClient {
     if (this.refreshPromise === null) {
       const refreshGeneration = this.tokenStore.getGeneration();
 
-      this.refreshPromise = this.refreshAccessTokenHandler()
+      this.refreshPromise = withBrowserSessionLock(this.refreshAccessTokenHandler)
         .then((accessToken) => {
           if (
             this.tokenStore.setIfGeneration(refreshGeneration, accessToken)
@@ -267,7 +301,9 @@ export class ApiClient {
             throw error;
           }
 
-          this.tokenStore.clearIfGeneration(refreshGeneration);
+          if (error instanceof ApiError && error.status === 401) {
+            this.tokenStore.clearIfGeneration(refreshGeneration);
+          }
           throw error;
         })
         .finally(() => {
@@ -302,7 +338,7 @@ export class ApiClient {
         }
       }
 
-      return await mutation();
+      return await withBrowserSessionLock(mutation);
     } finally {
       this.pendingSessionMutations -= 1;
       releaseMutation();

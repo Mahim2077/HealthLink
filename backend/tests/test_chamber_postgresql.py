@@ -23,6 +23,7 @@ from app.appointments.models import (
 from app.appointments.service import AppointmentService
 from app.doctors.models import DoctorPracticeSchedule, PracticeScheduleStatus
 from app.auth.models import AuthSession, User
+from app.reminders.models import Notification
 from app.citizens.models import CitizenProfile, UserNationalIdentifier
 from app.core.config import Settings
 from app.db.base import Base
@@ -317,6 +318,9 @@ def _cleanup(
             citizen_profile_ids = select(CitizenProfile.id).where(
                 CitizenProfile.user_id.in_(user_ids)
             )
+            connection.execute(delete(Notification).where(
+                Notification.user_id.in_(user_ids) | Notification.citizen_id.in_(citizen_profile_ids)
+            ))
             from app.clinical_audit.models import MedicalRecordAccessLog
             connection.execute(delete(MedicalRecordAccessLog).where(
                 MedicalRecordAccessLog.citizen_id.in_(citizen_profile_ids.scalar_subquery())

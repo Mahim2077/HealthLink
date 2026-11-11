@@ -223,11 +223,11 @@ export function MedicalHistoryTimeline({
               <HistoryEventCard event={event} key={event.id} portal={portal} query={query} />
             ))}
           </div>
-          <nav aria-label="Medical history pages" className="flex items-center justify-between border-t border-slate-200 pt-4">
+          {result.page > 1 || result.has_next ? <nav aria-label="Medical history pages" className="flex items-center justify-between border-t border-slate-200 pt-4">
             <button className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-bold text-slate-700 disabled:opacity-40" disabled={result.page <= 1} onClick={() => { setResult(null); setError(null); setQuery((current) => ({ ...current, page: Math.max(1, (current.page ?? 1) - 1) })); }} type="button">Previous</button>
             <span className="text-sm font-semibold text-slate-600">Page {result.page}</span>
             <button className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-bold text-slate-700 disabled:opacity-40" disabled={!result.has_next} onClick={() => { setResult(null); setError(null); setQuery((current) => ({ ...current, page: (current.page ?? 1) + 1 })); }} type="button">Next</button>
-          </nav>
+          </nav> : null}
         </>
       )}
     </section>

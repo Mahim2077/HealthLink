@@ -3,6 +3,7 @@
 import { apiClient } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { replaceSession } from "@/lib/auth/actions";
+import type { AccessTokenResponse } from "@/lib/auth/types";
 
 import type {
   ProfessionalApplicationResponse,
@@ -16,13 +17,13 @@ import type {
 export async function registerProfessional(
   request: ProfessionalRegistrationRequest,
 ): Promise<ProfessionalApplicationResponse> {
-  return apiClient.post<
-    ProfessionalApplicationResponse,
+  return replaceSession(() => apiClient.post<
+    ProfessionalApplicationResponse & AccessTokenResponse,
     ProfessionalRegistrationRequest
   >("auth/professional/register", request, {
     auth: false,
     retryOnUnauthorized: false,
-  });
+  }));
 }
 
 export async function onboardProfessional(

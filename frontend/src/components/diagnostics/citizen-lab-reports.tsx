@@ -41,12 +41,12 @@ export function CitizenDiagnosticTrends() {
       <p className="mt-2 text-sm text-slate-600">Finalized numeric results in chronological order, grouped by parameter and exact unit. These tables do not interpret results or establish a diagnosis.</p>
     </div>
     {error ? <ErrorState title="Result trends unavailable" message={error} onAction={() => { setData(null); setError(""); setVersion(v => v + 1); }} /> : !data ? <LoadingState label="Loading result trends" /> : <div className="space-y-5">
-      {!data.length ? <EmptyState title="No numeric results" message="Finalized numeric diagnostic results will appear here." /> : <LabTrendTables points={data} />}
-      <nav aria-label="Result trend pages" className="flex items-center gap-4">
+      {!data.length ? <EmptyState title="No numeric results" message="Finalized numeric diagnostic results will appear here." /> : <LabTrendTables points={data.slice(0, 100)} />}
+      {page > 1 || data.length > 100 ? <nav aria-label="Result trend pages" className="flex items-center gap-4">
       <button className="min-h-11 rounded-xl border px-4 disabled:opacity-50" disabled={page === 1} onClick={() => { setData(null); setPage(p => p - 1); }}>Previous</button>
       <span>Page {page}</span>
-        <button className="min-h-11 rounded-xl border px-4 disabled:opacity-50" disabled={data.length < 100} onClick={() => { setData(null); setPage(p => p + 1); }}>Next</button>
-      </nav>
+        <button className="min-h-11 rounded-xl border px-4 disabled:opacity-50" disabled={data.length <= 100} onClick={() => { setData(null); setPage(p => p + 1); }}>Next</button>
+      </nav> : null}
     </div>}
   </section>;
 }

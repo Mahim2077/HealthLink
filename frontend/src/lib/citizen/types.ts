@@ -27,7 +27,7 @@ export type CitizenRegistrationRequest = CitizenRegistrationBaseRequest &
       }
   );
 
-export type CitizenRegistrationResponse = {
+export type CitizenRegistrationResponse = AccessTokenResponse & {
   user_id: string;
   citizen_id: string;
   email: string;

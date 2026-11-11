@@ -65,7 +65,8 @@ def test_nid_registration_is_transactional_and_hashes_password(
     assert national_identifier.nid_number == "1234567890"
     assert verify_password("StrongPassword123!", registered.user.password_hash)
     assert registered.user.password_hash != "StrongPassword123!"
-    assert db_session.scalar(select(func.count()).select_from(AuthSession)) == 0
+    session = db_session.get(AuthSession, registered.tokens.session_id)
+    assert session is not None and session.user_id == registered.user.id
 
 
 def test_bcn_registration_uses_citizen_only_identity_storage(
@@ -294,7 +295,7 @@ def test_login_always_performs_exactly_one_argon2_verification(
         citizen.user.password_hash,
         profileless.password_hash,
     ]
-    assert db_session.scalar(select(func.count()).select_from(AuthSession)) == 1
+    assert db_session.scalar(select(func.count()).select_from(AuthSession)) == 2
 
 
 def test_login_dummy_hash_is_a_valid_precomputed_argon2id_hash() -> None:

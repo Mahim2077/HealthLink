@@ -91,7 +91,12 @@ def test_new_doctor_registration_creates_pending_application_transactionally(
     assert response.json()["verification_status"] == "PENDING"
     assert "nid_number" not in response.json()
     assert "bmdc_registration_number" not in response.json()
-    assert not client.cookies
+    assert "HttpOnly" in response.headers["set-cookie"]
+    token = response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    assert client.get("/api/v1/professionals/me", headers=headers).json()["verification_status"] == "PENDING"
+    assert client.get("/api/v1/professionals/me/practice-schedule", headers=headers).status_code == 403
+    assert client.post("/api/v1/auth/refresh").json()["portal"] == "PROFESSIONAL"
     user = db_session.get(User, uuid.UUID(response.json()["user_id"]))
     assert user is not None
     assert user.email == "doctor@example.com"
@@ -113,7 +118,7 @@ def test_new_doctor_registration_creates_pending_application_transactionally(
             == registration.id
         )
     ).bmdc_registration_number == "BMDC-0001"
-    assert db_session.scalar(select(func.count()).select_from(AuthSession)) == 0
+    assert db_session.scalar(select(func.count()).select_from(AuthSession)) == 1
 
 
 def test_non_doctor_registration_has_no_bmdc_detail(

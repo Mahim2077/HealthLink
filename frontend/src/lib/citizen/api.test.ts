@@ -35,7 +35,7 @@ describe("Citizen API", () => {
     apiMocks.replaceSession.mockReset();
   });
 
-  it("registers without creating an authenticated session", async () => {
+  it("establishes the new session through the shared replacement barrier", async () => {
     const request = {
       date_of_birth: "1990-01-02",
       email: "citizen@example.com",
@@ -46,6 +46,10 @@ describe("Citizen API", () => {
       password: "secure-pass",
     };
     const response = {
+      access_token: "new-citizen-token",
+      expires_in: 1800,
+      portal: "CITIZEN",
+      token_type: "bearer",
       citizen_id: "citizen-1",
       created_at: "2026-08-10T00:00:00Z",
       email: request.email,
@@ -55,6 +59,7 @@ describe("Citizen API", () => {
       user_id: "user-1",
     };
     apiMocks.post.mockResolvedValue(response);
+    apiMocks.replaceSession.mockImplementation(async (issueSession: () => Promise<unknown>) => issueSession());
 
     await expect(registerCitizen(request)).resolves.toEqual(response);
     expect(apiMocks.post).toHaveBeenCalledWith(
@@ -62,7 +67,7 @@ describe("Citizen API", () => {
       request,
       { auth: false, retryOnUnauthorized: false },
     );
-    expect(apiMocks.replaceSession).not.toHaveBeenCalled();
+    expect(apiMocks.replaceSession).toHaveBeenCalledOnce();
   });
 
   it("serializes citizen login through session replacement", async () => {

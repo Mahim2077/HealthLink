@@ -14,8 +14,8 @@ export async function logoutAll(): Promise<void> {
   await apiClient.terminateSession("auth/logout-all");
 }
 
-export async function replaceSession(
-  issueSession: () => Promise<string>,
-): Promise<string> {
+export async function replaceSession<T extends string | { access_token: string }>(
+  issueSession: () => Promise<T>,
+): Promise<T> {
   return apiClient.replaceSession(issueSession);
 }

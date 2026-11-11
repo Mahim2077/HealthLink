@@ -123,8 +123,8 @@ class LabReportService:
         rows = self.db.execute(select(LabReport, DiagnosticTest).join(DiagnosticTest, DiagnosticTest.id == LabReport.diagnostic_test_id).where(LabReport.citizen_id == citizen_id, LabReport.status == "FINALIZED").order_by(LabReport.report_date.desc(), LabReport.id.desc()).offset((page - 1) * 20).limit(20)).all()
         return [self.view(report, test) for report, test in rows]
 
-    def trends(self, citizen_id, page: int):
-        rows = self.db.execute(select(LabReport, LabReportItem).join(LabReportItem, LabReportItem.lab_report_id == LabReport.id).where(LabReport.citizen_id == citizen_id, LabReport.status == "FINALIZED", LabReportItem.result_value_numeric.is_not(None)).order_by(LabReport.report_date, LabReport.id, LabReportItem.id).offset((page - 1) * 100).limit(100)).all()
+    def trends(self, citizen_id, page: int, *, include_next: bool = False):
+        rows = self.db.execute(select(LabReport, LabReportItem).join(LabReportItem, LabReportItem.lab_report_id == LabReport.id).where(LabReport.citizen_id == citizen_id, LabReport.status == "FINALIZED", LabReportItem.result_value_numeric.is_not(None)).order_by(LabReport.report_date, LabReport.id, LabReportItem.id).offset((page - 1) * 100).limit(101 if include_next else 100)).all()
         return [LabTrendPoint(report_id=report.id, report_date=report.report_date, parameter_name=item.parameter_name, value=item.result_value_numeric, unit=item.unit) for report, item in rows]
 
     def view(self, report, test):

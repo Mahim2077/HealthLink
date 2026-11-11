@@ -111,6 +111,10 @@ class ProfessionalLoginRequest(BaseModel):
         return value
 
 
+class ProfessionalRegistrationResponse(ProfessionalApplicationResponse, TokenResponse):
+    pass
+
+
 class ProfessionalLoginResponse(TokenResponse):
     role_registration_id: uuid.UUID
     role_code: ProfessionalRoleCode

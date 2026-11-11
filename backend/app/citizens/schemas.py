@@ -14,6 +14,7 @@ from pydantic import (
     model_validator,
 )
 
+from app.auth.schemas import TokenResponse
 from app.citizens.constants import CitizenRegistrationMethod
 
 
@@ -120,7 +121,7 @@ class CitizenAddNidRequest(BaseModel):
         return value
 
 
-class CitizenRegistrationResponse(BaseModel):
+class CitizenRegistrationResponse(TokenResponse):
     user_id: uuid.UUID
     citizen_id: uuid.UUID
     email: EmailStr

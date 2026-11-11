@@ -37,11 +37,19 @@ class MedicineReminderTime(Base):
 class Notification(Base):
     __tablename__ = "notifications"
     __table_args__ = (
-        CheckConstraint("kind IN ('MEDICINE','APPOINTMENT')", name="valid_kind"),
+        CheckConstraint("kind IN ('MEDICINE','APPOINTMENT','DIAGNOSTIC','VERIFICATION')", name="valid_kind"),
+        CheckConstraint(
+            "(portal = 'CITIZEN' AND citizen_id IS NOT NULL AND user_id IS NULL) OR "
+            "(portal IN ('PROFESSIONAL','ADMIN') AND citizen_id IS NULL AND user_id IS NOT NULL)",
+            name="valid_recipient",
+        ),
         Index("ix_notifications_citizen_due", "citizen_id", "due_at"),
+        Index("ix_notifications_user_portal_due", "user_id", "portal", "due_at"),
     )
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    citizen_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("citizen_profiles.id", ondelete="RESTRICT"))
+    citizen_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("citizen_profiles.id", ondelete="RESTRICT"))
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    portal: Mapped[str] = mapped_column(String(20), server_default="CITIZEN")
     dedupe_key: Mapped[str] = mapped_column(String(200), unique=True)
     kind: Mapped[str] = mapped_column(String(20))
     message: Mapped[str] = mapped_column(String(1000))

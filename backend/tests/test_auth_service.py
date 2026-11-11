@@ -32,7 +32,7 @@ def test_create_session_stores_only_refresh_hash_and_issues_access_token(
     assert claims.portal is Portal.CITIZEN
 
 
-def test_refresh_rotates_hash_in_same_locked_row_and_preserves_expiry(
+def test_refresh_rotates_hash_in_same_locked_row_and_renews_expiry(
     db_session: Session,
     test_settings: Settings,
     user_factory: Callable[..., User],
@@ -54,8 +54,9 @@ def test_refresh_rotates_hash_in_same_locked_row_and_preserves_expiry(
     assert stored_session.last_used_at is not None
     assert stored_session.revoked_at is None
     assert rotated.portal is Portal.ADMIN
-    assert as_utc(stored_session.expires_at) == original_expiry
-    assert as_utc(rotated.refresh_token_expires_at) == original_expiry
+    expected = refresh_time + timedelta(days=test_settings.refresh_token_expire_days)
+    assert as_utc(stored_session.expires_at) == expected > original_expiry
+    assert as_utc(rotated.refresh_token_expires_at) == expected
 
 
 def test_rotated_refresh_token_cannot_be_replayed(

@@ -156,15 +156,13 @@ describe("CitizenDashboard", () => {
 
     const refreshedToken = createToken("CITIZEN", 1800);
     let resolveRefresh!: () => void;
-    testMocks.refreshSession.mockImplementation(
-      () =>
-        new Promise<string>((resolve) => {
-          resolveRefresh = () => {
-            accessTokenStore.set(refreshedToken);
-            resolve(refreshedToken);
-          };
-        }),
-    );
+    const pending = new Promise<string>((resolve) => {
+      resolveRefresh = () => {
+        accessTokenStore.set(refreshedToken);
+        resolve(refreshedToken);
+      };
+    });
+    testMocks.refreshSession.mockReturnValue(pending);
     renderDashboard();
     await act(async () => {
       await Promise.resolve();
@@ -178,7 +176,7 @@ describe("CitizenDashboard", () => {
       screen.getByText("Checking your Citizen session"),
     ).toBeInTheDocument();
     expect(screen.queryByText("Sign in to continue")).not.toBeInTheDocument();
-    expect(testMocks.refreshSession).toHaveBeenCalledOnce();
+    expect(testMocks.refreshSession).toHaveBeenCalledTimes(2);
 
     await act(async () => resolveRefresh());
     expect(screen.getByText("Welcome, Amina.")).toBeInTheDocument();

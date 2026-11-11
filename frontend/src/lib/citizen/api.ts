@@ -19,13 +19,13 @@ import type {
 export async function registerCitizen(
   request: CitizenRegistrationRequest,
 ): Promise<CitizenRegistrationResponse> {
-  return apiClient.post<
+  return replaceSession(() => apiClient.post<
     CitizenRegistrationResponse,
     CitizenRegistrationRequest
   >("auth/citizen/register", request, {
     auth: false,
     retryOnUnauthorized: false,
-  });
+  }));
 }
 
 export async function loginCitizen(

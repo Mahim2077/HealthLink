@@ -6,17 +6,68 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.orm import Session
 
+from app.admins.service import AdminService
+from app.auth.constants import Portal
+from app.auth.dependencies import AuthContext, get_current_auth_context, get_request_settings
 from app.citizens.dependencies import CitizenContext, get_current_citizen
+from app.professionals.dependencies import get_current_professional_context
 from app.core.config import Settings, get_settings
 from app.core.exceptions import HealthLinkError
 from app.db.session import get_db
-from app.reminders.schemas import ActiveInput, NotificationView, PrescriptionChoice, ReminderInput, ReminderView
+from app.reminders.inbox import InboxService
+from app.reminders.schemas import ActiveInput, InboxPage, InboxUpdate, NotificationView, PrescriptionChoice, ReminderInput, ReminderView, SchedulesPage
 from app.reminders.service import ReminderService
 
 router = APIRouter(tags=["reminders"])
 Citizen = Annotated[CitizenContext, Depends(get_current_citizen)]
 Database = Annotated[Session, Depends(get_db)]
 Page = Annotated[int, Query(ge=1, le=10000)]
+
+
+@router.get("/citizens/me/reminder-schedules", response_model=SchedulesPage)
+def list_schedules(citizen: Citizen, db: Database, page: Page = 1):
+    return ReminderService(db).schedules_page(citizen.profile.id, page)
+
+
+def current_inbox(
+    auth: Annotated[AuthContext, Depends(get_current_auth_context)],
+    db: Database,
+    settings: Annotated[Settings, Depends(get_request_settings)],
+) -> InboxService:
+    if auth.portal == Portal.CITIZEN:
+        recipient_id = get_current_citizen(auth, db).profile.id
+    else:
+        if auth.portal == Portal.ADMIN:
+            AdminService(db, settings).require_active_admin(auth.user.id)
+        else:
+            get_current_professional_context(auth, db)
+        recipient_id = auth.user.id
+    return InboxService(db, auth.portal, recipient_id)
+
+
+Inbox = Annotated[InboxService, Depends(current_inbox)]
+
+
+@router.get("/me/inbox", response_model=InboxPage)
+def list_inbox(inbox: Inbox, before: uuid.UUID | None = None):
+    return inbox.page(before)
+
+
+@router.post("/me/inbox/sync")
+def sync_inbox(inbox: Inbox, db: Database):
+    if inbox.portal == Portal.CITIZEN:
+        ReminderService(db).run_due_reminders(datetime.now(UTC), citizen_id=inbox.recipient_id)
+    return {"unread_count": inbox.unread_count()}
+
+
+@router.post("/me/inbox/{notification_id}/read", response_model=InboxUpdate)
+def mark_inbox_read(notification_id: uuid.UUID, inbox: Inbox):
+    return InboxUpdate(item=inbox.mark(notification_id), unread_count=inbox.unread_count())
+
+
+@router.post("/me/inbox/{notification_id}/acknowledge", response_model=InboxUpdate)
+def acknowledge_inbox_item(notification_id: uuid.UUID, inbox: Inbox):
+    return InboxUpdate(item=inbox.mark(notification_id, acknowledge=True), unread_count=inbox.unread_count())
 
 
 @router.get("/citizens/me/reminders", response_model=list[ReminderView])

@@ -20,6 +20,7 @@ from app.diagnostics.session_models import DiagnosticPdf, LabSession, LabSession
 from app.diagnostics.session_schemas import AcceptLabSession, CloseReason, CreateLabSession, LabSessionView
 from app.facilities.models import HealthcareFacility
 from app.professionals.models import ProfessionalRoleRegistration
+from app.reminders.inbox import record_notice
 
 
 ACTIVE = {Status.ACCEPTED, Status.CHECKED_IN, Status.COLLECTED, Status.PERFORMED}
@@ -162,6 +163,11 @@ class LabSessionService:
         item.attendance_deadline = utc(payload.attendance_deadline)
         item.status = Status.ACCEPTED
         item.share_code = None
+        record_notice(
+            self.db, citizen_id=item.citizen_id, kind="DIAGNOSTIC",
+            message=f"{facility.name} accepted your {test_name(item.catalog_code)} session. Open Diagnostic tests for attendance details.",
+            dedupe_key=f"diagnostic-accepted:{item.id}",
+        )
         self._commit(item, auth, "ACCEPT")
         return self.view(item, lab=True)
 
@@ -199,6 +205,11 @@ class LabSessionService:
             self.db.delete(draft)
         item.status = Status.UNABLE
         item.closed_reason = reason
+        record_notice(
+            self.db, citizen_id=item.citizen_id, kind="DIAGNOSTIC",
+            message=f"Your {test_name(item.catalog_code)} session was closed. Open Diagnostic tests for details.",
+            dedupe_key=f"diagnostic-closed:{item.id}",
+        )
         self._commit(item, auth, "CLOSE")
         return self.view(item, lab=actor is not None)
 
@@ -246,6 +257,11 @@ class LabSessionService:
         draft.published_at = datetime.now(UTC)
         item.current_report_version = version
         item.status = Status.PUBLISHED
+        record_notice(
+            self.db, citizen_id=item.citizen_id, kind="DIAGNOSTIC",
+            message=f"Your {test_name(draft.catalog_code)} report is available in Diagnostic tests.",
+            dedupe_key=f"diagnostic-published:{item.id}:{version}",
+        )
         self._commit(item, auth, "PUBLISH")
         return self.view(item, lab=True)
 
@@ -259,6 +275,11 @@ class LabSessionService:
         draft = self._draft(item)
         if draft:
             self.db.delete(draft)
+        record_notice(
+            self.db, citizen_id=item.citizen_id, kind="DIAGNOSTIC",
+            message="A diagnostic report was withdrawn. Open Diagnostic tests for the current status.",
+            dedupe_key=f"diagnostic-withdrawn:{item.id}:{version}",
+        )
         self._commit(item, auth, "WITHDRAW")
         return self.view(item, lab=True)
 

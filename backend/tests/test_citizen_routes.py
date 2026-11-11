@@ -48,7 +48,7 @@ def register_and_login(client: TestClient) -> tuple[dict, str]:
     return registration.json(), login.json()["access_token"]
 
 
-def test_register_returns_account_data_without_session_cookie_or_identity_value(
+def test_register_starts_a_session_without_exposing_private_identity_values(
     client: TestClient,
 ) -> None:
     response = client.post(
@@ -62,7 +62,14 @@ def test_register_returns_account_data_without_session_cookie_or_identity_value(
     assert "nid_number" not in response.json()
     assert "birth_certificate_number" not in response.json()
     assert "password" not in response.json()
-    assert REFRESH_TOKEN_COOKIE_NAME not in response.cookies
+    assert "refresh_token" not in response.json()
+    assert REFRESH_TOKEN_COOKIE_NAME in response.cookies
+    assert "HttpOnly" in response.headers["set-cookie"]
+    token = response.json()["access_token"]
+    assert client.get("/api/v1/citizens/me", headers={"Authorization": f"Bearer {token}"}).status_code == 200
+    assert client.post("/api/v1/auth/refresh").json()["portal"] == "CITIZEN"
+    assert client.post("/api/v1/auth/logout").status_code == 204
+    assert client.post("/api/v1/auth/refresh").status_code == 401
 
 
 def test_login_cookie_flags_and_refresh_token_is_not_in_json(

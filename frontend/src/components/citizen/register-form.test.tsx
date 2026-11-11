@@ -22,6 +22,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 const registrationResponse: CitizenRegistrationResponse = {
+  access_token: "new-session",
+  expires_in: 1800,
+  portal: "CITIZEN",
+  token_type: "bearer",
   citizen_id: "citizen-1",
   created_at: "2026-08-10T08:00:00Z",
   email: "amina@example.com",
@@ -74,7 +78,7 @@ describe("CitizenRegisterForm", () => {
     navigationMocks.replace.mockReset();
   });
 
-  it("submits an opaque NID as the only identity and routes to sign in", async () => {
+  it("submits an opaque NID as the only identity and opens the dashboard", async () => {
     const registerAction = vi
       .fn<(request: CitizenRegistrationRequest) => Promise<CitizenRegistrationResponse>>()
       .mockResolvedValue(registrationResponse);
@@ -99,7 +103,7 @@ describe("CitizenRegisterForm", () => {
       "birth_certificate_number",
     );
     expect(navigationMocks.replace).toHaveBeenCalledWith(
-      "/citizen/login?registered=1",
+      "/citizen/dashboard",
     );
   });
 

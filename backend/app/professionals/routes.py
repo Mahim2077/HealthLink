@@ -22,6 +22,7 @@ from app.professionals.schemas import (
     ProfessionalApplicationResponse,
     ProfessionalOnboardingRequest,
     ProfessionalRegistrationRequest,
+    ProfessionalRegistrationResponse,
     ProfessionalLoginRequest,
     ProfessionalLoginResponse,
     ProfessionalMeResponse,
@@ -57,15 +58,24 @@ def _response(
 
 @auth_router.post(
     "/register",
-    response_model=ProfessionalApplicationResponse,
+    response_model=ProfessionalRegistrationResponse,
     status_code=status.HTTP_201_CREATED,
 )
 def register_professional(
     payload: ProfessionalRegistrationRequest,
     request: Request,
+    response: Response,
     db: Annotated[Session, Depends(get_db)],
-) -> ProfessionalApplicationResponse:
-    return _response(ProfessionalService(db, _settings(request)).register_new(payload))
+) -> ProfessionalRegistrationResponse:
+    settings = _settings(request)
+    result, tokens = ProfessionalService(db, settings).register_new(payload)
+    set_refresh_cookie(response, tokens.refresh_token, tokens.refresh_token_expires_at, settings)
+    return ProfessionalRegistrationResponse(
+        **_response(result).model_dump(),
+        access_token=tokens.access_token,
+        expires_in=tokens.access_token_expires_in,
+        portal=tokens.portal,
+    )
 
 
 @auth_router.post("/login", response_model=ProfessionalLoginResponse)

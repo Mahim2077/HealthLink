@@ -12,7 +12,7 @@ describe("read-only care dashboards", () => {
     expect(await screen.findByText("Nothing booked")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Latest diagnostic result/ })).toHaveAttribute("href", "/citizen/diagnostic-tests");
     expect(screen.getByRole("link", { name: /AI assistant/ })).toHaveAttribute("href", "/citizen/ai-assistant");
-    expect(screen.getByText(/Automatic reminder delivery is not enabled/)).toBeInTheDocument();
+    expect(screen.getByText("Due reminders appear in your inbox.")).toBeInTheDocument();
   });
   it("links source prescriptions and reports using the diagnostic-test ID", async () => {
     render(<CitizenCareOverview load={vi.fn().mockResolvedValue({ ...citizen, recent_prescription: { id: "rx-1", created_at: "2026-10-01" }, latest_report: { diagnostic_test_id: "test-1", test_name: "Synthetic CBC", report_date: "2026-10-01" } })} />);

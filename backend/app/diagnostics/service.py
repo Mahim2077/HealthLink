@@ -18,6 +18,7 @@ from app.diagnostics.repository import DiagnosticsRepository, qualifying_lab_ses
 from app.diagnostics.schemas import DiagnosticTechnicianChoice, DiagnosticTestCreateRequest, DiagnosticTestView
 from app.professionals.constants import ProfessionalRoleCode
 from app.professionals.models import ProfessionalRoleRegistration
+from app.reminders.inbox import record_notice
 from app.visits.dependencies import CurrentPatientAccess
 from app.visits.models import MedicalVisit, VisitStatus
 from app.facilities.models import HealthcareFacility
@@ -89,6 +90,12 @@ class DiagnosticsService:
             instructions=payload.instructions,
             created_at=datetime.now(UTC),
         ))
+        self.db.flush()
+        record_notice(
+            self.db, citizen_id=item.citizen_id, kind="DIAGNOSTIC",
+            message=f"Your doctor requested {name}. Open Diagnostic tests to review the request.",
+            dedupe_key=f"diagnostic-request:{item.id}",
+        )
         self.db.commit()
         self.db.refresh(item)
         return self.view(item)

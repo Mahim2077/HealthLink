@@ -392,7 +392,7 @@ describe("ApiClient", () => {
     expect(tokenStore.getSnapshot()).toBe("second-session-token");
   });
 
-  it("clears in-memory auth when refresh fails", async () => {
+  it("clears in-memory auth when refresh rejects the session", async () => {
     tokenStore.set("expired-token");
     const fetchMock = vi
       .fn<typeof fetch>()
@@ -400,12 +400,22 @@ describe("ApiClient", () => {
     const client = new ApiClient({
       baseUrl: "https://api.healthlink.test/api/v1",
       fetchImplementation: fetchMock,
-      refreshAccessToken: vi.fn().mockRejectedValue(new Error("No session")),
+      refreshAccessToken: vi.fn().mockRejectedValue(new ApiError(401, "No session")),
       tokenStore,
     });
 
     await expect(client.get("protected")).rejects.toThrow("No session");
     expect(tokenStore.getSnapshot()).toBeNull();
+  });
+
+  it("keeps the current token after a transient refresh failure", async () => {
+    tokenStore.set("current-token");
+    const client = new ApiClient({
+      refreshAccessToken: vi.fn().mockRejectedValue(new TypeError("Network unavailable")),
+      tokenStore,
+    });
+    await expect(client.refreshSession()).rejects.toThrow("Network unavailable");
+    expect(tokenStore.getSnapshot()).toBe("current-token");
   });
 
   it("does not resurrect a token when refresh succeeds after clear", async () => {

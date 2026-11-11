@@ -80,7 +80,7 @@ function GrantManager() {
         <h3 className="font-bold">{grant.professional_name}</h3><p>{scopes[grant.access_scope]}</p><p className="text-sm">{grant.active ? "Active" : grant.revoked_at ? "Revoked" : "Expired"} · {grant.expires_at ? `Expires ${new Date(grant.expires_at).toLocaleString()}` : "No expiry"}</p>
         {grant.active && <button className="mt-3 font-semibold text-red-700" disabled={busy} onClick={() => setConfirm(grant.id)}>Revoke access</button>}
       </article>)}
-      <div className="flex items-center gap-4"><button disabled={page === 1 || busy} onClick={() => { setData(null); setPage(p => p - 1); }}>Previous</button><span>Page {page}</span><button disabled={!data?.has_next || busy} onClick={() => { setData(null); setPage(p => p + 1); }}>Next</button></div>
+      {data && (page > 1 || data.has_next) ? <div className="flex items-center gap-4"><button disabled={page === 1 || busy} onClick={() => { setData(null); setPage(p => p - 1); }}>Previous</button><span>Page {page}</span><button disabled={!data.has_next || busy} onClick={() => { setData(null); setPage(p => p + 1); }}>Next</button></div> : null}
     </section>
   </div>;
 }

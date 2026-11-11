@@ -8,6 +8,8 @@ import { ProfessionalOnboarding } from "./professional-onboarding";
 
 const mocks = vi.hoisted(() => ({ refreshSession: vi.fn() }));
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
+
 vi.mock("@/lib/auth/actions", () => ({
   logout: vi.fn(),
   logoutAll: vi.fn(),

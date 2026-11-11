@@ -88,6 +88,7 @@ class AuthService:
         *,
         active_professional_role_registration_id: uuid.UUID | None = None,
         now: datetime | None = None,
+        commit: bool = True,
     ) -> IssuedTokens:
         issued_at = now or utc_now()
         user = self.repository.get_user_by_id(user_id)
@@ -123,7 +124,8 @@ class AuthService:
                 raw_refresh_token,
                 now=issued_at,
             )
-            self.db.commit()
+            if commit:
+                self.db.commit()
             return issued_tokens
         except Exception:
             self.db.rollback()
@@ -161,6 +163,10 @@ class AuthService:
 
         next_refresh_token = generate_refresh_token()
         auth_session.last_used_at = refreshed_at
+        auth_session.expires_at = max(
+            as_utc(auth_session.expires_at),
+            refreshed_at + timedelta(days=self.settings.refresh_token_expire_days),
+        )
         auth_session.refresh_token_hash = hash_refresh_token(next_refresh_token)
         try:
             self.db.flush()

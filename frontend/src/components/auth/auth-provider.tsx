@@ -11,6 +11,8 @@ import {
 } from "react";
 
 import { logout, logoutAll, refreshSession } from "@/lib/auth/actions";
+import { subscribeToSessionChanges } from "@/lib/api/client";
+import { ApiError } from "@/lib/api/errors";
 import {
   createAuthSnapshot,
   decodeAccessTokenClaims,
@@ -45,6 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     accessTokenStore.clear();
   }, []);
 
+  useEffect(() => subscribeToSessionChanges(clearSession), [clearSession]);
+
   useEffect(() => {
     const claims = accessToken
       ? decodeAccessTokenClaims(accessToken)
@@ -55,16 +59,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const expiresInMs = claims.exp * 1000 - Date.now();
-    if (expiresInMs <= 0) {
-      return;
-    }
-
-    const timer = window.setTimeout(
+    if (expiresInMs <= 0) return;
+    const refreshAhead = Math.min(60_000, (claims.exp - claims.iat) * 100);
+    let active = true;
+    let retry: number | undefined;
+    const renew = () => {
+      if (document.visibilityState === "hidden") return;
+      window.clearTimeout(retry);
+      void refreshSession().catch((error: unknown) => {
+        if (!active || (error instanceof ApiError && error.status === 401)) return;
+        retry = window.setTimeout(renew, 15_000);
+      });
+    };
+    const checkOnReturn = () => {
+      if (claims.exp * 1000 - Date.now() <= refreshAhead) renew();
+    };
+    const timer = window.setTimeout(renew, Math.max(0, expiresInMs - refreshAhead));
+    const expiry = window.setTimeout(
       () => setExpiryCheck((check) => check + 1),
       expiresInMs,
     );
-
-    return () => window.clearTimeout(timer);
+    document.addEventListener("visibilitychange", checkOnReturn);
+    window.addEventListener("online", checkOnReturn);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      window.clearTimeout(retry);
+      window.clearTimeout(expiry);
+      document.removeEventListener("visibilitychange", checkOnReturn);
+      window.removeEventListener("online", checkOnReturn);
+    };
   }, [accessToken]);
 
   const value: AuthContextValue = {

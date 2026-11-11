@@ -37,9 +37,13 @@ def _settings(request: Request) -> Settings:
 def register_citizen(
     payload: CitizenRegistrationRequest,
     request: Request,
+    response: Response,
     db: Annotated[Session, Depends(get_db)],
 ) -> CitizenRegistrationResponse:
-    registered = CitizenService(db, _settings(request)).register(payload)
+    settings = _settings(request)
+    registered = CitizenService(db, settings).register(payload)
+    tokens = registered.tokens
+    set_refresh_cookie(response, tokens.refresh_token, tokens.refresh_token_expires_at, settings)
     return CitizenRegistrationResponse(
         user_id=registered.user.id,
         citizen_id=registered.profile.id,
@@ -50,6 +54,9 @@ def register_citizen(
             registered.identity.registered_with
         ),
         created_at=registered.user.created_at,
+        access_token=tokens.access_token,
+        expires_in=tokens.access_token_expires_in,
+        portal=tokens.portal,
     )
 
 

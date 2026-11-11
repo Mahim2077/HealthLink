@@ -7,12 +7,15 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+from app.admins.provisioning import create_trusted_admin
 from app.appointments.models import Appointment
 from app.auth.constants import Portal
+from app.auth.models import User
 from app.core.config import get_settings
 from app.db.base import Base
 from app.prescriptions.models import Prescription, PrescriptionItem
 from app.professionals.constants import ProfessionalRoleCode
+from app.reminders.inbox import record_notice
 from app.reminders.models import MedicineReminder, MedicineReminderTime, Notification
 from app.reminders.schemas import ReminderInput
 from app.reminders.service import ReminderService
@@ -117,6 +120,61 @@ def test_notification_read_acknowledgement_are_owned_and_idempotent(client, db_s
     ack = client.post(f"{base}/acknowledge", headers=headers).json()
     assert ack["read_at"] == first["read_at"]
     assert ack["acknowledged_at"] == client.post(f"{base}/acknowledge", headers=headers).json()["acknowledged_at"]
+
+
+def test_inboxes_scope_history_cursors_and_read_actions_to_the_recipient(client, db_session, test_settings):
+    citizen_user, citizen = _citizen(db_session, "InboxOwner")
+    other, _ = _citizen(db_session, "InboxOther")
+    professional, registration = _registration(db_session, _facility(db_session), ProfessionalRoleCode.DOCTOR)
+    admin = create_trusted_admin(
+        db_session, email="inbox-admin@example.com", password="SyntheticAdmin!123",
+        first_name="Inbox", last_name="Admin",
+    )
+    now = datetime.now(UTC)
+    for index in range(21):
+        record_notice(db_session, citizen_id=citizen.id, kind="MEDICINE", message="Citizen notice",
+                      dedupe_key=f"citizen-{index}", due_at=now)
+    record_notice(db_session, user_id=professional.id, portal=Portal.PROFESSIONAL,
+                  kind="APPOINTMENT", message="Professional notice", dedupe_key="professional")
+    record_notice(db_session, user_id=admin.user.id, portal=Portal.ADMIN,
+                  kind="VERIFICATION", message="Admin notice", dedupe_key="admin")
+    db_session.commit()
+
+    path = "/api/v1/me/inbox"
+    citizen_headers = _auth(_token(db_session, test_settings, citizen_user, Portal.CITIZEN))
+    other_headers = _auth(_token(db_session, test_settings, other, Portal.CITIZEN))
+    professional_headers = _auth(_token(db_session, test_settings, professional, Portal.PROFESSIONAL, registration))
+    admin_headers = _auth(_token(db_session, test_settings, admin.user, Portal.ADMIN))
+    first = client.get(path, headers=citizen_headers).json()
+    assert first["unread_count"] == 21 and len(first["items"]) == 20
+    last = client.get(path, headers=citizen_headers, params={"before": first["next_cursor"]}).json()
+    assert len(last["items"]) == 1 and last["next_cursor"] is None
+    assert last["items"][0]["id"] not in {item["id"] for item in first["items"]}
+    assert client.get(path, headers=other_headers, params={"before": first["next_cursor"]}).status_code == 404
+    assert client.get(path, headers=other_headers).json()["items"] == []
+    assert [item["message"] for item in client.get(path, headers=professional_headers).json()["items"]] == ["Professional notice"]
+    assert [item["message"] for item in client.get(path, headers=admin_headers).json()["items"]] == ["Admin notice"]
+    assert client.get(path).status_code == 401
+
+    action = f"{path}/{last['items'][0]['id']}/read"
+    assert client.post(action, headers=professional_headers).status_code == 404
+    update = client.post(action, headers=citizen_headers).json()
+    assert update["item"]["read_at"] and update["unread_count"] == 20
+    assert client.post(action, headers=citizen_headers).json() == update
+
+
+def test_inbox_sync_delivers_only_the_current_citizens_due_reminders(client, db_session, test_settings, monkeypatch):
+    citizen, _ = _seed_due(db_session)
+    foreign, _ = _seed_due(db_session)
+    monkeypatch.setattr(
+        "app.reminders.routes.datetime",
+        type("TestClock", (), {"now": staticmethod(lambda _: datetime(2026, 9, 12, 14, 1, tzinfo=UTC))}),
+    )
+    user = db_session.get(User, citizen.user_id)
+    headers = _auth(_token(db_session, test_settings, user, Portal.CITIZEN))
+    for _ in range(2):
+        assert client.post("/api/v1/me/inbox/sync", headers=headers).json() == {"unread_count": 2}
+    assert db_session.scalar(select(Notification).where(Notification.citizen_id == foreign.id)) is None
 
 
 def test_job_secret_fails_closed(client, test_settings):

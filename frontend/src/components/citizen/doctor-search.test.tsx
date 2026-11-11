@@ -335,7 +335,7 @@ describe("DoctorSearch", () => {
     await act(async () => { finishInitial({ items: [doctor], total: 70 }); });
     expect(screen.getByText("New Query Doctor")).toBeInTheDocument();
     expect(screen.queryByText("Dr. Ayesha Khan")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(screen.queryByRole("navigation", { name: "Doctor results pages" })).not.toBeInTheDocument();
     expect(searchAction).toHaveBeenCalledTimes(2);
   });
 });

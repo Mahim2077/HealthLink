@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
 from app.auth.models import AuthSession, User
+from app.reminders.models import Notification
 from app.citizens.models import CitizenIdentifier, CitizenProfile, UserNationalIdentifier
 from app.core.config import Settings
 from app.db.session import create_database_engine, get_db
@@ -49,6 +50,8 @@ def _delete_professional_users(engine, user_ids: list[uuid.UUID]) -> None:
     if not user_ids:
         return
     with engine.begin() as connection:
+        connection.execute(delete(AuthSession).where(AuthSession.user_id.in_(user_ids)))
+        connection.execute(delete(Notification).where(Notification.user_id.in_(user_ids)))
         profile_ids = select(HealthcareProfessionalProfile.id).where(
             HealthcareProfessionalProfile.user_id.in_(user_ids)
         )
@@ -83,7 +86,6 @@ def _delete_professional_users(engine, user_ids: list[uuid.UUID]) -> None:
                 UserNationalIdentifier.user_id.in_(user_ids)
             )
         )
-        connection.execute(delete(AuthSession).where(AuthSession.user_id.in_(user_ids)))
         connection.execute(delete(User).where(User.id.in_(user_ids)))
 
 

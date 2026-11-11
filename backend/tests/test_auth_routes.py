@@ -72,12 +72,12 @@ def test_refresh_endpoint_rotates_cookie_without_exposing_it_in_json(
     parsed_cookie.load(set_cookie)
     refresh_cookie = parsed_cookie[REFRESH_TOKEN_COOKIE_NAME]
     cookie_max_age = int(refresh_cookie["max-age"])
-    expected_remaining = int((as_utc(original_expiry) - utc_now()).total_seconds())
+    db_session.refresh(original_session)
+    assert as_utc(original_session.expires_at) > as_utc(original_expiry)
+    expected_remaining = int((as_utc(original_session.expires_at) - utc_now()).total_seconds())
     assert abs(cookie_max_age - expected_remaining) <= 2
     cookie_expiry = parsedate_to_datetime(refresh_cookie["expires"])
-    assert abs((cookie_expiry - as_utc(original_expiry)).total_seconds()) <= 1
-    db_session.refresh(original_session)
-    assert original_session.expires_at == original_expiry
+    assert abs((cookie_expiry - as_utc(original_session.expires_at)).total_seconds()) <= 1
 
 
 def test_refresh_requires_cookie(client: TestClient) -> None:

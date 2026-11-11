@@ -11,10 +11,8 @@ from app.admins.models import AdminActionLog
 from app.admins.provisioning import create_trusted_admin
 from app.auth.constants import Portal
 from app.auth.models import User
-from app.auth.service import AuthService
 from app.citizens.constants import CitizenRegistrationMethod
 from app.citizens.models import CitizenIdentifier, UserNationalIdentifier
-from app.core.config import Settings
 
 
 ADMIN_PASSWORD = "StrongAdminPassword123!"
@@ -258,16 +256,11 @@ def test_search_limit_is_clamped_by_schema(
 
 
 def test_detail_returns_user_identity_profile_and_session_count(
-    client: TestClient, db_session, test_settings: Settings
+    client: TestClient, db_session
 ) -> None:
     _provision_admin(db_session)
     registered = _register_citizen(client)
     token = _admin_token(client)
-    # Create an auth session for the citizen so the count is observable.
-    AuthService(db_session, test_settings).create_session(
-        uuid.UUID(registered["user_id"]), Portal.CITIZEN
-    )
-
     response = client.get(
         f"/api/v1/admin/citizen-identities/{registered['user_id']}",
         headers={"Authorization": f"Bearer {token}"},

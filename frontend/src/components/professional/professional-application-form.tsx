@@ -2,6 +2,7 @@
 
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { citizenInputClassName, FormField } from "@/components/citizen/form-field";
@@ -80,6 +81,7 @@ export function ProfessionalApplicationForm({
   registerAction?: (request: ProfessionalRegistrationRequest) => Promise<ProfessionalApplicationResponse>;
   onboardAction?: (request: ProfessionalOnboardingRequest) => Promise<ProfessionalApplicationResponse>;
 }) {
+  const router = useRouter();
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -151,7 +153,8 @@ export function ProfessionalApplicationForm({
         password: form.password,
       };
       try {
-        setResult(await registerAction(payload));
+        await registerAction(payload);
+        router.replace("/professional/status");
       } catch (reason) {
         if (!requiresEmailVerification(reason)) throw reason;
         const challenge = await requestSignupCode("PROFESSIONAL", payload.email);
@@ -176,7 +179,10 @@ export function ProfessionalApplicationForm({
             initialChallenge={challenge}
             onBack={() => setVerification(null)}
             onResend={() => requestSignupCode("PROFESSIONAL", payload.email)}
-            onVerify={async (proof) => setResult(await registerAction({ ...payload, ...proof }))}
+            onVerify={async (proof) => {
+              await registerAction({ ...payload, ...proof });
+              router.replace("/professional/status");
+            }}
           />
         </section>
       </main>

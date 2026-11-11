@@ -38,7 +38,7 @@ export function ReminderForm({ initial, onSaved, onCancel }: { initial?: Reminde
   }
   return <form onSubmit={submit} className="hl-card space-y-5 p-5">
     <h2 className="text-xl font-bold">{initial ? "Edit reminder" : "Create medicine reminder"}</h2>
-    <p className="text-sm text-slate-600">Times use Asia/Dhaka. This saves a schedule for reference only: automatic reminder delivery is not enabled, even when the schedule is active. Follow the schedule agreed with your clinician and use another method for alerts.</p>
+    <p className="text-sm text-slate-600">Times use Asia/Dhaka. Active schedules create in-app reminders as they become due while you use HealthLink. Continue following the schedule agreed with your clinician.</p>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     <fieldset disabled={pending} className="space-y-4">
       <label className="block text-sm font-semibold">Prescription medicine (optional)<select className={reminderInputClass} value={draft.prescription_item_id ?? ""} onChange={e => { const choice = choices.find(c => c.id === e.target.value); update({ prescription_item_id: e.target.value || null, ...(choice ? { medicine: choice.medicine } : {}) }); }}>

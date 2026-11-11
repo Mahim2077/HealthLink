@@ -13,6 +13,7 @@ from sqlalchemy.pool import NullPool
 from app.admins.models import AdminAccount, AdminActionLog
 from app.admins.provisioning import create_trusted_admin
 from app.auth.models import AuthSession, User
+from app.reminders.models import Notification
 from app.citizens.models import UserNationalIdentifier
 from app.core.config import Settings
 from app.db.session import create_database_engine, get_db
@@ -32,6 +33,8 @@ POSTGRES_TEST_DATABASE_URL = os.getenv("HEALTHLINK_TEST_DATABASE_URL")
 def _cleanup(engine, user_ids: list[uuid.UUID], facility_ids: list[uuid.UUID]) -> None:
     with engine.begin() as connection:
         if user_ids:
+            connection.execute(delete(AuthSession).where(AuthSession.user_id.in_(user_ids)))
+            connection.execute(delete(Notification).where(Notification.user_id.in_(user_ids)))
             profile_ids = select(HealthcareProfessionalProfile.id).where(
                 HealthcareProfessionalProfile.user_id.in_(user_ids)
             )
@@ -68,7 +71,6 @@ def _cleanup(engine, user_ids: list[uuid.UUID], facility_ids: list[uuid.UUID]) -
                 )
             )
             connection.execute(delete(AdminAccount).where(AdminAccount.user_id.in_(user_ids)))
-            connection.execute(delete(AuthSession).where(AuthSession.user_id.in_(user_ids)))
             connection.execute(delete(User).where(User.id.in_(user_ids)))
         if facility_ids:
             connection.execute(

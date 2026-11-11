@@ -404,7 +404,7 @@ test('AI consent, history, saved reminders and privacy remain functional', async
   await expect(summary.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
   await expect(summary.getByRole('checkbox')).not.toBeChecked();
   await page.goto('/citizen/reminders');
-  await expect(page.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open inbox', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Create reminder', exact: true }).click();
   await page.getByLabel('Medicine', { exact: true }).fill('Synthetic saved reminder');
   await page.getByLabel('Start date', { exact: true }).fill(f.today);
@@ -789,10 +789,10 @@ test('Survey regressions: filtered prescription return, empty mobile chat and tr
   expect(heading.y + heading.height).toBeLessThanOrEqual(region.y + region.height);
   await snapshot(page, info, 'survey-mobile-empty-chat-top');
   await page.goto('/citizen/reminders');
-  await expect(page.getByText(/Saving or activating a schedule does not send alerts/)).toBeVisible();
+  await expect(page.getByText(/Due reminders appear in your inbox/)).toBeVisible();
   await page.getByRole('button', { name: 'Create reminder', exact: true }).click();
-  await expect(page.getByText(/This saves a schedule for reference only/)).toBeVisible();
-  await snapshot(page, info, 'survey-reminders-delivery-disabled');
+  await expect(page.getByText(/Active schedules create in-app reminders/)).toBeVisible();
+  await snapshot(page, info, 'survey-in-app-reminders');
 });
 
 test('Survey regressions: unsaved practice edits and facility filtered-empty state', async ({ browser }, info) => {

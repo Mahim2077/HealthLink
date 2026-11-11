@@ -38,5 +38,10 @@ def list_reports(citizen: Annotated[CitizenContext, Depends(get_current_citizen)
 
 
 @router.get("/citizens/me/lab-trends", response_model=list[LabTrendPoint])
-def list_trends(citizen: Annotated[CitizenContext, Depends(get_current_citizen)], db: Database, page: Annotated[int, Query(ge=1, le=10000)] = 1):
-    return LabReportService(db).trends(citizen.profile.id, page)
+def list_trends(
+    citizen: Annotated[CitizenContext, Depends(get_current_citizen)],
+    db: Database,
+    page: Annotated[int, Query(ge=1, le=10000)] = 1,
+    include_next: bool = False,
+):
+    return LabReportService(db).trends(citizen.profile.id, page, include_next=include_next)

@@ -141,7 +141,7 @@ export function CitizenRegisterForm({
 
   const finishRegistration = (response: CitizenRegistrationResponse) => {
     if (onRegistered) onRegistered(response);
-    else router.replace("/citizen/login?registered=1");
+    else router.replace("/citizen/dashboard");
   };
 
   const updateValue = <Field extends keyof RegistrationValues>(

@@ -26,6 +26,7 @@ import {
   PortalTextNavigation,
 } from "@/components/auth/portal-navigation";
 import { HealthLinkMark } from "@/components/brand/healthlink-mark";
+import { InboxLink } from "@/components/reminders/inbox-link";
 import { loadAdminMe } from "@/lib/admin/api";
 import type { Portal } from "@/lib/auth/types";
 import { loadCitizenMe } from "@/lib/citizen/api";
@@ -345,7 +346,10 @@ export function PortalShell({ children, portal }: { children: ReactNode; portal:
                   {config.eyebrow}
                 </span>
               </div>
-              <PortalAccount portal={portal} />
+              <div className="flex shrink-0 items-center gap-1 sm:gap-3">
+                <InboxLink key={auth.claims?.sid} portal={portal} sessionId={auth.claims?.sid} />
+                <PortalAccount portal={portal} />
+              </div>
             </div>
             <PortalTextNavigation portal={portal} />
           </header>

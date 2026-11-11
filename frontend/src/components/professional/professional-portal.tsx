@@ -190,7 +190,7 @@ function ProfessionalPortalContent({
             </Link>
           ) : (
             <p className="mt-6 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-              This restricted session can display verification status only.
+              Clinical tools become available after this role is verified.
             </p>
           )}
         </section>

@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -35,6 +35,11 @@ class ReminderView(ReminderInput):
     id: uuid.UUID
 
 
+class SchedulesPage(BaseModel):
+    items: list[ReminderView]
+    has_more: bool
+
+
 class ActiveInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     is_active: bool
@@ -48,6 +53,22 @@ class NotificationView(BaseModel):
     due_at: datetime
     read_at: datetime | None
     acknowledged_at: datetime | None
+
+    @field_validator("due_at", "read_at", "acknowledged_at")
+    @classmethod
+    def timestamp_with_zone(cls, value: datetime | None) -> datetime | None:
+        return value.replace(tzinfo=UTC) if value and value.tzinfo is None else value
+
+
+class InboxPage(BaseModel):
+    items: list[NotificationView]
+    next_cursor: uuid.UUID | None
+    unread_count: int
+
+
+class InboxUpdate(BaseModel):
+    item: NotificationView
+    unread_count: int
 
 
 class PrescriptionChoice(BaseModel):

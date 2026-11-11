@@ -15,4 +15,4 @@ export const readLabReport = (id: string) => apiClient.get<LabReport | null>(`di
 export const saveLabReport = (id: string, body: LabDraft) => apiClient.put<LabReport, LabDraft>(`diagnostic-tests/${encodeURIComponent(id)}/lab-report`, body);
 export const finalizeLabReport = (id: string) => apiClient.post<LabReport>(`diagnostic-tests/${encodeURIComponent(id)}/lab-report/finalize`);
 export const listLabReports = (page: number) => apiClient.get<LabReport[]>(`citizens/me/lab-reports?page=${page}`);
-export const listLabTrends = (page: number) => apiClient.get<LabTrendPoint[]>(`citizens/me/lab-trends?page=${page}`);
+export const listLabTrends = (page: number) => apiClient.get<LabTrendPoint[]>(`citizens/me/lab-trends?page=${page}&include_next=true`);

@@ -63,6 +63,7 @@ class RegisteredCitizen:
     user: User
     profile: CitizenProfile
     identity: CitizenIdentifier
+    tokens: IssuedTokens
 
 
 @dataclass(frozen=True)
@@ -162,11 +163,14 @@ class CitizenService:
                 registered_with=method.value,
             )
             self.repository.add(identity)
+            tokens = AuthService(self.db, self.settings).create_session(
+                user.id, Portal.CITIZEN, commit=False,
+            )
             self.db.commit()
             self.db.refresh(user)
             self.db.refresh(profile)
             self.db.refresh(identity)
-            return RegisteredCitizen(user=user, profile=profile, identity=identity)
+            return RegisteredCitizen(user=user, profile=profile, identity=identity, tokens=tokens)
         except IntegrityError as error:
             self.db.rollback()
             raise CitizenConflictError(

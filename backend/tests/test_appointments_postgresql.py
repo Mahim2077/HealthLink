@@ -19,6 +19,7 @@ from app.appointments.models import (
     DoctorPracticeSession,
 )
 from app.auth.models import AuthSession, User
+from app.reminders.models import Notification
 from app.citizens.models import (
     CitizenIdentifier,
     CitizenProfile,
@@ -284,6 +285,9 @@ def _cleanup(
             citizen_profile_ids = select(CitizenProfile.id).where(
                 CitizenProfile.user_id.in_(user_ids)
             )
+            connection.execute(delete(Notification).where(
+                Notification.user_id.in_(user_ids) | Notification.citizen_id.in_(citizen_profile_ids)
+            ))
             connection.execute(
                 delete(Appointment).where(
                     Appointment.citizen_id.in_(
