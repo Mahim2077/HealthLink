@@ -15,6 +15,9 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/ui/async-stat
 import { citizenErrorMessage } from "@/lib/citizen/presentation";
 import { loadProfessionalMe } from "@/lib/professional/api";
 import type { ProfessionalMe } from "@/lib/professional/types";
+import { ProfessionalCitizenProfileLink, ProfessionalCitizenProfileSetup } from "./citizen-profile-setup";
+
+type ProfessionalPortalMode = "dashboard" | "status" | "citizen-profile";
 
 function ProfessionalGuard({ children }: { children: ReactNode }) {
   const auth = usePortalAuth("PROFESSIONAL");
@@ -83,7 +86,7 @@ function ProfessionalPortalContent({
   mode,
   verifiedDoctorSlot,
 }: {
-  mode: "dashboard" | "status";
+  mode: ProfessionalPortalMode;
   verifiedDoctorSlot?: ReactNode;
 }) {
   const [record, setRecord] = useState<ProfessionalMe | null>(null);
@@ -131,6 +134,10 @@ function ProfessionalPortalContent({
     );
   }
   if (!record) return null;
+
+  if (mode === "citizen-profile") {
+    return <ProfessionalCitizenProfileSetup hasProfile={record.has_citizen_profile} />;
+  }
 
   const verified = record.verification_status === "VERIFIED";
   if (mode === "dashboard" && !verified) {
@@ -193,6 +200,9 @@ function ProfessionalPortalContent({
               Clinical tools become available after this role is verified.
             </p>
           )}
+          {typeof record.has_citizen_profile === "boolean" ? (
+            <div className="mt-5"><ProfessionalCitizenProfileLink hasProfile={record.has_citizen_profile} /></div>
+          ) : null}
         </section>
       </main>
     );
@@ -210,6 +220,9 @@ function ProfessionalPortalContent({
         <p className="mt-3 text-lg text-slate-600">
           Your focused workspace for today&rsquo;s care.
         </p>
+        {typeof record.has_citizen_profile === "boolean" ? (
+          <div className="mt-5"><ProfessionalCitizenProfileLink hasProfile={record.has_citizen_profile} /></div>
+        ) : null}
       </header>
 
       <div className="mt-8 grid gap-5 lg:grid-cols-2">
@@ -262,7 +275,7 @@ export function ProfessionalPortal({
   mode,
   verifiedDoctorSlot,
 }: {
-  mode: "dashboard" | "status";
+  mode: ProfessionalPortalMode;
   verifiedDoctorSlot?: ReactNode;
 }) {
   return (

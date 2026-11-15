@@ -2,7 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
-import { accessTokenStore } from "@/lib/auth/token-store";
+import { testSessionStore } from "@/test/session-store";
 
 import { ProfessionalOnboarding } from "./professional-onboarding";
 
@@ -25,14 +25,14 @@ function token(portal: "CITIZEN" | "ADMIN") {
 
 describe("ProfessionalOnboarding", () => {
   beforeEach(() => {
-    accessTokenStore.clear();
+    testSessionStore.clear();
     mocks.refreshSession.mockReset();
   });
 
   it("hydrates an existing citizen session before showing protected onboarding", async () => {
     mocks.refreshSession.mockImplementation(async () => {
       const value = token("CITIZEN");
-      accessTokenStore.set(value);
+      testSessionStore.set(value);
       return value;
     });
     render(<AuthProvider><ProfessionalOnboarding /></AuthProvider>);
@@ -48,10 +48,12 @@ describe("ProfessionalOnboarding", () => {
     expect(screen.getByRole("link", { name: "Sign in as a citizen" })).toHaveAttribute("href", "/citizen/login");
   });
 
-  it("rejects a valid token from the wrong portal before rendering private onboarding", () => {
-    act(() => accessTokenStore.set(token("ADMIN")));
+  it("checks for a Citizen session before rendering onboarding even with an Admin session", async () => {
+    mocks.refreshSession.mockRejectedValue(new Error("No citizen session"));
+    act(() => testSessionStore.set(token("ADMIN")));
     render(<AuthProvider><ProfessionalOnboarding /></AuthProvider>);
-    expect(screen.getByText("Citizen session required")).toBeInTheDocument();
+    expect(await screen.findByText("Sign in before onboarding")).toBeInTheDocument();
+    expect(mocks.refreshSession).toHaveBeenCalledWith("CITIZEN");
     expect(screen.queryByRole("button", { name: "Submit role for verification" })).not.toBeInTheDocument();
   });
 });

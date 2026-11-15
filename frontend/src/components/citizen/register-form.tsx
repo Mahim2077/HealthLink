@@ -8,8 +8,9 @@ import { citizenInputClassName, FormField } from "./form-field";
 import { StatusAlert } from "./status-alert";
 import { registerCitizen } from "@/lib/citizen/api";
 import { EmailCodeForm } from "@/components/auth/email-code-form";
+import { PasswordInput } from "@/components/ui/password-input";
 import { requestSignupCode, requiresEmailVerification, type EmailChallenge } from "@/lib/auth/email-codes";
-import { registrationErrorMessage, registrationPasswordError, registrationPasswordHint } from "@/lib/auth/registration-validation";
+import { localCalendarDate, registrationErrorMessage, registrationGenders, registrationPasswordError, registrationPasswordHint } from "@/lib/auth/registration-validation";
 import type {
   CitizenIdentityKind,
   CitizenRegistrationRequest,
@@ -45,14 +46,6 @@ const initialValues: RegistrationValues = {
   identityKind: "NID",
   identityNumber: "",
 };
-
-export function localCalendarDate(date = new Date()): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return year + "-" + month + "-" + day;
-}
 
 export function validateCitizenRegistration(
   values: RegistrationValues,
@@ -347,10 +340,7 @@ export function CitizenRegisterForm({
                 value={values.gender}
               >
                 <option value="">Select gender</option>
-                <option value="MALE">Male</option>
-                <option value="FEMALE">Female</option>
-                <option value="OTHER">Other</option>
-                <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
+                {registrationGenders.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
               </select>
             </FormField>
             <FormField htmlFor="blood-group" label="Blood group">
@@ -397,7 +387,7 @@ export function CitizenRegisterForm({
             </FormField>
             <div className="hidden sm:block" />
             <FormField error={errors.password} hint={registrationPasswordHint} htmlFor="password" label="Password" required>
-              <input
+              <PasswordInput
                 aria-describedby={errors.password ? "password-error" : "password-hint"}
                 aria-invalid={Boolean(errors.password)}
                 autoComplete="new-password"
@@ -406,12 +396,12 @@ export function CitizenRegisterForm({
                 maxLength={128}
                 onChange={(event) => updateValue("password", event.target.value)}
                 required
-                type="password"
                 value={values.password}
+                visibilityIcon
               />
             </FormField>
             <FormField error={errors.confirmPassword} htmlFor="confirm-password" label="Confirm password" required>
-              <input
+              <PasswordInput
                 aria-describedby={errors.confirmPassword ? "confirm-password-error" : undefined}
                 aria-invalid={Boolean(errors.confirmPassword)}
                 autoComplete="new-password"
@@ -420,8 +410,9 @@ export function CitizenRegisterForm({
                 maxLength={128}
                 onChange={(event) => updateValue("confirmPassword", event.target.value)}
                 required
-                type="password"
                 value={values.confirmPassword}
+                visibilityIcon
+                visibilityTarget="confirmation password"
               />
             </FormField>
           </div>

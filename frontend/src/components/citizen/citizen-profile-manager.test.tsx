@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ApiError } from "@/lib/api/errors";
-import { accessTokenStore } from "@/lib/auth/token-store";
+import { testSessionStore } from "@/test/session-store";
 import type { CitizenDashboardData } from "@/lib/citizen/types";
 
 import { CitizenProfileManager } from "./citizen-profile-manager";
@@ -68,12 +68,12 @@ function renderManager(options: {
 
 describe("CitizenProfileManager", () => {
   beforeEach(() => {
-    accessTokenStore.clear();
+    testSessionStore.clear();
     mocks.refreshSession.mockReset();
   });
 
   it("updates only profile fields without any identity mutation", async () => {
-    act(() => accessTokenStore.set(token()));
+    act(() => testSessionStore.set(token()));
     const updated = {
       ...data.profile,
       address: "Chattogram",
@@ -104,7 +104,7 @@ describe("CitizenProfileManager", () => {
   });
 
   it("keeps professional-role onboarding with the citizen profile", async () => {
-    act(() => accessTokenStore.set(token()));
+    act(() => testSessionStore.set(token()));
     renderManager();
 
     await screen.findByRole("heading", { name: "Profile and identity" });
@@ -114,7 +114,7 @@ describe("CitizenProfileManager", () => {
   });
 
   it("requires exact CONFIRM before adding NID and locks replacement after success", async () => {
-    act(() => accessTokenStore.set(token()));
+    act(() => testSessionStore.set(token()));
     const addAction = vi.fn().mockResolvedValue({
       ...data.identity,
       nid_added_at: "2026-08-10T10:00:00Z",
@@ -138,7 +138,7 @@ describe("CitizenProfileManager", () => {
   });
 
   it("keeps the one-time form available when the server rejects a duplicate NID", async () => {
-    act(() => accessTokenStore.set(token()));
+    act(() => testSessionStore.set(token()));
     const addAction = vi.fn().mockRejectedValue(new ApiError(409, "NID is already registered."));
     renderManager({ addAction });
     await screen.findByRole("heading", { name: "Add your National ID" });
@@ -150,10 +150,11 @@ describe("CitizenProfileManager", () => {
     expect(screen.getByRole("button", { name: "Add National ID permanently" })).toBeInTheDocument();
   });
 
-  it("does not load private data for a wrong-portal session", () => {
-    act(() => accessTokenStore.set(token("ADMIN")));
+  it("does not load private data for a wrong-portal session", async () => {
+    mocks.refreshSession.mockRejectedValue(new Error("No citizen session"));
+    act(() => testSessionStore.set(token("ADMIN")));
     const { loadAction } = renderManager();
-    expect(screen.getByText("Citizen Portal access required")).toBeInTheDocument();
+    expect(await screen.findByText("Sign in to continue")).toBeInTheDocument();
     expect(loadAction).not.toHaveBeenCalled();
   });
 });

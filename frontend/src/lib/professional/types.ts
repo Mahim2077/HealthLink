@@ -86,5 +86,11 @@ export type ProfessionalMe = {
   verified_at: string | null;
   rejected_at: string | null;
   rejection_reason: string | null;
+  has_citizen_profile: boolean | null;
+};
+
+export type CitizenProfileSetup = {
+  date_of_birth: string;
+  gender: string;
 };
 import type { DoctorSpecialization } from "@/lib/doctors/specializations";

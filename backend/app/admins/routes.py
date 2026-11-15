@@ -24,7 +24,7 @@ from app.admins.verification_schemas import (
 )
 from app.admins.verification_service import ProfessionalVerificationService
 from app.auth.constants import Portal
-from app.auth.cookies import set_refresh_cookie
+from app.auth.cookies import set_sign_in_cookie
 from app.auth.dependencies import AuthContext, require_portal
 from app.auth.schemas import TokenResponse
 from app.core.config import Settings
@@ -55,7 +55,7 @@ def login_admin(
 ) -> TokenResponse:
     settings = _settings(request)
     tokens = AdminService(db, settings).login(payload)
-    set_refresh_cookie(response, tokens.refresh_token, tokens.refresh_token_expires_at, settings)
+    set_sign_in_cookie(request, response, tokens, settings)
     return TokenResponse(
         access_token=tokens.access_token,
         expires_in=tokens.access_token_expires_in,

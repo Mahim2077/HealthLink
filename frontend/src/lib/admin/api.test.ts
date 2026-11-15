@@ -14,7 +14,7 @@ describe("Admin API", () => {
     mocks.post.mockResolvedValue(response);
     mocks.replaceSession.mockImplementation(async (issue: () => Promise<string>) => issue());
     await expect(loginAdmin({ email: "admin@example.com", password: "secret" })).resolves.toEqual(response);
-    expect(mocks.post).toHaveBeenCalledWith("auth/admin/login", { email: "admin@example.com", password: "secret" }, { auth: false, retryOnUnauthorized: false });
+    expect(mocks.post).toHaveBeenCalledWith("auth/admin/login", { email: "admin@example.com", password: "secret" }, { auth: false, portal: "ADMIN", retryOnUnauthorized: false });
     expect(mocks.replaceSession).toHaveBeenCalledOnce();
   });
 

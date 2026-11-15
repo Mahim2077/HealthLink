@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import AuthContext, get_current_auth_context
-from app.auth.cookies import delete_refresh_cookie, set_refresh_cookie
+from app.auth.constants import Portal
+from app.auth.cookies import SESSION_PORTAL_HEADER, delete_refresh_cookie, refresh_cookie_name, set_refresh_cookie
+from app.auth.dependencies import AuthContext, AuthorizationError, get_current_auth_context
 from app.auth.schemas import TokenResponse
 from app.auth.service import AuthService, AuthenticationError, IssuedTokens
 from app.core.config import Settings
@@ -20,6 +21,7 @@ from app.db.session import get_db
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+SessionPortal = Annotated[Portal | None, Header(alias=SESSION_PORTAL_HEADER)]
 
 
 def _settings(request: Request) -> Settings:
@@ -54,22 +56,24 @@ def refresh_access_token(
     request: Request,
     response: Response,
     db: Annotated[Session, Depends(get_db)],
-    refresh_token: Annotated[
-        str | None,
-        Cookie(alias=REFRESH_TOKEN_COOKIE_NAME),
-    ] = None,
+    portal: SessionPortal = None,
 ) -> TokenResponse:
+    scoped_token = request.cookies.get(refresh_cookie_name(portal))
+    refresh_token = scoped_token or request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
     if not refresh_token:
         raise AuthenticationError("Refresh token required.")
 
     settings = _settings(request)
-    tokens = AuthService(db, settings).refresh_session(refresh_token)
+    tokens = AuthService(db, settings).refresh_session(refresh_token, portal=portal)
     set_refresh_cookie(
         response,
         tokens.refresh_token,
         tokens.refresh_token_expires_at,
         settings,
+        portal=portal,
     )
+    if portal is not None and scoped_token is None:
+        delete_refresh_cookie(response, settings)
     return _token_response(tokens)
 
 
@@ -78,18 +82,19 @@ def logout(
     request: Request,
     response: Response,
     db: Annotated[Session, Depends(get_db)],
-    refresh_token: Annotated[
-        str | None,
-        Cookie(alias=REFRESH_TOKEN_COOKIE_NAME),
-    ] = None,
+    portal: SessionPortal = None,
     authorization: Annotated[str | None, Header()] = None,
 ) -> None:
     settings = _settings(request)
-    AuthService(db, settings).logout_session(
-        refresh_token,
+    legacy_matched = AuthService(db, settings).logout_session(
+        request.cookies.get(refresh_cookie_name(portal)),
         access_claims=_logout_access_claims(authorization, settings),
+        portal=portal,
+        legacy_refresh_token=request.cookies.get(REFRESH_TOKEN_COOKIE_NAME) if portal is not None else None,
     )
-    delete_refresh_cookie(response, settings)
+    delete_refresh_cookie(response, settings, portal=portal)
+    if legacy_matched:
+        delete_refresh_cookie(response, settings)
 
 
 @router.post("/logout-all", status_code=204)
@@ -98,7 +103,10 @@ def logout_all(
     response: Response,
     db: Annotated[Session, Depends(get_db)],
     context: Annotated[AuthContext, Depends(get_current_auth_context)],
+    portal: SessionPortal = None,
 ) -> None:
     settings = _settings(request)
+    if portal is not None and context.portal != portal:
+        raise AuthorizationError()
     AuthService(db, settings).logout_all(context.user.id)
-    delete_refresh_cookie(response, settings)
+    delete_refresh_cookie(response, settings, portal=portal)

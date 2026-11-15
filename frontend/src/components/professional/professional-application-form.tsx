@@ -8,6 +8,7 @@ import { useState, type FormEvent } from "react";
 import { citizenInputClassName, FormField } from "@/components/citizen/form-field";
 import { EmailCodeForm } from "@/components/auth/email-code-form";
 import { StatusAlert } from "@/components/citizen/status-alert";
+import { PasswordInput } from "@/components/ui/password-input";
 import { requestSignupCode, requiresEmailVerification, type EmailChallenge } from "@/lib/auth/email-codes";
 import { registrationErrorMessage, registrationPasswordError, registrationPasswordHint } from "@/lib/auth/registration-validation";
 import { DOCTOR_SPECIALIZATIONS, type DoctorSpecialization } from "@/lib/doctors/specializations";
@@ -210,8 +211,32 @@ export function ProfessionalApplicationForm({
               <FormField htmlFor="professional-last-name" label="Last name" required><input className={citizenInputClassName} id="professional-last-name" maxLength={100} onChange={(event) => setField("lastName", event.target.value)} required value={form.lastName} /></FormField>
               <FormField htmlFor="professional-nid" hint="Birth Certificate Numbers cannot be used for professional registration." label="National ID" required><input className={citizenInputClassName} id="professional-nid" inputMode="numeric" maxLength={32} onChange={(event) => setField("nid", event.target.value)} required value={form.nid} /></FormField>
               <FormField htmlFor="professional-email" label="Email address" required><input autoComplete="email" className={citizenInputClassName} id="professional-email" maxLength={320} onChange={(event) => setField("email", event.target.value)} required type="email" value={form.email} /></FormField>
-              <FormField htmlFor="professional-password" hint={registrationPasswordHint} label="Password" required><input aria-describedby="professional-password-hint" autoComplete="new-password" className={citizenInputClassName} id="professional-password" maxLength={128} onChange={(event) => setField("password", event.target.value)} required type="password" value={form.password} /></FormField>
-              <FormField htmlFor="professional-confirm-password" label="Confirm password" required><input autoComplete="new-password" className={citizenInputClassName} id="professional-confirm-password" maxLength={128} onChange={(event) => setField("confirmPassword", event.target.value)} required type="password" value={form.confirmPassword} /></FormField>
+              <FormField htmlFor="professional-password" hint={registrationPasswordHint} label="Password" required>
+                <PasswordInput
+                  aria-describedby="professional-password-hint"
+                  autoComplete="new-password"
+                  className={citizenInputClassName}
+                  id="professional-password"
+                  maxLength={128}
+                  onChange={(event) => setField("password", event.target.value)}
+                  required
+                  value={form.password}
+                  visibilityIcon
+                />
+              </FormField>
+              <FormField htmlFor="professional-confirm-password" label="Confirm password" required>
+                <PasswordInput
+                  autoComplete="new-password"
+                  className={citizenInputClassName}
+                  id="professional-confirm-password"
+                  maxLength={128}
+                  onChange={(event) => setField("confirmPassword", event.target.value)}
+                  required
+                  value={form.confirmPassword}
+                  visibilityIcon
+                  visibilityTarget="confirmation password"
+                />
+              </FormField>
             </fieldset>
           ) : null}
 

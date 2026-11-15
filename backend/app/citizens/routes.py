@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
-from app.auth.cookies import set_refresh_cookie
+from app.auth.cookies import set_sign_in_cookie
 from app.auth.schemas import TokenResponse
 from app.citizens.constants import CitizenRegistrationMethod
 from app.citizens.dependencies import CitizenContext, get_current_citizen
@@ -43,7 +43,7 @@ def register_citizen(
     settings = _settings(request)
     registered = CitizenService(db, settings).register(payload)
     tokens = registered.tokens
-    set_refresh_cookie(response, tokens.refresh_token, tokens.refresh_token_expires_at, settings)
+    set_sign_in_cookie(request, response, tokens, settings)
     return CitizenRegistrationResponse(
         user_id=registered.user.id,
         citizen_id=registered.profile.id,
@@ -69,12 +69,7 @@ def login_citizen(
 ) -> TokenResponse:
     settings = _settings(request)
     tokens = CitizenService(db, settings).login(payload)
-    set_refresh_cookie(
-        response,
-        tokens.refresh_token,
-        tokens.refresh_token_expires_at,
-        settings,
-    )
+    set_sign_in_cookie(request, response, tokens, settings)
     return TokenResponse(
         access_token=tokens.access_token,
         expires_in=tokens.access_token_expires_in,

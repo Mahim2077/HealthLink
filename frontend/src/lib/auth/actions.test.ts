@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const apiMocks = vi.hoisted(() => ({
+  forPortal: vi.fn(),
   replaceSession: vi.fn(),
   refreshSession: vi.fn(),
   terminateSession: vi.fn(),
 }));
 
 vi.mock("@/lib/api/client", () => ({
-  apiClient: apiMocks,
+  apiClientForPortal: apiMocks.forPortal,
 }));
 
 import {
@@ -19,6 +20,7 @@ import {
 
 describe("auth session actions", () => {
   beforeEach(() => {
+    apiMocks.forPortal.mockReset().mockReturnValue(apiMocks);
     apiMocks.replaceSession.mockReset();
     apiMocks.refreshSession.mockReset();
     apiMocks.terminateSession.mockReset();
@@ -27,23 +29,26 @@ describe("auth session actions", () => {
   it("delegates refresh to the single-flight API client", async () => {
     apiMocks.refreshSession.mockResolvedValue("fresh-token");
 
-    await expect(refreshSession()).resolves.toBe("fresh-token");
+    await expect(refreshSession("CITIZEN")).resolves.toBe("fresh-token");
+    expect(apiMocks.forPortal).toHaveBeenCalledWith("CITIZEN");
     expect(apiMocks.refreshSession).toHaveBeenCalledOnce();
   });
 
   it("runs logout through the session-mutation barrier", async () => {
     apiMocks.terminateSession.mockResolvedValue(undefined);
 
-    await logout();
+    await logout("PROFESSIONAL");
 
+    expect(apiMocks.forPortal).toHaveBeenCalledWith("PROFESSIONAL");
     expect(apiMocks.terminateSession).toHaveBeenCalledWith("auth/logout");
   });
 
   it("runs logout-all through the session-mutation barrier", async () => {
     apiMocks.terminateSession.mockResolvedValue(undefined);
 
-    await logoutAll();
+    await logoutAll("ADMIN");
 
+    expect(apiMocks.forPortal).toHaveBeenCalledWith("ADMIN");
     expect(apiMocks.terminateSession).toHaveBeenCalledWith("auth/logout-all");
   });
 
@@ -51,7 +56,7 @@ describe("auth session actions", () => {
     const issueSession = vi.fn().mockResolvedValue("login-token");
     apiMocks.replaceSession.mockResolvedValue("login-token");
 
-    await expect(replaceSession(issueSession)).resolves.toBe("login-token");
+    await expect(replaceSession(issueSession, "PROFESSIONAL")).resolves.toBe("login-token");
     expect(apiMocks.replaceSession).toHaveBeenCalledWith(issueSession);
   });
 });

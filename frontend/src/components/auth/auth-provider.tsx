@@ -18,7 +18,7 @@ import {
   decodeAccessTokenClaims,
   sessionMatchesPortal,
 } from "@/lib/auth/portal";
-import { accessTokenStore } from "@/lib/auth/token-store";
+import { portalTokenStores } from "@/lib/auth/token-store";
 import type { AuthSnapshot, Portal } from "@/lib/auth/types";
 
 type AuthContextValue = AuthSnapshot & {
@@ -29,25 +29,28 @@ type AuthContextValue = AuthSnapshot & {
   setAccessToken: (accessToken: string) => void;
 };
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+const AuthContext = createContext<Record<Portal, AuthContextValue> | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+function usePortalSession(portal: Portal): AuthContextValue {
+  const store = portalTokenStores[portal];
   const [, setExpiryCheck] = useState(0);
   const accessToken = useSyncExternalStore(
-    accessTokenStore.subscribe,
-    accessTokenStore.getSnapshot,
-    accessTokenStore.getServerSnapshot,
+    store.subscribe,
+    store.getSnapshot,
+    store.getServerSnapshot,
   );
 
   const setAccessToken = useCallback((token: string) => {
-    accessTokenStore.set(token);
-  }, []);
+    store.set(token);
+  }, [store]);
 
   const clearSession = useCallback(() => {
-    accessTokenStore.clear();
-  }, []);
+    store.clear();
+  }, [store]);
 
-  useEffect(() => subscribeToSessionChanges(clearSession), [clearSession]);
+  const refresh = useCallback(() => refreshSession(portal), [portal]);
+  const signOut = useCallback(() => logout(portal), [portal]);
+  const signOutAll = useCallback(() => logoutAll(portal), [portal]);
 
   useEffect(() => {
     const claims = accessToken
@@ -66,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const renew = () => {
       if (document.visibilityState === "hidden") return;
       window.clearTimeout(retry);
-      void refreshSession().catch((error: unknown) => {
+      void refresh().catch((error: unknown) => {
         if (!active || (error instanceof ApiError && error.status === 401)) return;
         retry = window.setTimeout(renew, 15_000);
       });
@@ -89,33 +92,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       document.removeEventListener("visibilitychange", checkOnReturn);
       window.removeEventListener("online", checkOnReturn);
     };
-  }, [accessToken]);
+  }, [accessToken, refresh]);
 
-  const value: AuthContextValue = {
+  return {
     ...createAuthSnapshot(accessToken),
     clearSession,
-    logout,
-    logoutAll,
-    refreshSession,
+    logout: signOut,
+    logoutAll: signOutAll,
+    refreshSession: refresh,
     setAccessToken,
   };
+}
 
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const citizen = usePortalSession("CITIZEN");
+  const professional = usePortalSession("PROFESSIONAL");
+  const admin = usePortalSession("ADMIN");
+  useEffect(subscribeToSessionChanges, []);
+  const value = { CITIZEN: citizen, PROFESSIONAL: professional, ADMIN: admin };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth(): AuthContextValue {
+export function usePortalAuth(requiredPortal: Portal) {
   const context = useContext(AuthContext);
 
   if (context === null) {
-    throw new Error("useAuth must be used within an AuthProvider.");
+    throw new Error("usePortalAuth must be used within an AuthProvider.");
   }
 
-  return context;
-}
-
-export function usePortalAuth(requiredPortal: Portal) {
-  const auth = useAuth();
-
+  const auth = context[requiredPortal];
   return {
     ...auth,
     isRequiredPortal: sessionMatchesPortal(auth.portal, requiredPortal),

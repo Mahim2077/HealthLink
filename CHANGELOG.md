@@ -1,5 +1,12 @@
 # HealthLink changelog
 
+## 1.1.0
+
+- New and existing doctors can set up their own Citizen profile from the Professional Portal using their existing account and NID. Setup is available while a professional application is under review.
+- Resume active Citizen and Professional sessions from the home page. Signing out of one portal leaves the other portal's session active.
+- Add password visibility controls to Citizen registration and Professional applications.
+- Update `dnspython` to 2.9.2 to address CVE-2026-128089.
+
 ## 1.0.1
 
 - Start a browser session when citizen or professional registration succeeds. Renew active sessions in the same browser profile and synchronize sign-out across tabs.

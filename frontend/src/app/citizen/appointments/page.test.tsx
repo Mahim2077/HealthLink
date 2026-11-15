@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
-import { accessTokenStore } from "@/lib/auth/token-store";
+import { testSessionStore } from "@/test/session-store";
 import type { AppointmentListResponse } from "@/lib/appointments/types";
 import type { Portal } from "@/lib/auth/types";
 
@@ -57,8 +57,8 @@ function createToken(portal: Portal): string {
 
 describe("AppointmentsView", () => {
   beforeEach(() => {
-    accessTokenStore.clear();
-    act(() => accessTokenStore.set(createToken("CITIZEN")));
+    testSessionStore.clear();
+    act(() => testSessionStore.set(createToken("CITIZEN")));
   });
 
   afterEach(() => {

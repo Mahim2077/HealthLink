@@ -135,6 +135,7 @@ class AuthService:
         self,
         raw_refresh_token: str,
         *,
+        portal: Portal | None = None,
         now: datetime | None = None,
     ) -> IssuedTokens:
         refreshed_at = now or utc_now()
@@ -143,7 +144,7 @@ class AuthService:
             token_hash,
             for_update=True,
         )
-        if auth_session is None:
+        if auth_session is None or (portal is not None and auth_session.portal != portal):
             raise AuthenticationError("Invalid or expired refresh token.")
 
         if auth_session.revoked_at is not None:
@@ -186,11 +187,13 @@ class AuthService:
         raw_refresh_token: str | None,
         *,
         access_claims: AccessTokenClaims | None = None,
+        portal: Portal | None = None,
+        legacy_refresh_token: str | None = None,
         now: datetime | None = None,
-    ) -> None:
+    ) -> bool:
         revoked_at = now or utc_now()
 
-        if access_claims is not None:
+        if access_claims is not None and (portal is None or access_claims.portal == portal):
             auth_session = self.repository.get_session_by_id(
                 access_claims.sid,
                 for_update=True,
@@ -203,14 +206,24 @@ class AuthService:
                 if auth_session.revoked_at is None:
                     auth_session.revoked_at = revoked_at
 
-        if raw_refresh_token:
-            auth_session = self.repository.get_session_by_refresh_hash(
-                hash_refresh_token(raw_refresh_token),
-                for_update=True,
-            )
-            if auth_session is not None and auth_session.revoked_at is None:
-                auth_session.revoked_at = revoked_at
+        self._revoke_by_refresh_token(raw_refresh_token, portal, revoked_at)
+        legacy_matched = self._revoke_by_refresh_token(legacy_refresh_token, portal, revoked_at)
         self.db.commit()
+        return legacy_matched
+
+    def _revoke_by_refresh_token(
+        self, token: str | None, portal: Portal | None, revoked_at: datetime
+    ) -> bool:
+        if not token:
+            return False
+        auth_session = self.repository.get_session_by_refresh_hash(
+            hash_refresh_token(token), for_update=True
+        )
+        if auth_session is None or (portal is not None and auth_session.portal != portal):
+            return False
+        if auth_session.revoked_at is None:
+            auth_session.revoked_at = revoked_at
+        return True
 
     def logout_by_refresh_token(
         self,

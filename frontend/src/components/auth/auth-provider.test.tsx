@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { accessTokenStore } from "@/lib/auth/token-store";
+import { testSessionStore } from "@/test/session-store";
 import { refreshSession } from "@/lib/auth/actions";
 
 import { AuthProvider, usePortalAuth } from "./auth-provider";
@@ -57,7 +57,7 @@ function AuthProbe() {
 
 describe("AuthProvider", () => {
   beforeEach(() => {
-    accessTokenStore.clear();
+    testSessionStore.clear();
     vi.mocked(refreshSession).mockReset().mockResolvedValue("test");
   });
 
@@ -95,13 +95,13 @@ describe("AuthProvider", () => {
     );
 
     act(() => {
-      accessTokenStore.set(createCitizenToken(5));
+      testSessionStore.set(createCitizenToken(5));
     });
     expect(screen.getByText("authenticated")).toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(2_000);
-      accessTokenStore.set(createCitizenToken(20));
+      testSessionStore.set(createCitizenToken(20));
     });
     act(() => {
       vi.advanceTimersByTime(3_000);
@@ -121,10 +121,10 @@ describe("AuthProvider", () => {
     vi.setSystemTime(new Date("2030-01-01T00:00:00.000Z"));
     vi.mocked(refreshSession).mockImplementation(async () => {
       const token = createCitizenToken();
-      accessTokenStore.set(token);
+      testSessionStore.set(token);
       return token;
     });
-    accessTokenStore.set(createCitizenToken(5));
+    testSessionStore.set(createCitizenToken(5));
     render(<AuthProvider><AuthProbe /></AuthProvider>);
     await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
     expect(refreshSession).toHaveBeenCalledTimes(1);

@@ -1,11 +1,12 @@
 from collections.abc import Callable
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from app.auth.models import AuthSession, User
-from app.citizens.models import UserNationalIdentifier
+from app.citizens.models import CitizenIdentifier, CitizenProfile, UserNationalIdentifier
 from app.professionals.models import (
     DoctorRegistrationDetail,
     HealthcareProfessionalProfile,
@@ -101,9 +102,10 @@ def test_new_doctor_registration_creates_pending_application_transactionally(
     assert user is not None
     assert user.email == "doctor@example.com"
     assert verify_password("StrongPassword123!", user.password_hash)
-    assert db_session.scalar(
+    nid = db_session.scalar(
         select(UserNationalIdentifier).where(UserNationalIdentifier.user_id == user.id)
-    ).nid_number == "P4-NID-0001"
+    )
+    assert nid.nid_number == "P4-NID-0001"
     registration = db_session.get(
         ProfessionalRoleRegistration,
         uuid.UUID(response.json()["role_registration_id"]),
@@ -119,6 +121,45 @@ def test_new_doctor_registration_creates_pending_application_transactionally(
         )
     ).bmdc_registration_number == "BMDC-0001"
     assert db_session.scalar(select(func.count()).select_from(AuthSession)) == 1
+    assert db_session.scalar(select(func.count()).select_from(User)) == 1
+    assert client.get("/api/v1/citizens/me", headers=headers).status_code == 403
+    assert db_session.scalar(select(func.count()).select_from(CitizenProfile)) == 0
+    assert db_session.scalar(select(func.count()).select_from(CitizenIdentifier)) == 0
+    assert client.post(
+        "/api/v1/auth/citizen/login", json={"email": user.email, "password": "StrongPassword123!"},
+    ).status_code == 401
+    setup_path = "/api/v1/professionals/me/citizen-profile"
+    assert client.get("/api/v1/professionals/me", headers=headers).json()["has_citizen_profile"] is False
+    assert client.put(setup_path, headers=headers, json={
+        "date_of_birth": "1985-04-21", "gender": "FEMALE",
+    }).status_code == 204
+    assert client.get("/api/v1/professionals/me", headers=headers).json()["has_citizen_profile"] is True
+    assert client.get("/api/v1/professionals/me/practice-schedule", headers=headers).status_code == 403
+    assert client.put(setup_path, headers=headers, json={
+        "date_of_birth": "1970-01-01", "gender": "OTHER",
+    }).status_code == 204
+    citizen_token = login_citizen(client, user.email)
+    citizen_headers = {"Authorization": f"Bearer {citizen_token}"}
+    profile = client.get("/api/v1/citizens/me", headers=citizen_headers)
+    assert profile.status_code == 200
+    assert profile.json()["user_id"] == str(user.id)
+    assert profile.json()["date_of_birth"] == "1985-04-21"
+    assert profile.json()["gender"] == "FEMALE"
+    identity = db_session.scalar(select(CitizenIdentifier).where(CitizenIdentifier.user_id == user.id))
+    assert identity.national_identifier_id == nid.id
+    assert identity.registered_with == "NID"
+    assert client.get("/api/v1/professionals/me", headers=citizen_headers).status_code == 403
+    assert client.put(setup_path, headers=citizen_headers, json={
+        "date_of_birth": "1985-04-21", "gender": "FEMALE",
+    }).status_code == 403
+    updated = client.put("/api/v1/citizens/me/profile", headers=citizen_headers, json={
+        "first_name": user.first_name, "last_name": user.last_name,
+        "date_of_birth": "1985-04-22", "gender": "FEMALE",
+        "blood_group": "A+", "address": "Dhaka",
+    })
+    assert updated.status_code == 200
+    assert updated.json()["citizen_id"] == profile.json()["citizen_id"]
+    assert updated.json()["date_of_birth"] == "1985-04-22"
 
 
 def test_non_doctor_registration_has_no_bmdc_detail(
@@ -137,6 +178,30 @@ def test_non_doctor_registration_has_no_bmdc_detail(
     assert response.status_code == 201
     assert response.json()["role_code"] == "LAB_TECHNICIAN"
     assert db_session.scalar(select(func.count()).select_from(DoctorRegistrationDetail)) == 0
+    assert db_session.scalar(select(func.count()).select_from(CitizenProfile)) == 0
+    payload = {"date_of_birth": "1985-04-21", "gender": "OTHER"}
+    assert client.put("/api/v1/professionals/me/citizen-profile", json=payload).status_code == 401
+    headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+    assert client.get("/api/v1/professionals/me", headers=headers).json()["has_citizen_profile"] is None
+    assert client.put("/api/v1/professionals/me/citizen-profile", headers=headers, json=payload).status_code == 403
+
+
+@pytest.mark.parametrize("profile", [
+    {},
+    {"date_of_birth": "2999-01-01", "gender": "FEMALE"},
+    {"date_of_birth": "1985-04-21", "gender": "  "},
+    {"date_of_birth": "1985-04-21", "gender": "FEMALE", "nid_number": "ANOTHER-NID"},
+])
+def test_citizen_profile_setup_rejects_invalid_demographics(client, db_session, profile):
+    registration = client.post("/api/v1/auth/professional/register", json=professional_payload())
+    assert registration.status_code == 201
+    response = client.put(
+        "/api/v1/professionals/me/citizen-profile",
+        headers={"Authorization": f"Bearer {registration.json()['access_token']}"},
+        json=profile,
+    )
+    assert response.status_code == 422
+    assert db_session.scalar(select(func.count()).select_from(CitizenProfile)) == 0
 
 
 def test_registration_validates_nid_role_fields_and_bmdc_rules(client: TestClient) -> None:
@@ -285,6 +350,8 @@ def test_bmdc_number_is_globally_unique_and_conflict_rolls_back(
     )
     assert response.status_code == 409
     assert db_session.scalar(select(User).where(User.email == losing_email)) is None
+    for model in (UserNationalIdentifier, ProfessionalRoleRegistration):
+        assert db_session.scalar(select(func.count()).select_from(model)) == 1
 
 
 def test_seeded_role_catalog_contains_exact_six_active_roles(db_session) -> None:

@@ -5,8 +5,11 @@ import uuid
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import AuthContext, get_current_auth_context
-from app.auth.cookies import set_refresh_cookie
+from app.auth.dependencies import AuthContext, AuthorizationError, get_current_auth_context
+from app.auth.cookies import set_sign_in_cookie
+from app.citizens.repository import CitizenRepository
+from app.citizens.schemas import CitizenProfileSetupRequest
+from app.citizens.service import CitizenService
 from app.core.config import Settings
 from app.db.session import get_db
 from app.doctors.schemas import (
@@ -69,7 +72,7 @@ def register_professional(
 ) -> ProfessionalRegistrationResponse:
     settings = _settings(request)
     result, tokens = ProfessionalService(db, settings).register_new(payload)
-    set_refresh_cookie(response, tokens.refresh_token, tokens.refresh_token_expires_at, settings)
+    set_sign_in_cookie(request, response, tokens, settings)
     return ProfessionalRegistrationResponse(
         **_response(result).model_dump(),
         access_token=tokens.access_token,
@@ -87,12 +90,7 @@ def login_professional(
 ) -> ProfessionalLoginResponse:
     settings = _settings(request)
     result = ProfessionalService(db, settings).login(payload)
-    set_refresh_cookie(
-        response,
-        result.tokens.refresh_token,
-        result.tokens.refresh_token_expires_at,
-        settings,
-    )
+    set_sign_in_cookie(request, response, result.tokens, settings)
     return ProfessionalLoginResponse(
         access_token=result.tokens.access_token,
         expires_in=result.tokens.access_token_expires_in,
@@ -128,6 +126,7 @@ def get_professional_me(
         ProfessionalAuthContext,
         Depends(get_current_professional_context),
     ],
+    db: Annotated[Session, Depends(get_db)],
 ) -> ProfessionalMeResponse:
     registration = context.role_registration
     user = registration.professional.user
@@ -147,7 +146,25 @@ def get_professional_me(
         verified_at=registration.verified_at,
         rejected_at=registration.rejected_at,
         rejection_reason=registration.rejection_reason,
+        has_citizen_profile=(
+            CitizenRepository(db).get_profile_by_user_id(user.id) is not None
+            if registration.role.code == ProfessionalRoleCode.DOCTOR and registration.role.is_active
+            else None
+        ),
     )
+
+
+@professional_router.put("/me/citizen-profile", status_code=status.HTTP_204_NO_CONTENT)
+def setup_citizen_profile(
+    payload: CitizenProfileSetupRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    context: Annotated[ProfessionalAuthContext, Depends(get_current_professional_context)],
+) -> None:
+    role = context.role_registration.role
+    if role.code != ProfessionalRoleCode.DOCTOR or not role.is_active:
+        raise AuthorizationError("Sign in with the Doctor role to set up a Citizen profile.")
+    CitizenService(db, _settings(request)).setup_profile(context.auth.user.id, payload)
 
 
 # ---------------------------------------------------------------------------

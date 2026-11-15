@@ -24,8 +24,9 @@ export async function registerCitizen(
     CitizenRegistrationRequest
   >("auth/citizen/register", request, {
     auth: false,
+    portal: "CITIZEN",
     retryOnUnauthorized: false,
-  }));
+  }), "CITIZEN");
 }
 
 export async function loginCitizen(
@@ -39,6 +40,7 @@ export async function loginCitizen(
       CitizenLoginRequest
     >("auth/citizen/login", request, {
       auth: false,
+      portal: "CITIZEN",
       retryOnUnauthorized: false,
     });
 
@@ -51,7 +53,7 @@ export async function loginCitizen(
     }
 
     return response.access_token;
-  });
+  }, "CITIZEN");
 
   if (response === null) {
     throw new ApiError(500, "Citizen login did not return a session.");

@@ -1,5 +1,7 @@
 "use client";
 
+import type { Portal } from "./types";
+
 type TokenListener = () => void;
 
 export class AccessTokenStore {
@@ -90,3 +92,8 @@ export class AccessTokenStore {
 // Access tokens intentionally live only in this module-level memory store.
 // Refresh tokens remain in backend-issued HttpOnly cookies.
 export const accessTokenStore = new AccessTokenStore();
+export const portalTokenStores: Record<Portal, AccessTokenStore> = {
+  CITIZEN: new AccessTokenStore(),
+  PROFESSIONAL: new AccessTokenStore(),
+  ADMIN: new AccessTokenStore(),
+};

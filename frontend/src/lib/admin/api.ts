@@ -26,13 +26,13 @@ export async function loginAdmin(request: AdminLoginRequest): Promise<AdminLogin
     response = await apiClient.post<AdminLoginResponse, AdminLoginRequest>(
       "auth/admin/login",
       request,
-      { auth: false, retryOnUnauthorized: false },
+      { auth: false, portal: "ADMIN", retryOnUnauthorized: false },
     );
     if (response.portal !== "ADMIN") {
       throw new ApiError(403, "This session does not belong to the Admin Portal.", response);
     }
     return response.access_token;
-  });
+  }, "ADMIN");
   if (response === null) throw new ApiError(500, "Admin login did not return a session.");
   return response;
 }

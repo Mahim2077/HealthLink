@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
-import { accessTokenStore } from "@/lib/auth/token-store";
+import { testSessionStore } from "@/test/session-store";
 
 const mocks = vi.hoisted(() => ({ logout: vi.fn(), replace: vi.fn() }));
 vi.mock("@/lib/auth/actions", () => ({
@@ -25,13 +25,13 @@ function citizenToken() {
 
 describe("PortalNavigation", () => {
   beforeEach(() => {
-    accessTokenStore.clear();
+    testSessionStore.clear();
     mocks.logout.mockReset();
     mocks.replace.mockReset();
   });
 
   it("keeps the doctor-search section active on a doctor profile", () => {
-    act(() => accessTokenStore.set(citizenToken()));
+    act(() => testSessionStore.set(citizenToken()));
     render(<AuthProvider><PortalNavigation portal="CITIZEN" /></AuthProvider>);
 
     expect(screen.getByRole("link", { name: "Find a doctor" })).toHaveAttribute("aria-current", "page");
@@ -77,7 +77,7 @@ describe("PortalNavigation", () => {
   });
 
   it("signs out from the shared portal navigation", async () => {
-    act(() => accessTokenStore.set(citizenToken()));
+    act(() => testSessionStore.set(citizenToken()));
     mocks.logout.mockResolvedValue(undefined);
     vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<AuthProvider><PortalNavigation portal="CITIZEN" /></AuthProvider>);

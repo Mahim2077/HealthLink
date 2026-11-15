@@ -12,7 +12,7 @@ from app.auth.models import EmailCodeChallenge, User
 from app.core.security import REFRESH_TOKEN_COOKIE_NAME
 from app.db.session import create_database_engine
 from test_citizen_routes import registration_payload
-from test_professional_routes import professional_payload
+from test_professional_routes import login_citizen, professional_payload
 
 
 BASE = "/api/v1/auth"
@@ -80,6 +80,15 @@ def test_signup_requires_email_proof_and_preserves_portal_rules(client, db_sessi
     assert client.post(f"{BASE}/refresh").json()["portal"] == portal
     if portal == "PROFESSIONAL":
         assert result.json()["verification_status"] == "PENDING"
+        setup = client.put(
+            "/api/v1/professionals/me/citizen-profile",
+            headers={"Authorization": f"Bearer {result.json()['access_token']}"},
+            json={"date_of_birth": "1985-04-21", "gender": "FEMALE"},
+        )
+        assert setup.status_code == 204
+        token = login_citizen(client, payload["email"])
+        email_status = client.get(f"{BASE}/email/status", headers={"Authorization": f"Bearer {token}"})
+        assert email_status.json()["verified"] is True
     assert db_session.get(User, uuid.UUID(result.json()["user_id"])).email_verified_at is not None
     assert db_session.get(EmailCodeChallenge, uuid.UUID(proof["challenge_id"])) is None
     assert client.post(url, json={**payload, **proof}).status_code == 409

@@ -10,15 +10,18 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.auth.constants import Portal
+from app.auth.cookies import SESSION_PORTAL_HEADER, refresh_cookie_name
 from app.auth.dependencies import AuthContext, require_portal
 from app.auth.models import AuthSession, User
 from app.auth.service import AuthenticationError, AuthService, as_utc, utc_now
 from app.core.config import Settings
 from app.core.security import (
+    AccessTokenClaims,
     REFRESH_TOKEN_COOKIE_NAME,
     create_access_token,
     decode_access_token,
 )
+from test_professional_routes import professional_payload
 
 
 AUTH_COOKIE_PATH = "/api/v1/auth"
@@ -33,13 +36,88 @@ def _issue_tokens(
     return AuthService(db_session, settings).create_session(user.id, portal)
 
 
-def _set_refresh_cookie(client: TestClient, refresh_token: str) -> None:
+def _set_refresh_cookie(
+    client: TestClient, refresh_token: str, portal: Portal | None = None
+) -> None:
     client.cookies.set(
-        REFRESH_TOKEN_COOKIE_NAME,
+        refresh_cookie_name(portal),
         refresh_token,
         domain="testserver.local",
         path=AUTH_COOKIE_PATH,
     )
+
+
+def _register_doctor(
+    client: TestClient, settings: Settings, *, scoped: bool = False
+) -> AccessTokenClaims:
+    response = client.post(
+        "/api/v1/auth/professional/register",
+        json=professional_payload(),
+        headers={SESSION_PORTAL_HEADER: Portal.PROFESSIONAL} if scoped else None,
+    )
+    assert response.status_code == 201
+    return decode_access_token(response.json()["access_token"], settings)
+
+
+def test_scoped_refresh_preserves_another_portal_when_a_session_expires_or_signs_out(
+    client: TestClient,
+    db_session: Session,
+    test_settings: Settings,
+) -> None:
+    professional = _register_doctor(client, test_settings, scoped=True)
+    user = db_session.get(User, professional.sub)
+    assert user is not None
+    citizen = _issue_tokens(db_session, test_settings, user, Portal.CITIZEN)
+    _set_refresh_cookie(client, citizen.refresh_token, Portal.CITIZEN)
+    citizen_headers = {SESSION_PORTAL_HEADER: Portal.CITIZEN}
+    professional_headers = {SESSION_PORTAL_HEADER: Portal.PROFESSIONAL}
+
+    doctor_refresh = client.post("/api/v1/auth/refresh", headers=professional_headers)
+    assert doctor_refresh.status_code == 200
+    doctor_token = doctor_refresh.json()["access_token"]
+    assert decode_access_token(doctor_token, test_settings).sid == professional.sid
+    assert client.cookies.get(refresh_cookie_name(Portal.CITIZEN)) == citizen.refresh_token
+
+    citizen_session = db_session.get(AuthSession, citizen.session_id)
+    assert citizen_session is not None
+    citizen_session.expires_at = utc_now() - timedelta(seconds=1)
+    db_session.commit()
+    assert client.post("/api/v1/auth/refresh", headers=citizen_headers).status_code == 401
+
+    # Even a valid bearer from the other portal cannot end its session here.
+    logout = client.post(
+        "/api/v1/auth/logout",
+        headers={**citizen_headers, "Authorization": f"Bearer {doctor_token}"},
+    )
+    assert logout.status_code == 204
+    assert refresh_cookie_name(Portal.CITIZEN) not in client.cookies
+    assert client.post("/api/v1/auth/refresh", headers=professional_headers).status_code == 200
+
+    assert client.post("/api/v1/auth/logout", headers=professional_headers).status_code == 204
+    assert client.post("/api/v1/auth/refresh", headers=professional_headers).status_code == 401
+
+
+def test_scoped_refresh_only_migrates_the_matching_legacy_session(
+    client: TestClient,
+    test_settings: Settings,
+) -> None:
+    issued = _register_doctor(client, test_settings)
+    legacy_token = client.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
+    assert legacy_token is not None
+    citizen_headers = {SESSION_PORTAL_HEADER: Portal.CITIZEN}
+
+    assert client.post("/api/v1/auth/refresh", headers=citizen_headers).status_code == 401
+    assert client.post("/api/v1/auth/logout", headers=citizen_headers).status_code == 204
+    assert client.cookies.get(REFRESH_TOKEN_COOKIE_NAME) == legacy_token
+
+    response = client.post(
+        "/api/v1/auth/refresh", headers={SESSION_PORTAL_HEADER: Portal.PROFESSIONAL}
+    )
+    assert response.status_code == 200
+    claims = decode_access_token(response.json()["access_token"], test_settings)
+    assert claims.sid == issued.sid
+    assert refresh_cookie_name(Portal.PROFESSIONAL) in client.cookies
+    assert REFRESH_TOKEN_COOKIE_NAME not in client.cookies
 
 
 def test_refresh_endpoint_rotates_cookie_without_exposing_it_in_json(

@@ -1,21 +1,23 @@
 "use client";
 
-import { apiClient } from "@/lib/api/client";
+import { apiClientForPortal } from "@/lib/api/client";
+import type { Portal } from "./types";
 
-export async function refreshSession(): Promise<string> {
-  return apiClient.refreshSession();
+export async function refreshSession(portal: Portal): Promise<string> {
+  return apiClientForPortal(portal).refreshSession();
 }
 
-export async function logout(): Promise<void> {
-  await apiClient.terminateSession("auth/logout");
+export async function logout(portal: Portal): Promise<void> {
+  await apiClientForPortal(portal).terminateSession("auth/logout");
 }
 
-export async function logoutAll(): Promise<void> {
-  await apiClient.terminateSession("auth/logout-all");
+export async function logoutAll(portal: Portal): Promise<void> {
+  await apiClientForPortal(portal).terminateSession("auth/logout-all");
 }
 
 export async function replaceSession<T extends string | { access_token: string }>(
   issueSession: () => Promise<T>,
+  portal: Portal,
 ): Promise<T> {
-  return apiClient.replaceSession(issueSession);
+  return apiClientForPortal(portal).replaceSession(issueSession);
 }

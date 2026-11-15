@@ -2,15 +2,29 @@
 
 import { API_BASE_URL, joinApiUrl } from "./config";
 import { ApiError } from "./errors";
-import { requestAccessTokenRefresh } from "@/lib/auth/refresh";
-import { decodeAccessTokenClaims } from "@/lib/auth/portal";
+import { requestAccessTokenRefresh, SESSION_PORTAL_HEADER } from "@/lib/auth/refresh";
+import { decodeAccessTokenClaims, isPortal, portalForPathname } from "@/lib/auth/portal";
 import {
   AccessTokenStore,
   accessTokenStore,
+  portalTokenStores,
 } from "@/lib/auth/token-store";
+import { PORTALS, type Portal } from "@/lib/auth/types";
 
 const SESSION_CHANNEL = "healthlink:session";
 let browserSessionChannel: BroadcastChannel | undefined;
+
+type SessionChange = { portal: Portal; accountId?: string };
+
+function clearChangedSessions({ portal, accountId }: SessionChange) {
+  for (const candidate of PORTALS) {
+    const store = portalTokenStores[candidate];
+    const token = store.getSnapshot();
+    if (candidate === portal || (accountId && token && decodeAccessTokenClaims(token)?.sub === accountId)) {
+      store.clear();
+    }
+  }
+}
 
 async function withBrowserSessionLock<T>(run: () => Promise<T>): Promise<T> {
   return typeof navigator !== "undefined" && navigator.locks
@@ -24,10 +38,15 @@ function sessionChannel(): BroadcastChannel | undefined {
   return browserSessionChannel;
 }
 
-export function subscribeToSessionChanges(listener: () => void): () => void {
+export function subscribeToSessionChanges(): () => void {
   const channel = sessionChannel();
-  const onMessage = (event: MessageEvent) => {
-    if (event.data === "changed") listener();
+  const onMessage = (event: MessageEvent<Partial<SessionChange> | null>) => {
+    if (isPortal(event.data?.portal)) {
+      clearChangedSessions({
+        portal: event.data.portal,
+        accountId: typeof event.data.accountId === "string" ? event.data.accountId : undefined,
+      });
+    }
   };
   channel?.addEventListener("message", onMessage);
   return () => channel?.removeEventListener("message", onMessage);
@@ -44,6 +63,7 @@ export type ApiRequestOptions = Omit<RequestInit, "body"> & {
   auth?: boolean;
   body?: BodyInit | null;
   json?: unknown;
+  portal?: Portal;
   retryOnUnauthorized?: boolean;
 };
 
@@ -52,6 +72,8 @@ type ApiClientOptions = {
   fetchImplementation?: typeof fetch;
   refreshAccessToken?: () => Promise<string>;
   tokenStore?: AccessTokenStore;
+  portal?: Portal;
+  routeRequests?: boolean;
 };
 
 export class AuthSessionChangedError extends Error {
@@ -73,6 +95,8 @@ export class ApiClient {
   private readonly fetchImplementation: typeof fetch;
   private readonly refreshAccessTokenHandler: () => Promise<string>;
   private readonly tokenStore: AccessTokenStore;
+  private readonly portal?: Portal;
+  private readonly routeRequests: boolean;
   private pendingSessionMutations = 0;
   private refreshPromise: Promise<string> | null = null;
   private sessionMutationQueue: Promise<void> = Promise.resolve();
@@ -81,16 +105,22 @@ export class ApiClient {
     this.baseUrl = options.baseUrl ?? API_BASE_URL;
     this.fetchImplementation =
       options.fetchImplementation ?? globalThis.fetch.bind(globalThis);
-    this.tokenStore = options.tokenStore ?? accessTokenStore;
+    this.portal = options.portal;
+    this.routeRequests = options.routeRequests ?? false;
+    this.tokenStore = options.tokenStore ?? (this.portal ? portalTokenStores[this.portal] : accessTokenStore);
     this.refreshAccessTokenHandler =
       options.refreshAccessToken ??
-      (() => requestAccessTokenRefresh(this.fetchImplementation));
+      (() => requestAccessTokenRefresh(this.fetchImplementation, this.portal));
   }
 
   async request<TResponse>(
     path: string,
-    options: ApiRequestOptions = {},
+    { portal, ...options }: ApiRequestOptions = {},
   ): Promise<TResponse> {
+    if (this.routeRequests) {
+      const requestPortal = portal ?? (typeof window === "undefined" ? null : portalForPathname(window.location.pathname));
+      if (requestPortal) return apiClientForPortal(requestPortal).request<TResponse>(path, options);
+    }
     return this.execute<TResponse>(path, options, true);
   }
 
@@ -167,7 +197,14 @@ export class ApiClient {
           headers,
           retryOnUnauthorized: false,
         });
-        sessionChannel()?.postMessage("changed");
+        if (this.portal) {
+          const accountId = path === "auth/logout-all" && terminationAccessToken
+            ? decodeAccessTokenClaims(terminationAccessToken)?.sub
+            : undefined;
+          const change = { portal: this.portal, accountId };
+          clearChangedSessions(change);
+          sessionChannel()?.postMessage(change);
+        }
       } finally {
         this.tokenStore.clear();
       }
@@ -180,7 +217,7 @@ export class ApiClient {
     return this.withSessionMutationBarrier(async () => {
       const result = await issueSession();
       this.tokenStore.set(typeof result === "string" ? result : result.access_token);
-      sessionChannel()?.postMessage("changed");
+      if (this.portal) sessionChannel()?.postMessage({ portal: this.portal });
       return result;
     });
   }
@@ -206,6 +243,9 @@ export class ApiClient {
     const headers = new Headers(providedHeaders);
     if (!headers.has("Accept")) {
       headers.set("Accept", "application/json");
+    }
+    if (this.portal && path.startsWith("auth/")) {
+      headers.set(SESSION_PORTAL_HEADER, this.portal);
     }
 
     const tokenUsed = auth ? this.tokenStore.getSnapshot() : null;
@@ -365,4 +405,14 @@ export class ApiClient {
   }
 }
 
-export const apiClient = new ApiClient();
+const portalClients: Record<Portal, ApiClient> = {
+  CITIZEN: new ApiClient({ portal: "CITIZEN" }),
+  PROFESSIONAL: new ApiClient({ portal: "PROFESSIONAL" }),
+  ADMIN: new ApiClient({ portal: "ADMIN" }),
+};
+
+export function apiClientForPortal(portal: Portal): ApiClient {
+  return portalClients[portal];
+}
+
+export const apiClient = new ApiClient({ routeRequests: true });

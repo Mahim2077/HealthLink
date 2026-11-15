@@ -1,5 +1,19 @@
 import { isApiError } from "@/lib/api/errors";
 
+export const registrationGenders = [
+  { value: "MALE", label: "Male" },
+  { value: "FEMALE", label: "Female" },
+  { value: "OTHER", label: "Other" },
+  { value: "PREFER_NOT_TO_SAY", label: "Prefer not to say" },
+] as const;
+
+export function localCalendarDate(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
+}
+
 export const registrationPasswordHint =
   "Use 8–128 characters, including an uppercase letter, a lowercase letter, a number, and a symbol.";
 

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ApiError } from "@/lib/api/errors";
-import { accessTokenStore } from "@/lib/auth/token-store";
+import { testSessionStore } from "@/test/session-store";
 import type { Portal } from "@/lib/auth/types";
 import type { CitizenDashboardData } from "@/lib/citizen/types";
 
@@ -87,7 +87,7 @@ function renderDashboard(loadAction = vi.fn().mockResolvedValue(dashboardData)) 
 
 describe("CitizenDashboard", () => {
   beforeEach(() => {
-    accessTokenStore.clear();
+    testSessionStore.clear();
     testMocks.logout.mockReset();
     testMocks.logoutAll.mockReset();
     testMocks.refreshSession.mockReset();
@@ -106,7 +106,7 @@ describe("CitizenDashboard", () => {
       () =>
         new Promise<string>((resolve) => {
           resolveRefresh = () => {
-            accessTokenStore.set(citizenToken);
+            testSessionStore.set(citizenToken);
             resolve(citizenToken);
           };
         }),
@@ -125,15 +125,16 @@ describe("CitizenDashboard", () => {
     expect(screen.queryByText("00123456789012345")).not.toBeInTheDocument();
   });
 
-  it("does not load citizen data for a different portal token", () => {
-    act(() => accessTokenStore.set(createToken("PROFESSIONAL")));
+  it("does not load citizen data for a different portal token", async () => {
+    testMocks.refreshSession.mockRejectedValue(new ApiError(401, "No citizen session"));
+    act(() => testSessionStore.set(createToken("PROFESSIONAL")));
     const { loadAction } = renderDashboard();
 
     expect(
-      screen.getByText("Citizen Portal access required"),
+      await screen.findByText("Sign in to continue"),
     ).toBeInTheDocument();
     expect(loadAction).not.toHaveBeenCalled();
-    expect(testMocks.refreshSession).not.toHaveBeenCalled();
+    expect(testMocks.refreshSession).toHaveBeenCalledWith("CITIZEN");
   });
 
   it("shows the sign-in guard when cookie hydration fails", async () => {
@@ -152,13 +153,13 @@ describe("CitizenDashboard", () => {
   it("shows protected hydration, not signed-out UI, while an idle token is refreshed", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2030-01-01T00:00:00.000Z"));
-    act(() => accessTokenStore.set(createToken("CITIZEN", 2)));
+    act(() => testSessionStore.set(createToken("CITIZEN", 2)));
 
     const refreshedToken = createToken("CITIZEN", 1800);
     let resolveRefresh!: () => void;
     const pending = new Promise<string>((resolve) => {
       resolveRefresh = () => {
-        accessTokenStore.set(refreshedToken);
+        testSessionStore.set(refreshedToken);
         resolve(refreshedToken);
       };
     });
@@ -183,7 +184,7 @@ describe("CitizenDashboard", () => {
   });
 
   it("shows a data error and retries the citizen dashboard request", async () => {
-    act(() => accessTokenStore.set(createToken("CITIZEN")));
+    act(() => testSessionStore.set(createToken("CITIZEN")));
     const loadAction = vi
       .fn()
       .mockRejectedValueOnce(new ApiError(503, "Citizen service unavailable."))
@@ -200,7 +201,7 @@ describe("CitizenDashboard", () => {
   });
 
   it("surfaces primary care actions without identity content", async () => {
-    act(() => accessTokenStore.set(createToken("CITIZEN")));
+    act(() => testSessionStore.set(createToken("CITIZEN")));
     renderDashboard();
     await screen.findByText("Welcome, Amina.");
 

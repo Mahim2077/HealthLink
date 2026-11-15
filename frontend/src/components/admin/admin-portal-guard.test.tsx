@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ApiError } from "@/lib/api/errors";
-import { accessTokenStore } from "@/lib/auth/token-store";
+import { testSessionStore } from "@/test/session-store";
 
 const mocks = vi.hoisted(() => ({ loadRegistrations: vi.fn(), refreshSession: vi.fn() }));
 vi.mock("@/lib/admin/api", () => ({ loadProfessionalRegistrations: mocks.loadRegistrations }));
@@ -18,12 +18,14 @@ function token(portal: "ADMIN" | "CITIZEN") {
 }
 
 describe("AdminPortalGuard", () => {
-  beforeEach(() => { accessTokenStore.clear(); mocks.loadRegistrations.mockReset(); mocks.refreshSession.mockReset(); mocks.loadRegistrations.mockResolvedValue([]); });
+  beforeEach(() => { testSessionStore.clear(); mocks.loadRegistrations.mockReset(); mocks.refreshSession.mockReset(); mocks.loadRegistrations.mockResolvedValue([]); });
 
-  it("does not mount private queue data under a different portal", () => {
-    act(() => accessTokenStore.set(token("CITIZEN")));
+  it("does not mount private queue data under a different portal", async () => {
+    mocks.refreshSession.mockRejectedValue(new ApiError(401, "No admin session"));
+    act(() => testSessionStore.set(token("CITIZEN")));
     render(<AuthProvider><ProfessionalVerificationQueue /></AuthProvider>);
-    expect(screen.getByText("Admin Portal access required")).toBeInTheDocument();
+    expect(await screen.findByText("Admin sign in required")).toBeInTheDocument();
+    expect(mocks.refreshSession).toHaveBeenCalledWith("ADMIN");
     expect(mocks.loadRegistrations).not.toHaveBeenCalled();
   });
 
@@ -35,7 +37,7 @@ describe("AdminPortalGuard", () => {
   });
 
   it("mounts private queue data only after ADMIN authorization", async () => {
-    act(() => accessTokenStore.set(token("ADMIN")));
+    act(() => testSessionStore.set(token("ADMIN")));
     render(<AuthProvider><ProfessionalVerificationQueue /></AuthProvider>);
     expect(await screen.findByText("Queue is clear")).toBeInTheDocument();
     expect(mocks.loadRegistrations).toHaveBeenCalledWith("PENDING");

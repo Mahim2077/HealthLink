@@ -7,11 +7,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from app.auth.constants import Portal
+from app.auth.cookies import SESSION_PORTAL_HEADER, refresh_cookie_name
 from app.auth.models import AuthSession, User
 from app.auth.service import AuthService
 from app.citizens.models import CitizenIdentifier, UserNationalIdentifier
 from app.core.config import Settings
 from app.core.security import REFRESH_TOKEN_COOKIE_NAME, hash_password
+from test_professional_routes import professional_payload
 
 
 def registration_payload(
@@ -70,6 +72,25 @@ def test_register_starts_a_session_without_exposing_private_identity_values(
     assert client.post("/api/v1/auth/refresh").json()["portal"] == "CITIZEN"
     assert client.post("/api/v1/auth/logout").status_code == 204
     assert client.post("/api/v1/auth/refresh").status_code == 401
+
+
+def test_scoped_citizen_registration_leaves_legacy_professional_session_available(
+    client: TestClient,
+) -> None:
+    doctor = client.post("/api/v1/auth/professional/register", json=professional_payload())
+    assert doctor.status_code == 201
+    legacy_token = client.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
+    assert legacy_token is not None
+    headers = {SESSION_PORTAL_HEADER: Portal.CITIZEN}
+    response = client.post("/api/v1/auth/citizen/register", json=registration_payload(), headers=headers)
+    assert response.status_code == 201
+    assert refresh_cookie_name(Portal.CITIZEN) in client.cookies
+    assert client.cookies.get(REFRESH_TOKEN_COOKIE_NAME) == legacy_token
+    assert client.post("/api/v1/auth/refresh", headers=headers).status_code == 200
+    assert client.post("/api/v1/auth/logout", headers=headers).status_code == 204
+    assert client.post(
+        "/api/v1/auth/refresh", headers={SESSION_PORTAL_HEADER: Portal.PROFESSIONAL}
+    ).status_code == 200
 
 
 def test_login_cookie_flags_and_refresh_token_is_not_in_json(

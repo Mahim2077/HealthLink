@@ -44,6 +44,11 @@ describe("ProfessionalApplicationForm", () => {
     render(<ProfessionalApplicationForm mode="new" registerAction={registerAction} />);
     fillNewAccount();
     fillRoleFields();
+    fireEvent.click(screen.getByRole("button", { name: "Show password" }));
+    expect(screen.getByLabelText(/^Password/i)).toHaveAttribute("type", "text");
+    expect(screen.getByLabelText(/Confirm password/i)).toHaveAttribute("type", "password");
+    expect(registerAction).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Hide password" }));
     fireEvent.click(screen.getByRole("button", { name: "Submit professional application" }));
 
     await waitFor(() => expect(registerAction).toHaveBeenCalledOnce());

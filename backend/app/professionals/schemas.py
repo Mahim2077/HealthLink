@@ -137,3 +137,4 @@ class ProfessionalMeResponse(BaseModel):
     verified_at: datetime | None
     rejected_at: datetime | None
     rejection_reason: str | None
+    has_citizen_profile: bool | None = None

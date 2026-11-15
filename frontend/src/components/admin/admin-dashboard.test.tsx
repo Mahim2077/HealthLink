@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ApiError } from "@/lib/api/errors";
-import { accessTokenStore } from "@/lib/auth/token-store";
+import { testSessionStore } from "@/test/session-store";
 import { AdminDashboard } from "./admin-dashboard";
 
 const mocks = vi.hoisted(() => ({ logout: vi.fn(), refreshSession: vi.fn(), replace: vi.fn() }));
@@ -15,20 +15,21 @@ function token(portal: "ADMIN" | "CITIZEN") { const e=(v:object)=>btoa(JSON.stri
 function renderDashboard(loadAction = vi.fn().mockResolvedValue(admin)) { render(<AuthProvider><AdminDashboard loadAction={loadAction} /></AuthProvider>); return loadAction; }
 
 describe("AdminDashboard", () => {
-  beforeEach(() => { accessTokenStore.clear(); mocks.logout.mockReset(); mocks.refreshSession.mockReset(); mocks.replace.mockReset(); });
+  beforeEach(() => { testSessionStore.clear(); mocks.logout.mockReset(); mocks.refreshSession.mockReset(); mocks.replace.mockReset(); });
 
   it("hydrates an admin session and loads only current trusted account data", async () => {
-    mocks.refreshSession.mockImplementation(async () => { const value=token("ADMIN"); accessTokenStore.set(value); return value; });
+    mocks.refreshSession.mockImplementation(async () => { const value=token("ADMIN"); testSessionStore.set(value); return value; });
     const load = renderDashboard();
     expect(await screen.findByText("Welcome, Trusted.")).toBeInTheDocument();
     expect(load).toHaveBeenCalledOnce();
     expect(screen.getByText("Super administrator")).toBeInTheDocument();
   });
 
-  it("blocks a different portal before loading admin data", () => {
-    act(() => accessTokenStore.set(token("CITIZEN")));
+  it("blocks a different portal before loading admin data", async () => {
+    mocks.refreshSession.mockRejectedValue(new ApiError(401, "No admin session"));
+    act(() => testSessionStore.set(token("CITIZEN")));
     const load = renderDashboard();
-    expect(screen.getByText("Admin Portal access required")).toBeInTheDocument();
+    expect(await screen.findByText("Admin sign in required")).toBeInTheDocument();
     expect(load).not.toHaveBeenCalled();
   });
 
@@ -40,7 +41,7 @@ describe("AdminDashboard", () => {
   });
 
   it("shows the focused operational routes", async () => {
-    act(() => accessTokenStore.set(token("ADMIN")));
+    act(() => testSessionStore.set(token("ADMIN")));
     renderDashboard();
     await screen.findByText("Welcome, Trusted.");
     expect(

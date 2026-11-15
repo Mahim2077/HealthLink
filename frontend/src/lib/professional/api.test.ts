@@ -33,7 +33,7 @@ describe("Professional API", () => {
     expect(mocks.post).toHaveBeenCalledWith(
       "auth/professional/register",
       request,
-      { auth: false, retryOnUnauthorized: false },
+      { auth: false, portal: "PROFESSIONAL", retryOnUnauthorized: false },
     );
   });
 
@@ -48,7 +48,7 @@ describe("Professional API", () => {
 
     await onboardProfessional(request);
 
-    expect(mocks.post).toHaveBeenCalledWith("professionals/me/onboard", request);
+    expect(mocks.post).toHaveBeenCalledWith("professionals/me/onboard", request, { portal: "CITIZEN" });
     expect(request).not.toHaveProperty("nid_number");
     expect(request).not.toHaveProperty("user_id");
   });
@@ -58,7 +58,7 @@ describe("Professional API", () => {
     mocks.post.mockResolvedValue(response); mocks.replaceSession.mockImplementation(async (issue: () => Promise<string>) => issue());
     const request = { nid_number: "NID-1", password: "secret", role_code: "DOCTOR" as const };
     await expect(loginProfessional(request)).resolves.toEqual(response);
-    expect(mocks.post).toHaveBeenCalledWith("auth/professional/login", request, { auth: false, retryOnUnauthorized: false });
+    expect(mocks.post).toHaveBeenCalledWith("auth/professional/login", request, { auth: false, portal: "PROFESSIONAL", retryOnUnauthorized: false });
     expect(mocks.replaceSession).toHaveBeenCalledOnce();
     mocks.get.mockResolvedValue({ role_code: "DOCTOR" }); await loadProfessionalMe();
     expect(mocks.get).toHaveBeenCalledWith("professionals/me");

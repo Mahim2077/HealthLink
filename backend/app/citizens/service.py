@@ -21,6 +21,7 @@ from app.citizens.repository import CitizenRepository
 from app.citizens.schemas import (
     CitizenAddNidRequest,
     CitizenLoginRequest,
+    CitizenProfileSetupRequest,
     CitizenProfileUpdateRequest,
     CitizenRegistrationRequest,
 )
@@ -210,6 +211,28 @@ class CitizenService:
         if profile is None:
             raise CitizenCapabilityError()
         return profile
+
+    def setup_profile(self, user_id: uuid.UUID, request: CitizenProfileSetupRequest) -> None:
+        # Serialize setup across tabs and leave any existing Citizen record intact.
+        user = self.repository.get_user_by_id(user_id, for_update=True)
+        if user is None or not user.is_active:
+            raise CitizenCapabilityError()
+        if self.repository.get_profile_by_user_id(user_id) is not None:
+            return
+
+        nid = self.repository.get_national_identifier_by_user_id(user_id)
+        if nid is None:
+            raise CitizenIdentityUpgradeError("A National ID must be linked before you can set up a Citizen profile.")
+
+        self.repository.add(CitizenProfile(
+            user_id=user_id, date_of_birth=request.date_of_birth, gender=request.gender,
+        ))
+        if self.repository.get_identity_by_user_id(user_id) is None:
+            self.repository.add(CitizenIdentifier(
+                user_id=user_id, national_identifier_id=nid.id,
+                registered_with=CitizenRegistrationMethod.NID.value,
+            ))
+        self.db.commit()
 
     def get_identity(self, user_id: uuid.UUID) -> CitizenIdentityDetails:
         identity = self.repository.get_identity_by_user_id(user_id)

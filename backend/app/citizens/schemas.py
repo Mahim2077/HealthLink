@@ -22,15 +22,30 @@ RegistrationPassword = Annotated[SecretStr, Field(min_length=8, max_length=128)]
 LoginPassword = Annotated[SecretStr, Field(min_length=1, max_length=128)]
 
 
-class CitizenRegistrationRequest(BaseModel):
+class CitizenDemographics(BaseModel):
+    date_of_birth: date
+    gender: Annotated[str, Field(min_length=1, max_length=32)]
+
+    @field_validator("gender", mode="before")
+    @classmethod
+    def strip_gender(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def reject_future_date_of_birth(cls, value: date) -> date:
+        if value > date.today():
+            raise ValueError("Date of birth cannot be in the future.")
+        return value
+
+
+class CitizenRegistrationRequest(CitizenDemographics):
     email: EmailStr
     password: RegistrationPassword
     challenge_id: uuid.UUID | None = None
     code: Annotated[str | None, Field(pattern=r"^[0-9]{6}$")] = None
     first_name: Annotated[str, Field(min_length=1, max_length=100)]
     last_name: Annotated[str, Field(min_length=1, max_length=100)]
-    date_of_birth: date
-    gender: Annotated[str, Field(min_length=1, max_length=32)]
     blood_group: Annotated[str | None, Field(max_length=8)] = None
     address: str | None = None
     nid_number: Annotated[str | None, Field(max_length=32)] = None
@@ -39,7 +54,6 @@ class CitizenRegistrationRequest(BaseModel):
     @field_validator(
         "first_name",
         "last_name",
-        "gender",
         "blood_group",
         "address",
         "nid_number",
@@ -61,33 +75,27 @@ class CitizenRegistrationRequest(BaseModel):
             raise ValueError("Provide exactly one of NID or Birth Certificate Number.")
         return self
 
-    @field_validator("date_of_birth")
-    @classmethod
-    def reject_future_date_of_birth(cls, value: date) -> date:
-        if value > date.today():
-            raise ValueError("Date of birth cannot be in the future.")
-        return value
-
 
 class CitizenLoginRequest(BaseModel):
     email: EmailStr
     password: LoginPassword
 
 
-class CitizenProfileUpdateRequest(BaseModel):
+class CitizenProfileSetupRequest(CitizenDemographics):
+    model_config = ConfigDict(extra="forbid")
+
+
+class CitizenProfileUpdateRequest(CitizenDemographics):
     model_config = ConfigDict(extra="forbid")
 
     first_name: Annotated[str, Field(min_length=1, max_length=100)]
     last_name: Annotated[str, Field(min_length=1, max_length=100)]
-    date_of_birth: date
-    gender: Annotated[str, Field(min_length=1, max_length=32)]
     blood_group: Annotated[str | None, Field(max_length=8)] = None
     address: str | None = None
 
     @field_validator(
         "first_name",
         "last_name",
-        "gender",
         "blood_group",
         "address",
         mode="before",
@@ -97,13 +105,6 @@ class CitizenProfileUpdateRequest(BaseModel):
         if isinstance(value, str):
             stripped = value.strip()
             return stripped or None
-        return value
-
-    @field_validator("date_of_birth")
-    @classmethod
-    def reject_future_date_of_birth(cls, value: date) -> date:
-        if value > date.today():
-            raise ValueError("Date of birth cannot be in the future.")
         return value
 
 

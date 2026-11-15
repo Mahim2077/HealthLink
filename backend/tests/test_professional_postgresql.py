@@ -225,7 +225,29 @@ def test_live_postgresql_registration_and_existing_citizen_onboarding(
             )
             assert doctor.status_code == 201
             assert doctor.json()["verification_status"] == "PENDING"
-            user_ids.append(uuid.UUID(doctor.json()["user_id"]))
+            doctor_user_id = uuid.UUID(doctor.json()["user_id"])
+            user_ids.append(doctor_user_id)
+            headers = {"Authorization": f"Bearer {doctor.json()['access_token']}"}
+            assert client.get("/api/v1/professionals/me", headers=headers).json()["has_citizen_profile"] is False
+
+            barrier = Barrier(2)
+
+            def setup(gender: str) -> int:
+                with TestClient(application) as worker:
+                    barrier.wait(timeout=10)
+                    response = worker.put(
+                        "/api/v1/professionals/me/citizen-profile",
+                        headers=headers,
+                        json={"date_of_birth": "1985-04-21", "gender": gender},
+                    )
+                    return response.status_code
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                assert list(executor.map(setup, ["OTHER", "PREFER_NOT_TO_SAY"])) == [204, 204]
+            with Session(engine) as session:
+                citizens = session.scalars(select(CitizenProfile).where(CitizenProfile.user_id == doctor_user_id)).all()
+                identities = session.scalars(select(CitizenIdentifier).where(CitizenIdentifier.user_id == doctor_user_id)).all()
+                assert len(citizens) == len(identities) == 1
 
             citizen = client.post(
                 "/api/v1/auth/citizen/register",

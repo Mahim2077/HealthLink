@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api/errors";
+import { localCalendarDate } from "@/lib/auth/registration-validation";
 import type {
   CitizenRegistrationRequest,
   CitizenRegistrationResponse,
@@ -9,7 +10,6 @@ import type {
 
 import {
   CitizenRegisterForm,
-  localCalendarDate,
   validateCitizenRegistration,
 } from "./register-form";
 
@@ -85,6 +85,11 @@ describe("CitizenRegisterForm", () => {
 
     render(<CitizenRegisterForm registerAction={registerAction} />);
     fillRequiredFields("00A-19/BD");
+    fireEvent.click(screen.getByRole("button", { name: "Show confirmation password" }));
+    expect(screen.getByLabelText(/^Password/i)).toHaveAttribute("type", "password");
+    expect(screen.getByLabelText(/Confirm password/i)).toHaveAttribute("type", "text");
+    expect(registerAction).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Hide confirmation password" }));
     fireEvent.click(screen.getByRole("button", { name: "Create citizen account" }));
 
     await waitFor(() => expect(registerAction).toHaveBeenCalledOnce());

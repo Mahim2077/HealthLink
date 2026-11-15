@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { CitizenProfileManager } from "@/components/citizen/citizen-profile-manager";
+import { ProfessionalCitizenProfileLink } from "@/components/professional/citizen-profile-setup";
 import { useSettingsContext } from "./settings-layout";
 
 export function AccountSettings() {
@@ -22,7 +23,12 @@ export function AccountSettings() {
         <div><dt className="hl-setting-help">Verified facility</dt><dd className="mt-1 font-semibold">{professional.facility?.name ?? "No facility linked"}</dd></div>
       </> : <div><dt className="hl-setting-help">Account role</dt><dd className="mt-1 font-semibold">{admin?.is_super_admin ? "Super administrator" : "Administrator"}</dd></div>}
     </dl>
-    {professional ? <Link href="/professional/status" className="hl-button-secondary mt-6">View verification details</Link> : null}
+    {professional ? (
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Link href="/professional/status" className="hl-button-secondary">View verification details</Link>
+        <ProfessionalCitizenProfileLink hasProfile={professional.has_citizen_profile} />
+      </div>
+    ) : null}
     <p className="mt-6 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">{professional ? "Role approvals and facility assignments are managed by administrators. Sign out and select another approved role to change your professional workspace." : "Operational tools such as facilities, verification and citizen identity support remain in the admin workspace."}</p>
   </section>;
 }

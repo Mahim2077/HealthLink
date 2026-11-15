@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
-import { accessTokenStore } from "@/lib/auth/token-store";
+import { testSessionStore } from "@/test/session-store";
 
 const mocks = vi.hoisted(() => ({
   loadCitizenMe: vi.fn(),
@@ -54,7 +54,7 @@ function citizenToken() {
 }
 
 function renderShell() {
-  act(() => accessTokenStore.set(citizenToken()));
+  act(() => testSessionStore.set(citizenToken()));
   return render(
     <AuthProvider>
       <PortalShell portal="CITIZEN">
@@ -68,7 +68,7 @@ describe("PortalShell", () => {
   beforeEach(() => {
     window.localStorage.clear();
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
-    accessTokenStore.clear();
+    testSessionStore.clear();
     mocks.loadCitizenMe.mockReset();
     mocks.loadCitizenMe.mockResolvedValue({
       first_name: "Amina",

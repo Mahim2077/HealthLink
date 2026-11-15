@@ -65,7 +65,7 @@ describe("Citizen API", () => {
     expect(apiMocks.post).toHaveBeenCalledWith(
       "auth/citizen/register",
       request,
-      { auth: false, retryOnUnauthorized: false },
+      { auth: false, portal: "CITIZEN", retryOnUnauthorized: false },
     );
     expect(apiMocks.replaceSession).toHaveBeenCalledOnce();
   });
@@ -89,7 +89,7 @@ describe("Citizen API", () => {
     expect(apiMocks.post).toHaveBeenCalledWith(
       "auth/citizen/login",
       { email: "citizen@example.com", password: "secret" },
-      { auth: false, retryOnUnauthorized: false },
+      { auth: false, portal: "CITIZEN", retryOnUnauthorized: false },
     );
   });
 
