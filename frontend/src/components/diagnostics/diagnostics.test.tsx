@@ -3,12 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DiagnosticRequestPanel } from "./diagnostic-request-panel";
 import { DiagnosticList } from "./diagnostic-list";
 import { DiagnosticsPage } from "./diagnostics-page";
+import { DiagnosticSessions } from "./diagnostic-sessions";
+import type { LabSession } from "@/lib/diagnostics/session-api";
 
-const mocks = vi.hoisted(() => ({ create: vi.fn(), search: vi.fn(), assign: vi.fn(), citizen: vi.fn(), professional: vi.fn(), trends: vi.fn(), me: vi.fn(), auth: vi.fn(), catalog: vi.fn(), sessions: vi.fn() }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), search: vi.fn(), assign: vi.fn(), citizen: vi.fn(), professional: vi.fn(), trends: vi.fn(), me: vi.fn(), auth: vi.fn(), catalog: vi.fn(), sessions: vi.fn(), stage: vi.fn(), publish: vi.fn() }));
 vi.mock("@/lib/diagnostics/api", () => ({ createDiagnosticTest: mocks.create, listDiagnosticTechnicians: mocks.search, assignDiagnosticTest: mocks.assign, listCitizenDiagnostics: mocks.citizen, listProfessionalDiagnostics: mocks.professional, transitionDiagnosticTest: vi.fn() }));
 vi.mock("@/lib/diagnostics/report-api", () => ({ listLabTrends: mocks.trends }));
 vi.mock("@/lib/diagnostics/session-api", async importOriginal => ({
   ...await importOriginal<typeof import("@/lib/diagnostics/session-api")>(), getTestCatalog: mocks.catalog, getLabSessions: mocks.sessions,
+  stageLabPdf: mocks.stage, publishLabPdf: mocks.publish,
 }));
 vi.mock("@/lib/professional/api", () => ({ loadProfessionalMe: mocks.me }));
 vi.mock("@/components/auth/auth-provider", () => ({ usePortalAuth: mocks.auth }));
@@ -17,6 +20,18 @@ const testRecord = {
   id: "test-1", citizen_id: "citizen-1", visit_id: "visit-1", requested_by_role_registration_id: "doctor-1", assigned_to_role_registration_id: null,
   facility_id: "facility-1", facility_name: "City Hospital", test_name: "CBC", instructions: null, status: "REQUESTED" as const,
   requested_by_name: "Doctor", assigned_to_name: null, created_at: "2026-09-12", updated_at: "2026-09-12",
+};
+
+const performedSession: LabSession = {
+  id: "session-1", catalog_code: "CBC", test_name: "Complete blood count", status: "PERFORMED",
+  created_at: "2026-11-16T08:00:00Z", attendance_deadline: null, facility_name: "City Hospital",
+  closed_reason: null, share_code: null, patient_name: "Test Patient", report_version: null,
+  report_test_name: null, draft_version: null, draft_test_name: null, draft_tested_at: null,
+};
+
+const stagedSession: LabSession = {
+  ...performedSession, draft_version: 1, draft_test_name: performedSession.test_name,
+  draft_tested_at: "2026-11-16T09:00:00Z",
 };
 
 describe("Diagnostic safety and assignment", () => {
@@ -115,5 +130,41 @@ describe("Diagnostic safety and assignment", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
     await waitFor(() => expect(mocks.professional).toHaveBeenCalled());
     expect(await screen.findByText("No diagnostic tests")).toBeInTheDocument();
+  });
+
+  it("lets a technician finish as soon as upload succeeds, before the session list refreshes", async () => {
+    mocks.sessions.mockResolvedValueOnce([performedSession]).mockImplementation(() => new Promise(() => {}));
+    mocks.stage.mockResolvedValue(stagedSession);
+    mocks.publish.mockResolvedValue({
+      ...performedSession, status: "PUBLISHED", report_version: 1, report_test_name: performedSession.test_name,
+    });
+    render(<DiagnosticSessions lab />);
+
+    const input = await screen.findByLabelText("Report PDF (up to 3 MB)");
+    expect(screen.queryByRole("button", { name: "Finish lab session" })).not.toBeInTheDocument();
+    const file = new File(["report"], "result.pdf", { type: "application/pdf" });
+    fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.submit(input.closest("form")!);
+
+    const finish = await screen.findByRole("button", { name: "Finish lab session" });
+    expect(mocks.stage).toHaveBeenCalledWith(performedSession.id, file, undefined, undefined);
+    const verification = screen.getByRole("checkbox", { name: /I checked that the PDF matches/ });
+    expect(verification).toBeRequired();
+    fireEvent.click(finish);
+    expect(mocks.publish).not.toHaveBeenCalled();
+
+    fireEvent.click(verification);
+    fireEvent.click(finish);
+    expect(await screen.findByText("Session finished")).toBeInTheDocument();
+    expect(mocks.publish).toHaveBeenCalledExactlyOnceWith(performedSession.id, 1);
+    expect(screen.getByText("Open published PDF")).toBeInTheDocument();
+  });
+
+  it("shows the finish action for a previously uploaded draft with the preview closed", async () => {
+    mocks.sessions.mockResolvedValue([stagedSession]);
+    render(<DiagnosticSessions lab />);
+
+    expect(await screen.findByRole("button", { name: "Finish lab session" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Preview draft PDF" })).toHaveAttribute("aria-expanded", "false");
   });
 });

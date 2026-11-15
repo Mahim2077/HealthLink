@@ -18,7 +18,7 @@ const labels: Record<SessionStatus, string> = {
   EXPIRED: "Expired", CANCELLED: "Cancelled", UNABLE: "Unable to complete",
 };
 
-type Run = (action: () => Promise<unknown>) => Promise<void>;
+type Run = (action: () => Promise<LabSession | void>) => Promise<void>;
 
 function LabReportActions({ session, run, busy }: { session: LabSession; run: Run; busy: boolean }) {
   const [file, setFile] = useState<File | null>(null);
@@ -28,13 +28,15 @@ function LabReportActions({ session, run, busy }: { session: LabSession; run: Ru
   const [withdraw, setWithdraw] = useState(false);
   const revision = session.draft_version;
   const publishedVersion = session.report_version;
+  const finishing = session.status === "PERFORMED";
   return <div className="space-y-3">
     <h4 className="font-semibold">Original report PDF</h4>
     <form className="space-y-2" onSubmit={event => {
       event.preventDefault();
       if (file) void run(async () => {
-        await stageLabPdf(session.id, file, correction?.code, testedAt ? new Date(testedAt).toISOString() : undefined);
-        setPreview(true);
+        const updated = await stageLabPdf(session.id, file, correction?.code, testedAt ? new Date(testedAt).toISOString() : undefined);
+        setPreview(false);
+        return updated;
       });
     }}>
       <fieldset className="space-y-2" disabled={busy}>
@@ -51,20 +53,27 @@ function LabReportActions({ session, run, busy }: { session: LabSession; run: Ru
         <button type="submit" className={button}>Upload PDF</button>
       </fieldset>
     </form>
-    {revision !== null && <>
-      <button type="button" className={button} onClick={() => setPreview(value => !value)}>{preview ? "Hide draft PDF" : "Preview draft PDF"}</button>
-      {preview && <>
-        <p className="text-sm text-slate-600">{session.draft_test_name}{session.draft_tested_at && ` · Test time ${new Date(session.draft_tested_at).toLocaleString()}`}</p>
-        <DiagnosticPdfPreview key={revision} id={session.id} version={revision} />
-        <form className="space-y-2" key={revision} onSubmit={event => {
-          event.preventDefault();
-          void run(async () => { await publishLabPdf(session.id, revision); setPreview(false); });
-        }}>
-          <label className="flex items-start gap-2 text-sm"><input type="checkbox" required className="mt-1" /> I checked that the PDF matches this patient, the test type and test time.</label>
-          <button type="submit" className={primary} disabled={busy}>Publish report</button>
-        </form>
-      </>}
-    </>}
+    {revision !== null && <div className="space-y-2">
+      <p role="status" className="text-sm text-slate-600">
+        {finishing ? "PDF uploaded. Finish the lab session to share the report with the patient." : "Updated PDF uploaded. Publish it to make it available to the patient."}
+      </p>
+      <p className="text-sm text-slate-600">{session.draft_test_name}{session.draft_tested_at && ` · Test time ${new Date(session.draft_tested_at).toLocaleString()}`}</p>
+      <button type="button" className={button} aria-expanded={preview} onClick={() => setPreview(value => !value)}>
+        {preview ? "Hide draft PDF" : "Preview draft PDF"}
+      </button>
+      <form className="space-y-2" key={revision} onSubmit={event => {
+        event.preventDefault();
+        void run(async () => {
+          const updated = await publishLabPdf(session.id, revision);
+          setPreview(false);
+          return updated;
+        });
+      }}>
+        <label className="flex items-start gap-2 text-sm"><input type="checkbox" required disabled={busy} className="mt-1" /> I checked that the PDF matches this patient, the test type and test time.</label>
+        <button type="submit" className={primary} disabled={busy}>{finishing ? "Finish lab session" : "Publish updated report"}</button>
+      </form>
+      {preview && <DiagnosticPdfPreview key={revision} id={session.id} version={revision} />}
+    </div>}
     {publishedVersion !== null && <div className="space-y-2">
       <PublishedLabPdf id={session.id} version={publishedVersion} />
       {withdraw ? <div className="flex flex-wrap gap-2">
@@ -171,7 +180,12 @@ export function DiagnosticSessions({ lab = false, selection = null, onSelection,
     locked.current = true;
     setBusy(true);
     setError("");
-    try { await action(); }
+    try {
+      const updated = await action();
+      if (updated) {
+        setSessions(current => current?.map(session => session.id === updated.id ? updated : session) ?? null);
+      }
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to update the lab session."); }
     finally {
       setReload(value => value + 1);
@@ -223,7 +237,10 @@ export function DiagnosticSessions({ lab = false, selection = null, onSelection,
           <h3 className="font-semibold">{session.test_name}</h3>
           <p className="text-sm text-slate-600">{[session.patient_name, session.facility_name, new Date(session.created_at).toLocaleDateString()].filter(Boolean).join(" · ")}</p>
         </div>
-        <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-900">{session.status === "PUBLISHED" && session.report_version === null ? "Report withdrawn" : labels[session.status]}</span>
+        <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-900">
+          {session.status === "PUBLISHED" && session.report_version === null ? "Report withdrawn"
+            : lab && session.status === "PUBLISHED" ? "Session finished" : labels[session.status]}
+        </span>
       </div>
       {session.status === "ACCEPTED" && session.attendance_deadline && <p className="text-sm">Arrive by {new Date(session.attendance_deadline).toLocaleString()}.</p>}
       {session.closed_reason && <p className="text-sm">{closureReasons[session.closed_reason]}</p>}

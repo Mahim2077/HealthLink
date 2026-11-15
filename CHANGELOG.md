@@ -1,5 +1,9 @@
 # HealthLink changelog
 
+## 1.1.1
+
+- Show **Finish lab session** as soon as a technician uploads a draft PDF and when they reopen a session with a draft. Finishing publishes the report to the patient.
+
 ## 1.1.0
 
 - New and existing doctors can set up their own Citizen profile from the Professional Portal using their existing account and NID. Setup is available while a professional application is under review.
