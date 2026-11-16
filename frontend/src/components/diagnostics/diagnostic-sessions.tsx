@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   acceptLabSession, advanceLabSession, cancelLabSession, closeLabSession, closureReasons,
   getLabSessions, publishLabPdf, stageLabPdf, startLabSession, withdrawLabPdf,
@@ -12,13 +12,14 @@ import { TestPicker } from "./test-picker";
 const button = "min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-semibold disabled:opacity-50";
 const primary = "min-h-11 rounded-xl bg-sky-700 px-4 text-sm font-semibold text-white disabled:opacity-50";
 const input = "mt-1 block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2";
+const pageSize = 20;
 const labels: Record<SessionStatus, string> = {
   REQUESTED: "Awaiting acceptance", ACCEPTED: "Accepted · Awaiting arrival", CHECKED_IN: "Checked in",
   COLLECTED: "Sample collected", PERFORMED: "Test performed", PUBLISHED: "Report available",
   EXPIRED: "Expired", CANCELLED: "Cancelled", UNABLE: "Unable to complete",
 };
 
-type Run = (action: () => Promise<LabSession | void>) => Promise<void>;
+type Run = (action: () => Promise<LabSession | void>, reportAction?: "finish" | "history") => Promise<void>;
 
 function LabReportActions({ session, run, busy }: { session: LabSession; run: Run; busy: boolean }) {
   const [file, setFile] = useState<File | null>(null);
@@ -37,7 +38,7 @@ function LabReportActions({ session, run, busy }: { session: LabSession; run: Ru
         const updated = await stageLabPdf(session.id, file, correction?.code, testedAt ? new Date(testedAt).toISOString() : undefined);
         setPreview(false);
         return updated;
-      });
+      }, finishing ? undefined : "history");
     }}>
       <fieldset className="space-y-2" disabled={busy}>
         <label className="block text-sm">Report PDF (up to 3 MB)
@@ -67,7 +68,7 @@ function LabReportActions({ session, run, busy }: { session: LabSession; run: Ru
           const updated = await publishLabPdf(session.id, revision);
           setPreview(false);
           return updated;
-        });
+        }, finishing ? "finish" : "history");
       }}>
         <label className="flex items-start gap-2 text-sm"><input type="checkbox" required disabled={busy} className="mt-1" /> I checked that the PDF matches this patient, the test type and test time.</label>
         <button type="submit" className={primary} disabled={busy}>{finishing ? "Finish lab session" : "Publish updated report"}</button>
@@ -78,9 +79,10 @@ function LabReportActions({ session, run, busy }: { session: LabSession; run: Ru
       <PublishedLabPdf id={session.id} version={publishedVersion} />
       {withdraw ? <div className="flex flex-wrap gap-2">
         <button type="button" className={button} disabled={busy} onClick={() => void run(async () => {
-          await withdrawLabPdf(session.id, publishedVersion);
+          const updated = await withdrawLabPdf(session.id, publishedVersion);
           setWithdraw(false);
-        })}>Confirm withdrawal</button>
+          return updated;
+        }, "history")}>Confirm withdrawal</button>
         <button type="button" className={button} onClick={() => setWithdraw(false)}>Keep report</button>
       </div> : <button type="button" className={button} onClick={() => setWithdraw(true)}>Withdraw report</button>}
     </div>}
@@ -140,17 +142,33 @@ function CitizenPdf({ session }: { session: LabSession }) {
   </div>;
 }
 
-export function DiagnosticSessions({ lab = false, selection = null, onSelection, onRefresh }: {
+function SessionPagination({ page, count, busy, label, onPage }: {
+  page: number; count: number; busy: boolean; label: string; onPage: (page: number) => void;
+}) {
+  if (page === 1 && count <= pageSize) return null;
+  return <nav aria-label={label} className="flex flex-wrap items-center gap-3">
+    <button type="button" className={button} disabled={page === 1 || busy} onClick={() => onPage(page - 1)}>Previous sessions</button>
+    <span className="text-sm">Page {page}</span>
+    <button type="button" className={button} disabled={count <= pageSize || busy} onClick={() => onPage(page + 1)}>Next sessions</button>
+  </nav>;
+}
+
+export function DiagnosticSessions({ lab = false, selection = null, onSelection, onRefresh, doctorAssignedTests }: {
   lab?: boolean;
   selection?: TestChoice | null;
   onSelection?: (choice: TestChoice | null) => void;
   onRefresh?: () => void;
+  doctorAssignedTests?: ReactNode;
 }) {
   const [sessions, setSessions] = useState<LabSession[] | null>(null);
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<{ message: string; inHistory: boolean } | null>(null);
   const [loadError, setLoadError] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [finishedSessions, setFinishedSessions] = useState<LabSession[] | null>(null);
+  const [historyError, setHistoryError] = useState("");
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState("");
   const [deadline, setDeadline] = useState("");
@@ -159,7 +177,7 @@ export function DiagnosticSessions({ lab = false, selection = null, onSelection,
 
   useEffect(() => {
     let active = true;
-    void getLabSessions(lab, page).then(data => {
+    void getLabSessions(lab, page, lab ? false : undefined).then(data => {
       if (active) {
         setSessions(data);
         setLoadError("");
@@ -171,22 +189,51 @@ export function DiagnosticSessions({ lab = false, selection = null, onSelection,
     return () => { active = false; };
   }, [lab, onRefresh, page, reload]);
   useEffect(() => {
+    if (!lab || !historyOpen) return;
+    let active = true;
+    void getLabSessions(true, historyPage, true).then(data => {
+      if (active) {
+        setFinishedSessions(data);
+        setHistoryError("");
+      }
+    }, reason => {
+      if (active) setHistoryError(reason instanceof Error ? reason.message : "Unable to load finished lab sessions.");
+    });
+    return () => { active = false; };
+  }, [lab, historyOpen, historyPage, reload]);
+  useEffect(() => {
     const timer = window.setInterval(() => { if (!document.hidden) setReload(value => value + 1); }, 30_000);
     return () => window.clearInterval(timer);
   }, []);
 
-  const run: Run = async action => {
+  const run: Run = async (action, reportAction) => {
     if (locked.current) return;
     locked.current = true;
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       const updated = await action();
-      if (updated) {
+      if (lab && updated?.status === "PUBLISHED") {
+        setSessions(current => current?.filter(session => session.id !== updated.id) ?? null);
+        if (reportAction === "finish") {
+          const firstPage = historyPage === 1;
+          setFinishedSessions(current => {
+            const otherSessions = firstPage ? (current ?? []).filter(session => session.id !== updated.id) : [];
+            return [updated, ...otherSessions].slice(0, pageSize + 1);
+          });
+          setHistoryPage(1);
+          setHistoryOpen(true);
+          setHistoryError("");
+        } else {
+          setFinishedSessions(current => current?.map(session => session.id === updated.id ? updated : session) ?? null);
+        }
+      } else if (updated) {
         setSessions(current => current?.map(session => session.id === updated.id ? updated : session) ?? null);
       }
     }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to update the lab session."); }
+    catch (reason) {
+      setError({ message: reason instanceof Error ? reason.message : "Unable to update the lab session.", inHistory: reportAction === "history" });
+    }
     finally {
       setReload(value => value + 1);
       setBusy(false);
@@ -202,36 +249,7 @@ export function DiagnosticSessions({ lab = false, selection = null, onSelection,
     if (page !== 1) { setPage(1); setSessions(null); }
   });
 
-  return <section id="diagnostic-new" className="space-y-4" aria-label="Lab sessions">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <h2 className="text-xl font-bold">{lab ? "Lab sessions" : "Your lab sessions"}</h2>
-      <button type="button" className={button} onClick={() => setReload(value => value + 1)}>Refresh sessions</button>
-    </div>
-    {lab ? <form className="hl-card space-y-3 p-5" onSubmit={event => {
-      event.preventDefault();
-      void run(async () => {
-        await acceptLabSession(code.trim(), new Date(deadline).toISOString());
-        setCode("");
-        setDeadline("");
-        if (page !== 1) { setPage(1); setSessions(null); }
-      });
-    }}>
-      <h3 className="font-semibold">Accept a request</h3>
-      <label className="block text-sm">Patient’s session code<input className={input} value={code} onChange={event => setCode(event.target.value)} required maxLength={32} autoComplete="off" /></label>
-      <label className="block text-sm">Attendance deadline in your local time<input className={input} value={deadline} onChange={event => setDeadline(event.target.value)} required type="datetime-local" /></label>
-      <button type="submit" className={primary} disabled={busy}>Accept request</button>
-    </form> : onSelection && <form className="hl-card space-y-3 p-5" onSubmit={event => {
-      event.preventDefault();
-      if (selection) void create(selection.code);
-    }}>
-      <h3 className="font-semibold">Request a test</h3>
-      <p className="text-sm text-slate-600">Share the session code with a technician at your chosen participating facility.</p>
-      <TestPicker value={selection} onChange={onSelection} />
-      <button type="submit" className={primary} disabled={!selection || busy}>Start session</button>
-    </form>}
-    {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
-    {loadError ? <p role="alert" className="text-sm text-rose-700">{loadError}</p> : !sessions ? <p role="status">Loading lab sessions…</p> : sessions.length === 0 && <p className="text-sm text-slate-600">No lab sessions on this page.</p>}
-    {sessions?.slice(0, 20).map(session => <article className="hl-card space-y-3 p-5" key={session.id}>
+  const renderSession = (session: LabSession) => <article className="hl-card space-y-3 p-5" key={session.id}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="font-semibold">{session.test_name}</h3>
@@ -256,11 +274,56 @@ export function DiagnosticSessions({ lab = false, selection = null, onSelection,
           <CitizenPdf session={session} />
         </>}
       </>}
-    </article>)}
-    {sessions && (page > 1 || sessions.length > 20) && <nav aria-label="Lab session pages" className="flex flex-wrap items-center gap-3">
-      <button type="button" className={button} disabled={page === 1 || busy} onClick={() => { setPage(page - 1); setSessions(null); }}>Previous sessions</button>
-      <span className="text-sm">Page {page}</span>
-      <button type="button" className={button} disabled={sessions.length <= 20 || busy} onClick={() => { setPage(page + 1); setSessions(null); }}>Next sessions</button>
-    </nav>}
-  </section>;
+  </article>;
+
+  return <>
+    <section id="diagnostic-new" className="space-y-4" aria-label="Lab sessions">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xl font-bold">{lab ? "Lab sessions" : "Your lab sessions"}</h2>
+        <button type="button" className={button} onClick={() => setReload(value => value + 1)}>Refresh sessions</button>
+      </div>
+      {lab ? <form className="hl-card space-y-3 p-5" onSubmit={event => {
+        event.preventDefault();
+        void run(async () => {
+          await acceptLabSession(code.trim(), new Date(deadline).toISOString());
+          setCode("");
+          setDeadline("");
+          if (page !== 1) { setPage(1); setSessions(null); }
+        });
+      }}>
+        <h3 className="font-semibold">Accept a request</h3>
+        <label className="block text-sm">Patient’s session code<input className={input} value={code} onChange={event => setCode(event.target.value)} required maxLength={32} autoComplete="off" /></label>
+        <label className="block text-sm">Attendance deadline in your local time<input className={input} value={deadline} onChange={event => setDeadline(event.target.value)} required type="datetime-local" /></label>
+        <button type="submit" className={primary} disabled={busy}>Accept request</button>
+      </form> : onSelection && <form className="hl-card space-y-3 p-5" onSubmit={event => {
+        event.preventDefault();
+        if (selection) void create(selection.code);
+      }}>
+        <h3 className="font-semibold">Request a test</h3>
+        <p className="text-sm text-slate-600">Share the session code with a technician at your chosen participating facility.</p>
+        <TestPicker value={selection} onChange={onSelection} />
+        <button type="submit" className={primary} disabled={!selection || busy}>Start session</button>
+      </form>}
+      {error && !error.inHistory && <p role="alert" className="text-sm text-rose-700">{error.message}</p>}
+      {loadError ? <p role="alert" className="text-sm text-rose-700">{loadError}</p> : !sessions ? <p role="status">Loading lab sessions…</p> : sessions.length === 0 && <p className="text-sm text-slate-600">No lab sessions on this page.</p>}
+      {sessions?.slice(0, pageSize).map(renderSession)}
+      {sessions && <SessionPagination page={page} count={sessions.length} busy={busy} label="Lab session pages"
+        onPage={next => { setPage(next); setSessions(null); }} />}
+    </section>
+    {lab && <details className="space-y-4" open={historyOpen} onToggle={event => setHistoryOpen(event.currentTarget.open)}>
+      <summary className="min-h-11 cursor-pointer font-semibold">Previously assigned diagnostic tests</summary>
+      <section className="space-y-3" aria-labelledby="finished-lab-sessions-heading">
+        <h2 id="finished-lab-sessions-heading" className="text-lg font-semibold">Finished lab sessions</h2>
+        {error?.inHistory && <p role="alert" className="text-sm text-rose-700">{error.message}</p>}
+        {historyError ? <p role="alert" className="text-sm text-rose-700">{historyError}</p> : !finishedSessions ? <p role="status">Loading finished lab sessions…</p> : finishedSessions.length === 0 && <p className="text-sm text-slate-600">No finished lab sessions on this page.</p>}
+        {finishedSessions?.slice(0, pageSize).map(renderSession)}
+        {finishedSessions && <SessionPagination page={historyPage} count={finishedSessions.length} busy={busy} label="Finished lab session pages"
+          onPage={next => { setHistoryPage(next); setFinishedSessions(null); setHistoryError(""); }} />}
+      </section>
+      {doctorAssignedTests && <section className="space-y-3" aria-labelledby="doctor-assigned-tests-heading">
+        <h2 id="doctor-assigned-tests-heading" className="text-lg font-semibold">Doctor-assigned tests</h2>
+        {doctorAssignedTests}
+      </section>}
+    </details>}
+  </>;
 }

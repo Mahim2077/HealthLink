@@ -34,7 +34,11 @@ const citizenPath = "citizens/me/diagnostic-sessions";
 const labPath = "professionals/me/diagnostic-sessions";
 
 export const getTestCatalog = () => apiClient.get<TestChoice[]>("diagnostics/test-catalog");
-export const getLabSessions = (lab: boolean, page: number) => apiClient.get<LabSession[]>(`${lab ? labPath : citizenPath}?page=${page}`, { cache: "no-store" });
+export const getLabSessions = (lab: boolean, page: number, finished?: boolean) => {
+  const params = new URLSearchParams({ page: String(page) });
+  if (lab && finished !== undefined) params.set("finished", String(finished));
+  return apiClient.get<LabSession[]>(`${lab ? labPath : citizenPath}?${params}`, { cache: "no-store" });
+};
 export const startLabSession = (id: string, catalog_code: string) => apiClient.post<LabSession, { id: string; catalog_code: string }>(citizenPath, { id, catalog_code });
 export const cancelLabSession = (id: string) => apiClient.post<LabSession>(`${citizenPath}/${id}/cancel`);
 export const acceptLabSession = (code: string, attendance_deadline: string) => apiClient.post<LabSession, { code: string; attendance_deadline: string }>(`${labPath}/accept`, { code, attendance_deadline });

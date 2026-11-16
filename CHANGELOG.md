@@ -1,5 +1,9 @@
 # HealthLink changelog
 
+## 1.1.2
+
+- Move finished lab sessions to **Previously assigned diagnostic tests**, where technicians can reopen and manage published reports. Paginate finished and unfinished sessions independently.
+
 ## 1.1.1
 
 - Show **Finish lab session** as soon as a technician uploads a draft PDF and when they reopen a session with a draft. Finishing publishes the report to the patient.

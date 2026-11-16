@@ -53,10 +53,10 @@ def cancel_session(session_id: UUID, citizen: Citizen, db: Database):
 
 
 @router.get("/professionals/me/diagnostic-sessions", response_model=list[LabSessionView])
-def lab_sessions(actor: Lab, db: Database, page: Page = 1):
+def lab_sessions(actor: Lab, db: Database, page: Page = 1, finished: bool | None = None):
     service = LabSessionService(db)
     facility = service._facility(actor.role_registration)
-    return service.list(actor.role_registration.id, page, citizen=False, facility_id=facility.id)
+    return service.list(actor.role_registration.id, page, citizen=False, facility_id=facility.id, finished=finished)
 
 
 @router.post("/professionals/me/diagnostic-sessions/accept", response_model=LabSessionView)

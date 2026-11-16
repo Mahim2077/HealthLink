@@ -108,11 +108,17 @@ class LabSessionService:
         row = self.db.execute(self._view_query(lab).where(LabSession.id == item.id)).one()
         return self._view_row(row, citizen=citizen)
 
-    def list(self, owner: UUID, page: int, *, citizen: bool, facility_id: UUID | None = None) -> list[LabSessionView]:
+    def list(self, owner: UUID, page: int, *, citizen: bool, facility_id: UUID | None = None,
+             finished: bool | None = None) -> list[LabSessionView]:
         condition = LabSession.citizen_id == owner if citizen else (
             (LabSession.technician_id == owner) & (LabSession.facility_id == facility_id)
         )
-        rows = self.db.execute(self._view_query(not citizen).where(condition).order_by(
+        query = self._view_query(not citizen).where(condition)
+        if finished is True:
+            query = query.where(LabSession.status == Status.PUBLISHED).order_by(DiagnosticPdf.published_at.desc().nulls_last())
+        elif finished is False:
+            query = query.where(LabSession.status != Status.PUBLISHED)
+        rows = self.db.execute(query.order_by(
             LabSession.created_at.desc(), LabSession.id.desc()
         ).offset((page - 1) * 20).limit(21))
         return [self._view_row(row, citizen=citizen) for row in rows]

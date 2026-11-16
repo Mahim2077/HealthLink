@@ -30,10 +30,9 @@ function ProfessionalDiagnostics() {
   }
   if (me.role_code === "DOCTOR") return <DiagnosticList loadAction={listProfessionalDiagnostics} role="doctor" transitionAction={transitionDiagnosticTest} />;
   return <div className="space-y-8">
-    <DiagnosticSessions lab />
-    <details><summary className="min-h-11 cursor-pointer font-semibold">Previously assigned diagnostic tests</summary>
+    <DiagnosticSessions lab doctorAssignedTests={
       <DiagnosticList loadAction={listProfessionalDiagnostics} role="lab" transitionAction={transitionDiagnosticTest} />
-    </details>
+    } />
   </div>;
 }
 

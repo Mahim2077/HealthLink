@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DiagnosticRequestPanel } from "./diagnostic-request-panel";
 import { DiagnosticList } from "./diagnostic-list";
@@ -32,6 +32,10 @@ const performedSession: LabSession = {
 const stagedSession: LabSession = {
   ...performedSession, draft_version: 1, draft_test_name: performedSession.test_name,
   draft_tested_at: "2026-11-16T09:00:00Z",
+};
+
+const publishedSession: LabSession = {
+  ...performedSession, status: "PUBLISHED", report_version: 1, report_test_name: performedSession.test_name,
 };
 
 describe("Diagnostic safety and assignment", () => {
@@ -132,12 +136,10 @@ describe("Diagnostic safety and assignment", () => {
     expect(await screen.findByText("No diagnostic tests")).toBeInTheDocument();
   });
 
-  it("lets a technician finish as soon as upload succeeds, before the session list refreshes", async () => {
+  it("moves a newly finished session into the open history before either list refreshes", async () => {
     mocks.sessions.mockResolvedValueOnce([performedSession]).mockImplementation(() => new Promise(() => {}));
     mocks.stage.mockResolvedValue(stagedSession);
-    mocks.publish.mockResolvedValue({
-      ...performedSession, status: "PUBLISHED", report_version: 1, report_test_name: performedSession.test_name,
-    });
+    mocks.publish.mockResolvedValue(publishedSession);
     render(<DiagnosticSessions lab />);
 
     const input = await screen.findByLabelText("Report PDF (up to 3 MB)");
@@ -155,9 +157,11 @@ describe("Diagnostic safety and assignment", () => {
 
     fireEvent.click(verification);
     fireEvent.click(finish);
-    expect(await screen.findByText("Session finished")).toBeInTheDocument();
+    const history = await screen.findByRole("region", { name: "Finished lab sessions" });
+    expect(within(history).getByText("Session finished")).toBeInTheDocument();
+    expect(within(history).getByText("Open published PDF")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Lab sessions" })).queryByRole("heading", { name: performedSession.test_name })).not.toBeInTheDocument();
     expect(mocks.publish).toHaveBeenCalledExactlyOnceWith(performedSession.id, 1);
-    expect(screen.getByText("Open published PDF")).toBeInTheDocument();
   });
 
   it("shows the finish action for a previously uploaded draft with the preview closed", async () => {
@@ -166,5 +170,20 @@ describe("Diagnostic safety and assignment", () => {
 
     expect(await screen.findByRole("button", { name: "Finish lab session" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Preview draft PDF" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("loads finished sessions under previously assigned tests alongside the doctor-assigned list", async () => {
+    mocks.auth.mockReturnValue({ status: "authenticated", isRequiredPortal: true, claims: { sid: "lab" }, refreshSession: vi.fn() });
+    mocks.me.mockResolvedValue({ role_code: "LAB_TECHNICIAN", verification_status: "VERIFIED" });
+    mocks.professional.mockResolvedValue({ tests: [{ ...testRecord, status: "IN_PROGRESS" }] });
+    mocks.sessions.mockImplementation(async (_lab, _page, finished) => finished ? [publishedSession] : []);
+    render(<DiagnosticsPage portal="PROFESSIONAL" />);
+
+    fireEvent.click(await screen.findByText("Previously assigned diagnostic tests"));
+    const history = await screen.findByRole("region", { name: "Finished lab sessions" });
+    expect(await within(history).findByRole("heading", { name: publishedSession.test_name })).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Doctor-assigned tests" })).getByRole("link", { name: "Open lab report" })).toBeInTheDocument();
+    expect(mocks.sessions).toHaveBeenCalledWith(true, 1, false);
+    expect(mocks.sessions).toHaveBeenCalledWith(true, 1, true);
   });
 });

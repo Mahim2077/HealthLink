@@ -102,7 +102,12 @@ def test_cross_facility_pdf_is_private_and_fulfills_only_matching_requests(clien
     assert audit == "UPLOAD_PDF"
     assert client.get(pdf_path, headers=owner).status_code == 404
     assert client.get(f"{lab_path}/pdf/{version}", headers=lab_auth).content == pdf
+    assert [item["id"] for item in client.get(LAB, headers=lab_auth, params={"finished": False}).json()] == [session["id"]]
+    assert client.get(LAB, headers=lab_auth, params={"finished": True}).json() == []
     assert client.post(lab_path + "/publish", headers=lab_auth, json={"version": version}).status_code == 200
+    assert client.get(LAB, headers=lab_auth, params={"finished": False}).json() == []
+    finished = client.get(LAB, headers=lab_auth, params={"finished": True}).json()
+    assert [(item["id"], item["report_version"]) for item in finished] == [(session["id"], version)]
 
     def requests():
         return {item["id"]: item for item in client.get("/api/v1/citizens/me/diagnostic-tests", headers=owner).json()["tests"]}
@@ -131,6 +136,35 @@ def test_cross_facility_pdf_is_private_and_fulfills_only_matching_requests(clien
     assert client.post(lab_path + "/withdraw", headers=lab_auth, json={"version": revision}).status_code == 200
     assert client.get(pdf_path, headers=owner).status_code == 404
     assert requests()[unrelated["id"]]["status"] == "REQUESTED"
+    finished = client.get(LAB, headers=lab_auth, params={"finished": True}).json()
+    assert [(item["id"], item["report_version"]) for item in finished] == [(session["id"], None)]
+
+
+def test_lab_history_filters_before_paginating(client, db_session, test_settings):
+    facility = _facility(db_session)
+    technician, lab = _registration(db_session, facility, ProfessionalRoleCode.LAB_TECHNICIAN)
+    other_technician, other_lab = _registration(db_session, facility, ProfessionalRoleCode.LAB_TECHNICIAN)
+    _, patient = _citizen(db_session, "Patient")
+    now = datetime.now(UTC)
+    active = LabSession(citizen_id=patient.id, technician_id=lab.id, facility_id=facility.id,
+                        catalog_code="CBC", status="PERFORMED", created_at=now - timedelta(days=1))
+    history = [
+        LabSession(citizen_id=patient.id, technician_id=lab.id, facility_id=facility.id,
+                   catalog_code="CBC", status="PUBLISHED", created_at=now - timedelta(minutes=21 - offset))
+        for offset in range(21)
+    ]
+    db_session.add_all([active, *history])
+    db_session.commit()
+
+    lab_auth = headers(db_session, test_settings, technician, Portal.PROFESSIONAL, lab)
+    other_auth = headers(db_session, test_settings, other_technician, Portal.PROFESSIONAL, other_lab)
+    unfinished = client.get(LAB, headers=lab_auth, params={"finished": False}).json()
+    assert [item["id"] for item in unfinished] == [str(active.id)]
+    first = client.get(LAB, headers=lab_auth, params={"finished": True}).json()
+    assert [item["id"] for item in first] == [str(item.id) for item in reversed(history)]
+    second = client.get(LAB, headers=lab_auth, params={"finished": True, "page": 2}).json()
+    assert [item["id"] for item in second] == [str(history[0].id)]
+    assert client.get(LAB, headers=other_auth, params={"finished": True}).json() == []
 
 
 def test_expiry_and_authorized_facility_recovery_require_fresh_sessions(client, db_session, test_settings):
